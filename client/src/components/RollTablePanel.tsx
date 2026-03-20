@@ -365,7 +365,10 @@ export function RollTablePanel() {
     const onMove = (e: MouseEvent) => {
       setRollTablePanelPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
     };
-    const onUp = () => setIsDragging(false);
+    const onUp = () => {
+      document.body.style.userSelect = '';
+      setIsDragging(false);
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
     return () => {
@@ -382,7 +385,10 @@ export function RollTablePanel() {
         height: Math.max(280, e.clientY - rollTablePanelPosition.y),
       });
     };
-    const onUp = () => setIsResizing(false);
+    const onUp = () => {
+      document.body.style.userSelect = '';
+      setIsResizing(false);
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
     return () => {
@@ -398,7 +404,10 @@ export function RollTablePanel() {
       const maxSidebar = Math.max(180, rollTablePanelSize.width - 340);
       setSidebarWidth(Math.max(170, Math.min(maxSidebar, raw)));
     };
-    const onUp = () => setIsResizingSidebar(false);
+    const onUp = () => {
+      document.body.style.userSelect = '';
+      setIsResizingSidebar(false);
+    };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
     return () => {
@@ -965,6 +974,10 @@ export function RollTablePanel() {
         className={`macros-panel-header rolltables-panel-header ${isGM ? 'is-draggable' : ''}`}
         onMouseDown={(e) => {
           if (!isGM) return;
+          // Prevent text selection during drag
+          e.preventDefault();
+          document.body.style.userSelect = 'none';
+          
           setIsDragging(true);
           setDragOffset({ x: e.clientX - rollTablePanelPosition.x, y: e.clientY - rollTablePanelPosition.y });
         }}
@@ -1039,6 +1052,10 @@ export function RollTablePanel() {
           onMouseDown={(e) => {
             if (!isGM) return;
             e.stopPropagation();
+            // Prevent text selection during resize
+            e.preventDefault();
+            document.body.style.userSelect = 'none';
+            
             setIsResizingSidebar(true);
           }}
           style={{ cursor: isGM ? 'col-resize' : 'default' }}
@@ -1191,6 +1208,10 @@ export function RollTablePanel() {
         onMouseDown={(e) => {
           if (!isGM) return;
           e.stopPropagation();
+          // Prevent text selection during resize
+          e.preventDefault();
+          document.body.style.userSelect = 'none';
+          
           setIsResizing(true);
         }}
       />

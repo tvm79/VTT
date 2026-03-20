@@ -1,16 +1,22 @@
 import type { CSSProperties } from 'react';
 import { Icon } from './Icon';
+import { FilterPanel, type FilterState } from './FilterPanel';
 
 interface CompendiumProps {
   activeTab: 'compendium' | 'modules' | 'import' | 'journals' | 'characters';
   activeBrowseTab: string;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
-  fetchItemsByType: (type: string) => void;
+  fetchItemsByType: (type: string, filters?: any) => void;
   loadingTypeItems: boolean;
   cardSizeScale: number;
   setCardSizeScale: (value: number) => void;
   setActiveBrowseTab: (value: string) => void;
+  showFilters?: boolean;
+  setShowFilters?: (value: boolean) => void;
+  filters?: any;
+  setFilters?: (filters: any) => void;
+  activeFilterCount?: number;
   modules: any[];
   sessionModules: any[];
   isGM: boolean;
@@ -24,8 +30,9 @@ interface CompendiumProps {
   duplicateItem: (item: any) => void;
   deleteItem: (item: any) => void;
   autoResolveBestImageForItem: (item: any) => void;
-  getItemCardVisual: (type?: string, crValue?: unknown) => { icon: string; accent: string };
+  getItemCardVisual: (type?: string, crValue?: unknown, schoolValue?: unknown) => { icon: string; accent: string; schoolIcon?: string };
   extractMonsterChallengeRating: (item: any) => unknown;
+  extractSpellSchool: (item: any) => unknown;
   getEntryDisplayImage: (item: any, preferToken?: boolean) => string;
   selectedItem: any;
   setSelectedItem: (item: any | null) => void;
@@ -103,6 +110,7 @@ export function Compendium({
   autoResolveBestImageForItem,
   getItemCardVisual,
   extractMonsterChallengeRating,
+  extractSpellSchool,
   getEntryDisplayImage,
   selectedItem,
   setSelectedItem,
@@ -147,7 +155,16 @@ export function Compendium({
   imageBackfillResult,
   runImageBackfill,
   imageFetcherConfig,
+  showFilters,
+  setShowFilters,
+  filters,
+  setFilters,
+  activeFilterCount,
 }: CompendiumProps) {
+  // Show filter button only for spell and monster tabs
+  const showFilterButton = activeBrowseTab === 'spell' || activeBrowseTab === 'monster';
+  const filterCount = activeFilterCount || 0;
+  
   return (
     <>
       {activeTab === 'compendium' && (
@@ -182,6 +199,16 @@ export function Compendium({
             <button className="btn-search" onClick={() => fetchItemsByType(activeBrowseTab)} disabled={loadingTypeItems}>
               <Icon name="search" />
             </button>
+            {showFilterButton && (
+              <button 
+                className={`btn-filters ${showFilters ? 'active' : ''}`}
+                onClick={() => setShowFilters?.(!showFilters)}
+                title="Filter"
+              >
+                <Icon name="filter" />
+                {filterCount > 0 && <span className="filter-badge">{filterCount}</span>}
+              </button>
+            )}
           </div>
         </>
       )}
@@ -201,6 +228,23 @@ export function Compendium({
             />
             <span className="slider-value">{Math.round(cardSizeScale * 100)}%</span>
           </div>
+
+          {/* Wrapper for filter sidebar and items grid */}
+          <div className={(activeBrowseTab === 'spell' || activeBrowseTab === 'monster') ? "compendium-with-sidebar" : ""}>
+            {(activeBrowseTab === 'spell' || activeBrowseTab === 'monster') && (
+              <div className="filter-sidebar">
+                <FilterPanel
+                  type={activeBrowseTab as 'spell' | 'monster'}
+                  filters={filters || {}}
+                  onFiltersChange={(newFilters) => {
+                    setShowFilters?.(true);
+                    setFilters?.(newFilters);
+                    fetchItemsByType(activeBrowseTab, newFilters);
+                  }}
+                  onClose={() => {}}
+                />
+              </div>
+            )}
 
           <div className="items-grid" style={{ '--card-size-scale': cardSizeScale } as CSSProperties}>
             {activeTab === 'modules' ? (
@@ -268,7 +312,7 @@ export function Compendium({
                   <div className="loading">Loading...</div>
                 ) : typeItems.length > 0 ? (
                   typeItems.map((item: any) => {
-                    const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item));
+                    const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item));
                     const cardStyle = {
                       cursor: 'grab',
                       '--card-accent': visual.accent,
@@ -278,6 +322,7 @@ export function Compendium({
                       <div
                         key={item.id}
                         className={`item-card ${floatingPanels.some((panel) => panel.item.id === item.id) ? 'selected' : ''}`}
+                        data-type={String(item.type || '').toLowerCase()}
                         onClick={() => {
                           setSelectedItem(item);
                           openItemPanel(item);
@@ -294,7 +339,7 @@ export function Compendium({
                         <div className="card-art">
                           <img
                             className="card-art-image"
-                            src={getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
+                            src={visual.schoolIcon && String(item?.type || '').toLowerCase().includes('spell') ? visual.schoolIcon : getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
                             alt={item?.name || 'Compendium entry image'}
                             loading="lazy"
                           />
@@ -308,7 +353,7 @@ export function Compendium({
                         </div>
                         <img
                           className="card-bg-image"
-                          src={getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
+                          src={visual.schoolIcon && String(item?.type || '').toLowerCase().includes('spell') ? visual.schoolIcon : getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
                           alt=""
                         />
                         <div className="card-header">
@@ -366,6 +411,7 @@ export function Compendium({
               </>
             )}
           </div>
+          </div>{/* end compendium-with-sidebar */}
 
         </div>
       )}

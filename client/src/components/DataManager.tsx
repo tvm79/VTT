@@ -7,9 +7,11 @@ import { Characters } from './Characters';
 import { Journals } from './Journals';
 import { FloatingPanelsLayer } from './FloatingPanelsLayer';
 import { RollableText } from './RollableText';
+import { FilterPanel, type FilterState } from './FilterPanel';
 import { useGameStore, type ActiveSheet } from '../store/gameStore';
 import { normalizeEntry, inferType } from '../dataNormalizer';
 import { extractMonsterChallengeRating, getChallengeRatingColor } from '../utils/challengeRatingColors';
+import { getSpellSchoolColor, getSpellSchoolIcon, extractSpellSchool } from '../utils/spellSchoolColors';
 import { getEditorAutocompleteSuggestions, getEditorSelectOptions } from './dataManagerEditorOptions';
 import {
   getArrayEntryPreviewLabel,
@@ -101,10 +103,13 @@ interface ImageFetcherResolveResponse {
   bestCandidate?: ImageFetcherCandidate | null;
 }
 
-function getItemCardVisual(type?: string, crValue?: unknown): { icon: string; accent: string } {
+function getItemCardVisual(type?: string, crValue?: unknown, schoolValue?: unknown): { icon: string; accent: string; schoolIcon?: string } {
   const normalized = (type || '').toLowerCase();
 
-  if (normalized.includes('spell')) return { icon: 'scroll', accent: '#8b5cf6' };
+  if (normalized.includes('spell')) {
+    const schoolIcon = getSpellSchoolIcon(schoolValue);
+    return { icon: 'scroll', accent: getSpellSchoolColor(schoolValue, '#8b5cf6'), schoolIcon: schoolIcon || undefined };
+  }
   if (normalized.includes('monster') || normalized.includes('creature')) {
     return { icon: 'skull', accent: getChallengeRatingColor(crValue, '#f97316') };
   }
@@ -1183,6 +1188,10 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [activeBrowseTab, setActiveBrowseTab] = useState<string>('spell');
   
+  // Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({});
+  
   // Available files state
   const [availableFiles, setAvailableFiles] = useState<AvailableFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<AvailableFile | null>(null);
@@ -1275,6 +1284,10 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
   const handleResizeStart = (e: React.MouseEvent) => {
     if (!isGM) return;
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
   };
 
@@ -1450,6 +1463,9 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
+      console.log('[PanelDrag] Ended dragging panel');
       setDraggingPanel(null);
     };
 
@@ -1995,13 +2011,33 @@ interface OpenPanel {
     );
   };
 
-  const fetchItemsByType = async (type: string) => {
+  const fetchItemsByType = async (type: string, filterState?: FilterState) => {
     if (!session) return;
     setLoadingTypeItems(true);
     try {
       const params = new URLSearchParams();
       if (searchQuery) params.append('q', searchQuery);
       params.append('limit', '100');
+      
+      // Add filter parameters
+      const activeFilters = filterState || filters;
+      if (activeFilters.level) params.append('level', activeFilters.level);
+      if (activeFilters.school) params.append('school', activeFilters.school);
+      if (activeFilters.sourceClass) params.append('sourceClass', activeFilters.sourceClass);
+      if (activeFilters.concentration) params.append('concentration', String(activeFilters.concentration));
+      if (activeFilters.ritual) params.append('ritual', String(activeFilters.ritual));
+      if (activeFilters.verbal) params.append('verbal', String(activeFilters.verbal));
+      if (activeFilters.somatic) params.append('somatic', String(activeFilters.somatic));
+      if (activeFilters.material) params.append('material', String(activeFilters.material));
+      if (activeFilters.source) params.append('source', activeFilters.source);
+      if (activeFilters.crMin) params.append('crMin', activeFilters.crMin);
+      if (activeFilters.crMax) params.append('crMax', activeFilters.crMax);
+      if (activeFilters.creatureType) params.append('creatureType', activeFilters.creatureType);
+      if (activeFilters.size) params.append('size', activeFilters.size);
+      if (activeFilters.speedFly) params.append('speedFly', String(activeFilters.speedFly));
+      if (activeFilters.speedSwim) params.append('speedSwim', String(activeFilters.speedSwim));
+      if (activeFilters.speedBurrow) params.append('speedBurrow', String(activeFilters.speedBurrow));
+      if (activeFilters.speedClimb) params.append('speedClimb', String(activeFilters.speedClimb));
       
       // Use new compendium API for normalized structure
       const res = await fetch(`/api/data/compendium/${type}?${params}`);
@@ -2732,11 +2768,19 @@ interface OpenPanel {
   const handlePanelDragStart = (e: React.MouseEvent, panelId: string) => {
     const panel = floatingPanels.find(p => p.id === panelId);
     if (!panel) return;
+    
+    // Prevent text selection during drag - this fixes the bug where dragging 
+    // a panel across the canvas would select text elements in the drag path
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setDraggingPanel(panelId);
     setDragOffset({
       x: e.clientX - panel.position.x,
       y: e.clientY - panel.position.y,
     });
+    
+    console.log('[PanelDrag] Started dragging panel:', panelId);
   };
 
   const _handleCreateModule = async () => {
@@ -4498,7 +4542,7 @@ interface OpenPanel {
     (() => {
       panelForTypedView = panel;
       const layoutType = getPanelLayoutType(String(panel.item.type || ''));
-      const visual = getItemCardVisual(String(panel.item.type || ''), extractMonsterChallengeRating(panel.item));
+      const visual = getItemCardVisual(String(panel.item.type || ''), extractMonsterChallengeRating(panel.item), extractSpellSchool(panel.item));
 
       return (
         <div
@@ -4802,6 +4846,8 @@ interface OpenPanel {
           activeBrowseTab={activeBrowseTab}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          filters={filters}
+          setFilters={setFilters}
           fetchItemsByType={fetchItemsByType}
           loadingTypeItems={loadingTypeItems}
           cardSizeScale={cardSizeScale}
@@ -4822,6 +4868,7 @@ interface OpenPanel {
           autoResolveBestImageForItem={autoResolveBestImageForItem}
           getItemCardVisual={getItemCardVisual}
           extractMonsterChallengeRating={extractMonsterChallengeRating}
+          extractSpellSchool={extractSpellSchool}
           getEntryDisplayImage={getEntryDisplayImage}
           selectedItem={selectedItem}
           setSelectedItem={setSelectedItem}
@@ -4866,6 +4913,9 @@ interface OpenPanel {
           imageBackfillResult={imageBackfillResult}
           runImageBackfill={runImageBackfill}
           imageFetcherConfig={imageFetcherConfig}
+          showFilters={showFilters}
+          setShowFilters={setShowFilters}
+          activeFilterCount={Object.keys(filters).length}
         />
 
         {activeTab === 'journals' && (

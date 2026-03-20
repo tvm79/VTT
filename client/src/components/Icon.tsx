@@ -95,6 +95,7 @@ import {
   faBeer,             // 🍺 (tavern)
   faMountain,
   faDiceFour,
+  faFilter,
   faDiceSix,         // ⛰️ (mountain/cave)
   faRandom,           // 🔀 (shuffle)
   faRepeat,           // 🔁 (repeat)
@@ -185,6 +186,7 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'times-circle': faTimesCircle,
   'eye': faEye,
   'cube': faCube,
+  'filter': faFilter,
   'pen': faPen,
   'edit': faPen,
   'heart': faHeart,

@@ -85,6 +85,10 @@ export function PlayerListPanel() {
 
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent) => {
+    // Prevent text selection during drag
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - playerListPanelPosition.x,
@@ -104,6 +108,8 @@ export function PlayerListPanel() {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
       setIsDragging(false);
     };
 
@@ -123,6 +129,10 @@ export function PlayerListPanel() {
   // Handle resize start
   const handleResizeStart = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
     setResizeStart({
       x: e.clientX,

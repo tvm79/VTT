@@ -99,6 +99,10 @@ export function SceneManager() {
     if ((e.target as HTMLElement).closest('.panel-header-buttons')) return;
     if ((e.target as HTMLElement).closest('.scene-actions')) return;
     
+    // Prevent text selection during drag
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - sceneManagerPosition.x,
@@ -109,6 +113,10 @@ export function SceneManager() {
   // Handle resizing
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
     setResizeStart({
       x: e.clientX,
@@ -134,6 +142,8 @@ export function SceneManager() {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag/resize ends
+      document.body.style.userSelect = '';
       setIsDragging(false);
       setIsResizing(false);
     };

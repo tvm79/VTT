@@ -62,17 +62,17 @@ export function ParticleEmitterIconsOverlay({
 
   // Simpler approach: Just refresh icons after a short delay to ensure PIXI is ready
   useEffect(() => {
-    console.log('[ParticleEmitterIconsOverlay] Init effect running');
+    //console.log('[ParticleEmitterIconsOverlay] Init effect running');
     
     // Immediate trigger to refresh icons once PIXI is ready
     const refreshTimer = setTimeout(() => {
-      console.log('[ParticleEmitterIconsOverlay] Immediate refresh trigger');
+      //console.log('[ParticleEmitterIconsOverlay] Immediate refresh trigger');
       setFontLoaded(true);
     }, 100);
     
     // Fallback: Force refresh icons after 5 seconds
     const fallbackTimer = setTimeout(() => {
-      console.log('[ParticleEmitterIconsOverlay] Fallback trigger - refreshing icons after 5s delay');
+      //console.log('[ParticleEmitterIconsOverlay] Fallback trigger - refreshing icons after 5s delay');
       setFontLoaded(true);
     }, 5000);
     
@@ -168,7 +168,7 @@ export function ParticleEmitterIconsOverlay({
 
     // Force recreate icons when fontLoaded changes from false to true
     if (fontLoaded) {
-      console.log('[ParticleEmitterIconsOverlay] Force recreating icons due to fontLoaded');
+      //console.log('[ParticleEmitterIconsOverlay] Force recreating icons due to fontLoaded');
       // Remove existing icons and recreate them
       iconsRef.current.forEach((icon) => {
         icon.parent?.removeChild(icon);
@@ -195,13 +195,13 @@ export function ParticleEmitterIconsOverlay({
   }, [emitters, isVisible, getLayer, createIcon, updateIconVisual, presets, fontLoaded]);
 
   useEffect(() => {
-    console.log('[ParticleEmitterIconsOverlay] Second useEffect running, fontLoaded:', fontLoaded);
+    //console.log('[ParticleEmitterIconsOverlay] Second useEffect running, fontLoaded:', fontLoaded);
     const layer = getLayer();
     if (!layer) {
       console.log('[ParticleEmitterIconsOverlay] No layer, skipping');
       return;
     }
-    console.log('[ParticleEmitterIconsOverlay] Clearing and recreating all icons');
+    //console.log('[ParticleEmitterIconsOverlay] Clearing and recreating all icons');
     for (const icon of iconsRef.current.values()) {
       icon.parent?.removeChild(icon);
       icon.destroy({ children: true });

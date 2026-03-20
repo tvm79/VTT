@@ -122,6 +122,10 @@ export function MacrosPanel() {
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent) => {
     if (!isGM) return;
+    // Prevent text selection during drag
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - macrosPanelPosition.x,
@@ -141,6 +145,8 @@ export function MacrosPanel() {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
       setIsDragging(false);
     };
 
@@ -157,6 +163,10 @@ export function MacrosPanel() {
   const handleResizeStart = (e: React.MouseEvent) => {
     if (!isGM) return;
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
   };
 

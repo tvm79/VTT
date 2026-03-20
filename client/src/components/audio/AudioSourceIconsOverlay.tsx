@@ -69,17 +69,17 @@ export function AudioSourceIconsOverlay({
 
   // Simpler approach: Just refresh icons after a short delay to ensure PIXI is ready
   useEffect(() => {
-    console.log('[AudioSourceIconsOverlay] Init effect running');
+    //console.log('[AudioSourceIconsOverlay] Init effect running');
     
     // Immediate trigger to refresh icons once PIXI is ready
     const refreshTimer = setTimeout(() => {
-      console.log('[AudioSourceIconsOverlay] Immediate refresh trigger');
+      //console.log('[AudioSourceIconsOverlay] Immediate refresh trigger');
       setFontLoaded(true);
     }, 100);
     
     // Fallback: Force refresh icons after 5 seconds
     const fallbackTimer = setTimeout(() => {
-      console.log('[AudioSourceIconsOverlay] Fallback trigger - refreshing icons after 5s delay');
+      //console.log('[AudioSourceIconsOverlay] Fallback trigger - refreshing icons after 5s delay');
       setFontLoaded(true);
     }, 5000);
     
@@ -296,7 +296,7 @@ export function AudioSourceIconsOverlay({
 
   // Update icon positions
   useEffect(() => {
-    console.log('[AudioSourceIconsOverlay] Sync useEffect running, fontLoaded:', fontLoaded);
+    //console.log('[AudioSourceIconsOverlay] Sync useEffect running, fontLoaded:', fontLoaded);
     
     // Get the layer
     const layer = getAudioIconsLayer();
@@ -318,7 +318,7 @@ export function AudioSourceIconsOverlay({
 
     // Recreate icons when fontLoaded changes - runs AFTER visibility check
     if (fontLoaded) {
-      console.log('[AudioSourceIconsOverlay] Recreating all icons due to fontLoaded');
+      //console.log('[AudioSourceIconsOverlay] Recreating all icons due to fontLoaded');
       iconsRef.current.forEach((icon) => {
         layer.removeChild(icon);
         icon.destroy({ children: true });

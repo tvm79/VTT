@@ -214,6 +214,10 @@ export function AudioPanel() {
       return;
     }
 
+    // Prevent text selection during drag
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - audioPanelPosition.x,
@@ -232,6 +236,8 @@ export function AudioPanel() {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
       setIsDragging(false);
     };
 
@@ -248,6 +254,10 @@ export function AudioPanel() {
   const handleResizeStart = (e: React.MouseEvent) => {
     if (!isGM) return;
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
   };
 

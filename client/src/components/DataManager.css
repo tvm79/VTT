@@ -17,6 +17,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 900px;
+  min-width: 900px;
   background: var(--bg-primary);
   color: var(--text-primary);
   overflow: hidden;
@@ -372,6 +374,246 @@
 .search-section .btn-search:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Filter Button */
+.search-section .btn-filters {
+  padding: 10px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.search-section .btn-filters:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.search-section .btn-filters.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.search-section .filter-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+/* Compendium with sidebar wrapper */
+.compendium-with-sidebar {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Compendium takes remaining space when sidebar is present */
+.compendium-with-sidebar > *:not(.filter-sidebar) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Filter Sidebar - always visible on left */
+.filter-sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.filter-sidebar .filter-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-sidebar .filter-section {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.filter-sidebar .filter-actions {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+/* Old filter panel overlay styles - now unused */
+.filter-panel-overlay {
+  display: none;
+}
+
+.filter-panel {
+  padding: 16px;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.filter-header .filter-count {
+  color: var(--accent);
+  font-weight: normal;
+}
+
+.filter-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.filter-close:hover {
+  color: var(--text-primary);
+}
+
+.filter-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+}
+
+.filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.filter-group select {
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filter-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-range select {
+  flex: 1;
+}
+
+.filter-range span {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.filter-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.filter-checkbox input {
+  accent-color: var(--accent);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.filter-clear {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.filter-clear:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.filter-apply {
+  flex: 1;
+  padding: 10px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.filter-apply:hover {
+  filter: brightness(1.1);
 }
 
 .results {
@@ -739,6 +981,7 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  min-width: 0;
 }
 
 /* Card Size Slider */
@@ -827,6 +1070,8 @@
   min-height: 180px;
 }
 
+
+
 .compendium-view .item-card:hover {
   border-color: color-mix(in srgb, var(--card-accent) 62%, white 8%);
   transform: translateY(-4px);
@@ -904,8 +1149,8 @@
 /* Card overlay elements - positioned within card-art */
 .compendium-view .card-type-overlay {
   position: absolute;
-  top: calc(6px * var(--card-size-scale, 1));
-  right: calc(6px * var(--card-size-scale, 1));
+  top: calc(1px * var(--card-size-scale, 1));
+  right: calc(4px * var(--card-size-scale, 1));
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -921,9 +1166,30 @@
   backdrop-filter: blur(4px);
 }
 
+.compendium-view .card-school-icon-overlay {
+  position: absolute;
+  bottom: calc(6px * var(--card-size-scale, 1));
+  right: calc(6px * var(--card-size-scale, 1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(36px * var(--card-size-scale, 1));
+  height: calc(36px * var(--card-size-scale, 1));
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+.compendium-view .card-school-icon-overlay img {
+  width: calc(24px * var(--card-size-scale, 1));
+  height: calc(24px * var(--card-size-scale, 1));
+  object-fit: contain;
+}
+
 .compendium-view .card-name-overlay {
   position: absolute;
-  top: 50%;
+  top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
   font-weight: 700;

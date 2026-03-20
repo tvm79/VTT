@@ -66,6 +66,10 @@ function generateDiceIconCSS(): string {
 
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent) => {
+    // Prevent text selection during drag
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - diceRollerPosition.x,
@@ -85,6 +89,8 @@ function generateDiceIconCSS(): string {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
       setIsDragging(false);
     };
 
@@ -100,6 +106,10 @@ function generateDiceIconCSS(): string {
   // Handle resize start
   const handleResizeStart = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
   };
 

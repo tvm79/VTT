@@ -73,19 +73,19 @@ export function LightIconsOverlay({
     
     // First refresh after 500ms
     const timer1 = setTimeout(() => {
-      console.log('[LightIconsOverlay] First refresh trigger (500ms)');
+      //console.log('[LightIconsOverlay] First refresh trigger (500ms)');
       setFontLoaded(true);
     }, 500);
     
     // Second refresh after 2 seconds
     const timer2 = setTimeout(() => {
-      console.log('[LightIconsOverlay] Second refresh trigger (2s)');
+      //console.log('[LightIconsOverlay] Second refresh trigger (2s)');
       setFontLoaded(prev => prev); // Trigger re-render
     }, 2000);
     
     // Final fallback after 5 seconds
     const timer3 = setTimeout(() => {
-      console.log('[LightIconsOverlay] Final fallback trigger (5s)');
+      //console.log('[LightIconsOverlay] Final fallback trigger (5s)');
       setFontLoaded(prev => prev); // Trigger re-render
     }, 5000);
     
@@ -356,7 +356,7 @@ export function LightIconsOverlay({
 
     // Recreate icons when fontLoaded changes - runs AFTER visibility check
     if (fontLoaded) {
-      console.log('[LightIconsOverlay] Recreating all icons due to fontLoaded');
+      //console.log('[LightIconsOverlay] Recreating all icons due to fontLoaded');
       iconsRef.current.forEach((icon) => {
         layer.removeChild(icon);
         icon.destroy();
@@ -389,7 +389,7 @@ export function LightIconsOverlay({
     // Always recreate icons when fontLoaded changes to fix placeholder issue
     const shouldRecreateIcons = fontLoaded;
     if (shouldRecreateIcons) {
-      console.log('[LightIconsOverlay] Recreating all icons due to fontLoaded');
+      //console.log('[LightIconsOverlay] Recreating all icons due to fontLoaded');
       // Clear all existing icons and recreate them
       iconsRef.current.forEach((icon) => {
         layer.removeChild(icon);

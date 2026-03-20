@@ -108,7 +108,11 @@ export function CombatTracker() {
       });
     };
 
-    const onMouseUp = () => setIsDraggingOverlay(false);
+    const onMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
+      setIsDraggingOverlay(false);
+    };
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -155,7 +159,11 @@ export function CombatTracker() {
       });
     };
 
-    const onMouseUp = () => setIsDraggingPanel(false);
+    const onMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
+      setIsDraggingPanel(false);
+    };
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -230,6 +238,10 @@ export function CombatTracker() {
         onMouseDown={(event) => {
           // Only start dragging if not clicking on resize handle
           if ((event.target as HTMLElement).closest('.combat-cards-resize-handle')) return;
+          // Prevent text selection during drag
+          event.preventDefault();
+          document.body.style.userSelect = 'none';
+          
           setIsDraggingOverlay(true);
           setDragStart({
             x: event.clientX - overlayOffset.x,
@@ -355,6 +367,10 @@ export function CombatTracker() {
     onMouseDown={(event) => {
       const target = event.target as HTMLElement;
       if (target.closest('button, input, select, textarea, a')) return;
+      // Prevent text selection during drag
+      event.preventDefault();
+      document.body.style.userSelect = 'none';
+      
       setIsDraggingPanel(true);
       setPanelDragStart({
         x: event.clientX - panelOffset.x,

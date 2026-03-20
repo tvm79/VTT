@@ -1,0 +1,397 @@
+import { useState, useEffect } from 'react';
+
+export interface FilterState {
+  // Spell filters
+  level?: string;
+  school?: string;
+  sourceClass?: string;
+  concentration?: boolean;
+  ritual?: boolean;
+  verbal?: boolean;
+  somatic?: boolean;
+  material?: boolean;
+  source?: string;
+  
+  // Monster filters
+  crMin?: string;
+  crMax?: string;
+  creatureType?: string;
+  size?: string;
+  speedFly?: boolean;
+  speedSwim?: boolean;
+  speedBurrow?: boolean;
+  speedClimb?: boolean;
+}
+
+export interface FilterOptions {
+  schools?: { value: string; label: string }[];
+  classes?: { value: string; label: string }[];
+  sources?: { value: string; label: string }[];
+  levels?: { value: string; label: string }[];
+  creatureTypes?: { value: string; label: string }[];
+  sizes?: { value: string; label: string }[];
+  challengeRatings?: { value: string; label: string }[];
+}
+
+interface FilterPanelProps {
+  type: 'spell' | 'monster';
+  filters: FilterState;
+  onFiltersChange: (filters: FilterState) => void;
+  onClose: () => void;
+}
+
+export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterPanelProps) {
+  const [options, setOptions] = useState<FilterOptions>({});
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    // Fetch filter options
+    async function fetchOptions() {
+      try {
+        const res = await fetch(`/api/data/compendium/filters/${type}`);
+        const data = await res.json();
+        setOptions(data);
+      } catch (error) {
+        console.error('Failed to fetch filter options:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchOptions();
+  }, [type]);
+  
+  const updateFilter = (key: keyof FilterState, value: any) => {
+    const newFilters = { ...filters };
+    if (value === '' || value === undefined || value === null) {
+      delete newFilters[key];
+    } else {
+      (newFilters as any)[key] = value;
+    }
+    onFiltersChange(newFilters);
+  };
+  
+  const clearFilters = () => {
+    onFiltersChange({});
+  };
+  
+  const activeFilterCount = Object.keys(filters).length;
+  
+  const renderSpellFilters = () => (
+    <div className="filter-section">
+      {/* Level Filter */}
+      <div className="filter-group">
+        <label>Level</label>
+        <select
+          value={filters.level || ''}
+          onChange={(e) => updateFilter('level', e.target.value)}
+        >
+          <option value="">All Levels</option>
+          {options.levels?.map((l) => (
+            <option key={l.value} value={l.value}>{l.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* School Filter */}
+      <div className="filter-group">
+        <label>School</label>
+        <select
+          value={filters.school || ''}
+          onChange={(e) => updateFilter('school', e.target.value)}
+        >
+          <option value="">All Schools</option>
+          {options.schools?.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Class Filter */}
+      <div className="filter-group">
+        <label>Class</label>
+        <select
+          value={filters.sourceClass || ''}
+          onChange={(e) => updateFilter('sourceClass', e.target.value)}
+        >
+          <option value="">All Classes</option>
+          {options.classes?.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Source Filter */}
+      <div className="filter-group">
+        <label>Source</label>
+        <select
+          value={filters.source || ''}
+          onChange={(e) => updateFilter('source', e.target.value)}
+        >
+          <option value="">All Sources</option>
+          {options.sources?.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Properties */}
+      <div className="filter-group">
+        <label>Properties</label>
+        <div className="filter-checkboxes">
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.concentration || false}
+              onChange={(e) => updateFilter('concentration', e.target.checked ? 'true' : undefined)}
+            />
+            Concentration
+          </label>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.ritual || false}
+              onChange={(e) => updateFilter('ritual', e.target.checked ? 'true' : undefined)}
+            />
+            Ritual
+          </label>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.verbal || false}
+              onChange={(e) => updateFilter('verbal', e.target.checked ? 'true' : undefined)}
+            />
+            Verbal (V)
+          </label>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.somatic || false}
+              onChange={(e) => updateFilter('somatic', e.target.checked ? 'true' : undefined)}
+            />
+            Somatic (S)
+          </label>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.material || false}
+              onChange={(e) => updateFilter('material', e.target.checked ? 'true' : undefined)}
+            />
+            Material (M)
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+  
+  const renderMonsterFilters = () => (
+    <div className="filter-section">
+      {/* Challenge Rating Range */}
+      <div className="filter-group">
+        <label>Challenge Rating</label>
+        <div className="filter-range">
+          <select
+            value={filters.crMin || ''}
+            onChange={(e) => updateFilter('crMin', e.target.value)}
+          >
+            <option value="">Min CR</option>
+            {options.challengeRatings?.map((cr) => (
+              <option key={cr.value} value={cr.value}>{cr.label}</option>
+            ))}
+          </select>
+          <span>to</span>
+          <select
+            value={filters.crMax || ''}
+            onChange={(e) => updateFilter('crMax', e.target.value)}
+          >
+            <option value="">Max CR</option>
+            {options.challengeRatings?.map((cr) => (
+              <option key={cr.value} value={cr.value}>{cr.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      
+      {/* Creature Type Filter */}
+      <div className="filter-group">
+        <label>Type</label>
+        <select
+          value={filters.creatureType || ''}
+          onChange={(e) => updateFilter('creatureType', e.target.value)}
+        >
+          <option value="">All Types</option>
+          {options.creatureTypes?.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Size Filter */}
+      <div className="filter-group">
+        <label>Size</label>
+        <select
+          value={filters.size || ''}
+          onChange={(e) => updateFilter('size', e.target.value)}
+        >
+          <option value="">All Sizes</option>
+          {options.sizes?.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Source Filter */}
+      <div className="filter-group">
+        <label>Source</label>
+        <select
+          value={filters.source || ''}
+          onChange={(e) => updateFilter('source', e.target.value)}
+        >
+          <option value="">All Sources</option>
+          {options.sources?.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Movement Filters */}
+      <div className="filter-group">
+        <label>Movement</label>
+        <div className="filter-checkboxes">
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.speedFly || false}
+              onChange={(e) => updateFilter('speedFly', e.target.checked ? 'true' : undefined)}
+            />
+            Flying
+          </label>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.speedSwim || false}
+              onChange={(e) => updateFilter('speedSwim', e.target.checked ? 'true' : undefined)}
+            />
+            Swimming
+          </label>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.speedBurrow || false}
+              onChange={(e) => updateFilter('speedBurrow', e.target.checked ? 'true' : undefined)}
+            />
+            Burrowing
+          </label>
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.speedClimb || false}
+              onChange={(e) => updateFilter('speedClimb', e.target.checked ? 'true' : undefined)}
+            />
+            Climbing
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+  
+  return (
+    <div className="filter-panel">
+      <div className="filter-header">
+        <h3>Filters {activeFilterCount > 0 && <span className="filter-count">({activeFilterCount})</span>}</h3>
+        <button className="filter-close" onClick={onClose}>×</button>
+      </div>
+      
+      {loading ? (
+        <div className="filter-loading">Loading options...</div>
+      ) : (
+        <>
+          {type === 'spell' ? renderSpellFilters() : renderMonsterFilters()}
+        </>
+      )}
+      
+      <div className="filter-actions">
+        <button className="filter-clear" onClick={clearFilters}>
+          Clear All
+        </button>
+        <button className="filter-apply" onClick={onClose}>
+          Apply
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Active filters display component
+export function ActiveFilters({ 
+  filters, 
+  onRemove, 
+  options 
+}: { 
+  filters: FilterState; 
+  onRemove: (key: keyof FilterState) => void;
+  options: FilterOptions;
+}) {
+  const getFilterLabel = (key: keyof FilterState, value: any): string => {
+    switch (key) {
+      case 'level':
+        return `Level: ${options.levels?.find(l => l.value === value)?.label || value}`;
+      case 'school':
+        return `School: ${value}`;
+      case 'sourceClass':
+        return `Class: ${value}`;
+      case 'source':
+        return `Source: ${value}`;
+      case 'concentration':
+        return 'Concentration';
+      case 'ritual':
+        return 'Ritual';
+      case 'verbal':
+        return 'Verbal (V)';
+      case 'somatic':
+        return 'Somatic (S)';
+      case 'material':
+        return 'Material (M)';
+      case 'crMin':
+        return `CR: ${value}+`;
+      case 'crMax':
+        return `CR: ≤${value}`;
+      case 'creatureType':
+        return `Type: ${value}`;
+      case 'size':
+        return `Size: ${value}`;
+      case 'speedFly':
+        return 'Flying';
+      case 'speedSwim':
+        return 'Swimming';
+      case 'speedBurrow':
+        return 'Burrowing';
+      case 'speedClimb':
+        return 'Climbing';
+      default:
+        return `${key}: ${value}`;
+    }
+  };
+  
+  const filterKeys = Object.keys(filters) as (keyof FilterState)[];
+  
+  if (filterKeys.length === 0) return null;
+  
+  return (
+    <div className="active-filters">
+      {filterKeys.map((key) => {
+        const value = filters[key];
+        if (value === undefined || value === null || value === '') return null;
+        return (
+          <button
+            key={key}
+            className="active-filter-chip"
+            onClick={() => onRemove(key)}
+          >
+            {getFilterLabel(key, value)}
+            <span className="filter-remove">×</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

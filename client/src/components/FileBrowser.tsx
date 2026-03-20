@@ -251,6 +251,10 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
     const target = e.target as HTMLElement;
     if (target.closest('button, input, textarea, audio, .file-browser-resize')) return;
 
+    // Prevent text selection during drag
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+
     setIsDraggingPanel(true);
     setDragOffset({
       x: e.clientX - position.x,
@@ -271,6 +275,8 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag ends
+      document.body.style.userSelect = '';
       setIsDraggingPanel(false);
     };
 
@@ -287,6 +293,10 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
   const handleResizeStart = (e: React.MouseEvent) => {
     if (!isGM) return;
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
   };
 
@@ -301,6 +311,8 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after resize ends
+      document.body.style.userSelect = '';
       setIsResizing(false);
     };
 

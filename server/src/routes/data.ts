@@ -1290,10 +1290,288 @@ router.post('/import/5etools', async (req, res) => {
   }
 });
 
+// Size mapping from abbreviation to full word
+const sizeLabels: Record<string, string> = {
+  t: 'Tiny',
+  tiny: 'Tiny',
+  s: 'Small',
+  small: 'Small',
+  m: 'Medium',
+  medium: 'Medium',
+  l: 'Large',
+  large: 'Large',
+  h: 'Huge',
+  huge: 'Huge',
+  g: 'Gargantuan',
+  gargantuan: 'Gargantuan',
+};
+
+// Helper function to convert CR string to numeric value
+function parseCrValue(cr: string): number {
+  if (!cr) return 0;
+  
+  // Handle fractions like "1/4", "1/2", "1/8"
+  if (cr.includes('/')) {
+    const [num, den] = cr.split('/').map(Number);
+    if (den > 0) return num / den;
+  }
+  
+  // Handle numeric values
+  const parsed = parseFloat(cr);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+// Monster type mapping from abbreviation to full word
+const monsterTypeLabels: Record<string, string> = {
+  a: 'Aberration',
+  aberration: 'Aberration',
+  b: 'Beast',
+  beast: 'Beast',
+  c: 'Construct',
+  construct: 'Construct',
+  d: 'Dragon',
+  dragon: 'Dragon',
+  e: 'Elemental',
+  elemental: 'Elemental',
+  f: 'Fey',
+  fey: 'Fey',
+  g: 'Giant',
+  giant: 'Giant',
+  h: 'Humanoid',
+  humanoid: 'Humanoid',
+  m: 'Monstrosity',
+  monstrosity: 'Monstrosity',
+  o: 'Ooze',
+  ooze: 'Ooze',
+  p: 'Plant',
+  plant: 'Plant',
+  u: 'Undead',
+  undead: 'Undead',
+};
+
+// Spell school mapping from abbreviation to full word
+const schoolLabels: Record<string, string> = {
+  a: 'Abjuration',
+  abjuration: 'Abjuration',
+  c: 'Conjuration',
+  conjuration: 'Conjuration',
+  d: 'Divination',
+  divination: 'Divination',
+  e: 'Enchantment',
+  enchantment: 'Enchantment',
+  v: 'Evocation',
+  ev: 'Evocation',
+  evocation: 'Evocation',
+  i: 'Illusion',
+  illusion: 'Illusion',
+  n: 'Necromancy',
+  necromancy: 'Necromancy',
+  t: 'Transmutation',
+  transmutation: 'Transmutation',
+};
+
+// Reverse lookup maps
+const sizeValueMap: Record<string, string> = {
+  tiny: 't', small: 's', medium: 'm', large: 'l', huge: 'h', gargantuan: 'g',
+  Tiny: 't', Small: 's', Medium: 'm', Large: 'l', Huge: 'h', Gargantuan: 'g',
+};
+
+const monsterTypeValueMap: Record<string, string> = {
+  aberration: 'a', beast: 'b', construct: 'c', dragon: 'd', elemental: 'e',
+  fey: 'f', giant: 'g', humanoid: 'h', monstrosity: 'm', ooze: 'o', plant: 'p', undead: 'u',
+  Aberration: 'a', Beast: 'b', Construct: 'c', Dragon: 'd', Elemental: 'e',
+  Fey: 'f', Giant: 'g', Humanoid: 'h', Monstrosity: 'm', Ooze: 'o', Plant: 'p', Undead: 'u',
+};
+
+const schoolValueMap: Record<string, string> = {
+  abjuration: 'A', conjuration: 'C', divination: 'D', enchantment: 'E', evocation: 'V',
+  illusion: 'I', necromancy: 'N', transmutation: 'T',
+  Abjuration: 'A', Conjuration: 'C', Divination: 'D', Enchantment: 'E', Evocation: 'V',
+  Illusion: 'I', Necromancy: 'N', Transmutation: 'T',
+};
+
+function getSizeLabel(value: string): string {
+  const normalized = String(value).toLowerCase().trim();
+  return sizeLabels[normalized] || value;
+}
+
+function getSizeValue(value: string): string {
+  const normalized = String(value).toLowerCase().trim();
+  // If it's a full word, convert to abbreviation
+  if (sizeValueMap[normalized]) {
+    return sizeValueMap[normalized];
+  }
+  // Otherwise return as-is (it's already an abbreviation)
+  return value;
+}
+
+function getMonsterTypeLabel(value: string): string {
+  const normalized = String(value).toLowerCase().trim();
+  return monsterTypeLabels[normalized] || value;
+}
+
+function getMonsterTypeValue(value: string): string {
+  const normalized = String(value).toLowerCase().trim();
+  // If it's a full word, convert to abbreviation
+  if (monsterTypeValueMap[normalized]) {
+    return monsterTypeValueMap[normalized];
+  }
+  // Otherwise return as-is (it's already an abbreviation)
+  return value;
+}
+
+function getSchoolLabel(value: string): string {
+  const normalized = String(value).toLowerCase().trim();
+  return schoolLabels[normalized] || value;
+}
+
+function getSchoolValue(value: string): string {
+  const normalized = String(value).toLowerCase().trim();
+  // If it's a full word, convert to abbreviation
+  if (schoolValueMap[normalized]) {
+    return schoolValueMap[normalized];
+  }
+  // Otherwise return as-is (it's already an abbreviation)
+  return value;
+}
+
+// Get available filter options for a given type
+router.get('/compendium/filters/:type', async (req, res) => {
+  const { type } = req.params;
+  
+  try {
+    const options: Record<string, { value: string; label: string }[]> = {};
+    
+    if (type === 'spell') {
+      const entries = await prisma.compendiumEntry.findMany({
+        where: { type: 'spell' },
+        select: { raw: true, source: true },
+        take: 5000,
+      });
+      
+      const schoolSet = new Set<string>();
+      const classSet = new Set<string>();
+      const sourceSet = new Set<string>();
+      
+      entries.forEach((entry: any) => {
+        const raw = entry.raw || {};
+        const system = raw.system || raw.data || {};
+        
+        // Get school - could be direct or nested
+        const school = system.school || system.school?.name;
+        if (school) schoolSet.add(school);
+        
+        // Get classes - try multiple possible paths in both raw and system
+        const classPaths = [
+          system.classes, 
+          system.sourceClass, 
+          system.class,
+          raw.classes,
+          raw.sourceClass,
+          raw.class
+        ];
+        
+        for (const classes of classPaths) {
+          if (!classes) continue;
+          if (Array.isArray(classes)) {
+            classes.forEach((c: any) => {
+              const className = typeof c === 'object' ? c.name || c.value || c : c;
+              if (className) classSet.add(className);
+            });
+          } else if (typeof classes === 'object') {
+            Object.keys(classes).forEach((c) => classSet.add(c));
+          } else if (typeof classes === 'string') {
+            classSet.add(classes);
+          }
+        }
+        
+        if (entry.source) sourceSet.add(entry.source);
+      });
+      
+      options.schools = Array.from(schoolSet).sort().map(s => ({ value: getSchoolLabel(s), label: getSchoolLabel(s) }));
+      options.classes = Array.from(classSet).sort().map(s => ({ value: s, label: s }));
+      options.sources = Array.from(sourceSet).sort().map(s => ({ value: s, label: s }));
+      
+      options.levels = Array.from({ length: 10 }, (_, i) => ({
+        value: String(i),
+        label: i === 0 ? 'Cantrip' : `Level ${i}`,
+      }));
+      
+    } else if (type === 'monster') {
+      const entries = await prisma.compendiumEntry.findMany({
+        where: { type: 'monster' },
+        select: { raw: true, source: true },
+        take: 5000,
+      });
+      
+      const typeSet = new Set<string>();
+      const sizeSet = new Set<string>();
+      const sourceSet = new Set<string>();
+      
+      entries.forEach((entry: any) => {
+        const raw = entry.raw || {};
+        const system = raw.system || raw.data || {};
+        
+        // Get monster type - the type is stored at raw.type directly
+        const mtype = raw.type;
+        if (mtype) {
+          typeSet.add(mtype);
+        }
+        
+        // Get size - it's stored in raw.system.size as an array like ["H"] for Huge
+        const size = system.size;
+        if (size) {
+          if (Array.isArray(size)) {
+            size.forEach((s: string) => sizeSet.add(s));
+          } else {
+            sizeSet.add(size);
+          }
+        }
+        
+        if (entry.source) sourceSet.add(entry.source);
+      });
+      
+      options.creatureTypes = Array.from(typeSet).sort().map(s => ({ value: getMonsterTypeValue(s), label: getMonsterTypeLabel(s) }));
+      options.sizes = Array.from(sizeSet).sort().map(s => ({ value: getSizeValue(s), label: getSizeLabel(s) }));
+      options.sources = Array.from(sourceSet).sort().map(s => ({ value: s, label: s }));
+      
+      options.challengeRatings = Array.from({ length: 34 }, (_, i) => ({
+        value: String(i / 2),
+        label: i / 2 === 0 ? '0' : i / 2 === 0.125 ? '1/8' : i / 2 === 0.25 ? '1/4' : i / 2 === 0.5 ? '1/2' : String(i / 2),
+      }));
+    }
+    
+    res.json(options);
+  } catch (error: any) {
+    console.error('Error getting filter options:', error);
+    res.status(500).json({ error: 'Failed to get filter options', message: error.message });
+  }
+});
+
 // Get compendium entries by type (normalized)
 router.get('/compendium/:type', async (req, res) => {
   const { type } = req.params;
   const { q, limit = '100', offset = '0', system } = req.query;
+  
+  // Spell filters
+  const level = req.query.level as string | undefined;
+  const school = req.query.school as string | undefined;
+  const sourceClass = req.query.sourceClass as string | undefined;
+  const concentration = req.query.concentration as string | undefined;
+  const ritual = req.query.ritual as string | undefined;
+  const verbal = req.query.verbal as string | undefined;
+  const somatic = req.query.somatic as string | undefined;
+  const material = req.query.material as string | undefined;
+  
+  // Monster filters
+  const crMin = req.query.crMin as string | undefined;
+  const crMax = req.query.crMax as string | undefined;
+  const size = req.query.size as string | undefined;
+  const creatureType = req.query.creatureType as string | undefined;
+  const speedFly = req.query.speedFly as string | undefined;
+  const speedSwim = req.query.speedSwim as string | undefined;
+  const speedBurrow = req.query.speedBurrow as string | undefined;
+  const speedClimb = req.query.speedClimb as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 100, 500);
   const offsetNum = parseInt(offset as string) || 0;
@@ -1305,6 +1583,87 @@ router.get('/compendium/:type', async (req, res) => {
     }
     if (system) {
       where.system = String(system);
+    }
+    
+    // Build filter conditions based on type
+    if (type === 'spell') {
+      const spellFilters: any[] = [];
+      
+      if (level !== undefined) {
+        spellFilters.push({ raw: { path: ['system', 'level'], equals: parseInt(level) } });
+      }
+      if (school) {
+        // Use abbreviation for school matching (database stores as abbreviation like 'C', 'V', etc.)
+        const schoolValue = getSchoolValue(school);
+        spellFilters.push({ raw: { path: ['system', 'school'], string_contains: schoolValue } });
+      }
+      if (sourceClass) {
+        // Try multiple paths for class matching
+        spellFilters.push({
+          OR: [
+            { raw: { path: ['system', 'classes'], string_contains: sourceClass } },
+            { raw: { path: ['system', 'sourceClass'], string_contains: sourceClass } },
+            { raw: { path: ['system', 'class'], string_contains: sourceClass } },
+            { raw: { path: ['raw', 'classes'], string_contains: sourceClass } }
+          ]
+        });
+      }
+      if (concentration === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'concentration'], equals: true } });
+      }
+      if (ritual === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'ritual'], equals: true } });
+      }
+      if (verbal === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'components', 'verbal'], equals: true } });
+      }
+      if (somatic === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'components', 'somatic'], equals: true } });
+      }
+      if (material === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'components', 'material'], equals: true } });
+      }
+      
+      if (spellFilters.length > 0) {
+        where.AND = spellFilters;
+      }
+    } else if (type === 'monster') {
+      const monsterFilters: any[] = [];
+      
+      if (crMin !== undefined) {
+        monsterFilters.push({ raw: { path: ['system', 'cr'], gte: parseCrValue(crMin) } });
+      }
+      if (crMax !== undefined) {
+        monsterFilters.push({ raw: { path: ['system', 'cr'], lte: parseCrValue(crMax) } });
+      }
+      if (size) {
+        // Size is stored in raw.system.size as an array like ["H"] for Huge
+        // Try matching the array containing the size abbreviation
+        const sizeValue = getSizeValue(size).toUpperCase();
+        // Use equals to match the exact array element
+        monsterFilters.push({ raw: { path: ['system', 'size'], equals: [sizeValue] } });
+      }
+      if (creatureType) {
+        // The type is stored at raw.type (e.g., "monstrosity", "beast")
+        const typeValue = getMonsterTypeLabel(creatureType).toLowerCase();
+        monsterFilters.push({ raw: { path: ['type'], string_contains: typeValue } });
+      }
+      if (speedFly === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'fly'], not: null } });
+      }
+      if (speedSwim === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'swim'], not: null } });
+      }
+      if (speedBurrow === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'burrow'], not: null } });
+      }
+      if (speedClimb === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'climb'], not: null } });
+      }
+      
+      if (monsterFilters.length > 0) {
+        where.AND = monsterFilters;
+      }
     }
     
     const include: any = {
@@ -1618,6 +1977,26 @@ router.get('/compendium/images/metrics', async (_req, res) => {
 router.get('/compendium/search', async (req, res) => {
   const { q, type, system, limit = '50', offset = '0' } = req.query;
   
+  // Spell filters
+  const level = req.query.level as string | undefined;
+  const school = req.query.school as string | undefined;
+  const sourceClass = req.query.sourceClass as string | undefined;
+  const concentration = req.query.concentration as string | undefined;
+  const ritual = req.query.ritual as string | undefined;
+  const verbal = req.query.verbal as string | undefined;
+  const somatic = req.query.somatic as string | undefined;
+  const material = req.query.material as string | undefined;
+  
+  // Monster filters
+  const crMin = req.query.crMin as string | undefined;
+  const crMax = req.query.crMax as string | undefined;
+  const size = req.query.size as string | undefined;
+  const creatureType = req.query.creatureType as string | undefined;
+  const speedFly = req.query.speedFly as string | undefined;
+  const speedSwim = req.query.speedSwim as string | undefined;
+  const speedBurrow = req.query.speedBurrow as string | undefined;
+  const speedClimb = req.query.speedClimb as string | undefined;
+  
   const limitNum = Math.min(parseInt(limit as string) || 50, 200);
   const offsetNum = parseInt(offset as string) || 0;
   
@@ -1632,6 +2011,96 @@ router.get('/compendium/search', async (req, res) => {
     }
     if (system) {
       where.system = String(system);
+    }
+    
+    // Build filter conditions based on type
+    if (type === 'spell') {
+      // Use raw JSON query for spell-specific filters
+      const spellFilters: any[] = [];
+      
+      if (level !== undefined) {
+        spellFilters.push({ raw: { path: ['system', 'level'], equals: parseInt(level) } });
+      }
+      if (school) {
+        // Use abbreviation for school matching (database stores as abbreviation like 'C', 'V', etc.)
+        const schoolValue = getSchoolValue(school);
+        spellFilters.push({
+          OR: [
+            { raw: { path: ['system', 'school'], string_contains: schoolValue } },
+            { raw: { path: ['system', 'school', 'name'], string_contains: schoolValue } },
+            { raw: { path: ['data', 'school'], string_contains: schoolValue } },
+            { raw: { path: ['school'], string_contains: schoolValue } }
+          ]
+        });
+      }
+      if (sourceClass) {
+        // Try multiple paths for class matching
+        spellFilters.push({
+          OR: [
+            { raw: { path: ['system', 'classes'], string_contains: sourceClass } },
+            { raw: { path: ['system', 'sourceClass'], string_contains: sourceClass } },
+            { raw: { path: ['system', 'class'], string_contains: sourceClass } },
+            { raw: { path: ['data', 'classes'], string_contains: sourceClass } },
+            { raw: { path: ['classes'], string_contains: sourceClass } }
+          ]
+        });
+      }
+      if (concentration === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'concentration'], equals: true } });
+      }
+      if (ritual === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'ritual'], equals: true } });
+      }
+      if (verbal === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'components', 'verbal'], equals: true } });
+      }
+      if (somatic === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'components', 'somatic'], equals: true } });
+      }
+      if (material === 'true') {
+        spellFilters.push({ raw: { path: ['system', 'components', 'material'], equals: true } });
+      }
+      
+      if (spellFilters.length > 0) {
+        where.AND = spellFilters;
+      }
+    } else if (type === 'monster') {
+      // Use raw JSON query for monster-specific filters
+      const monsterFilters: any[] = [];
+      
+      if (crMin !== undefined) {
+        monsterFilters.push({ raw: { path: ['system', 'cr'], gte: parseCrValue(crMin) } });
+      }
+      if (crMax !== undefined) {
+        monsterFilters.push({ raw: { path: ['system', 'cr'], lte: parseCrValue(crMax) } });
+      }
+      if (size) {
+        // Size is stored in raw.system.size as an array like ["H"] for Huge
+        const sizeValue = getSizeValue(size).toUpperCase();
+        // Use equals to match the exact array element
+        monsterFilters.push({ raw: { path: ['system', 'size'], equals: [sizeValue] } });
+      }
+      if (creatureType) {
+        // The type is stored at raw.type (e.g., "monstrosity", "beast")
+        const typeValue = getMonsterTypeLabel(creatureType).toLowerCase();
+        monsterFilters.push({ raw: { path: ['type'], string_contains: typeValue } });
+      }
+      if (speedFly === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'fly'], not: null } });
+      }
+      if (speedSwim === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'swim'], not: null } });
+      }
+      if (speedBurrow === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'burrow'], not: null } });
+      }
+      if (speedClimb === 'true') {
+        monsterFilters.push({ raw: { path: ['system', 'speed', 'climb'], not: null } });
+      }
+      
+      if (monsterFilters.length > 0) {
+        where.AND = monsterFilters;
+      }
     }
     
     const entries = await prisma.compendiumEntry.findMany({

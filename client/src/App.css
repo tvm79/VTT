@@ -1678,7 +1678,6 @@ canvas {
 /* Filter Panel - for selection filter buttons */
 .filter-panel {
   background: var(--surface) !important;
-  border: 1px solid var(--accent);
   border-radius: var(--radius-md);
   padding: var(--space-2);
   display: flex;

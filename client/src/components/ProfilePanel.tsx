@@ -54,6 +54,10 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.panel-header')) {
+      // Prevent text selection during drag
+      e.preventDefault();
+      document.body.style.userSelect = 'none';
+      
       setIsDragging(true);
       setDragOffset({
         x: e.clientX - profilePanelPosition.x,
@@ -64,6 +68,10 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
 
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Prevent text selection during resize
+    e.preventDefault();
+    document.body.style.userSelect = 'none';
+    
     setIsResizing(true);
     setResizeStart({
       x: e.clientX,
@@ -89,6 +97,8 @@ export function ProfilePanel({ onClose }: ProfilePanelProps) {
     };
 
     const handleMouseUp = () => {
+      // Restore text selection after drag/resize ends
+      document.body.style.userSelect = '';
       setIsDragging(false);
       setIsResizing(false);
     };
