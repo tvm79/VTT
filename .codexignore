@@ -1,0 +1,53 @@
+Codex Ignore File
+
+Prevents Codex from loading large or irrelevant files during analysis.
+
+This reduces token usage and speeds up repository scanning.
+
+Node / package artifacts
+
+node_modules/ package-lock.json pnpm-lock.yaml yarn.lock
+
+Build outputs
+
+dist/ build/ out/ .next/ .cache/
+
+Logs
+
+*.log logs/
+
+Environment files
+
+.env .env.local .env.*
+
+Binary assets (not useful for code analysis)
+
+.png .jpg .jpeg .gif .webp .mp3 .wav .ogg .mp4 .mov
+
+Large game assets
+
+assets/ textures/ audio/ music/ sounds/ maps/ tiles/ tokens/
+
+Generated data
+
+coverage/ storybook-static/
+
+Git metadata
+
+.git/ .gitignore
+
+System files
+
+.DS_Store Thumbs.db
+
+Temporary files
+
+tmp/ temp/ *.tmp
+
+Documentation builds
+
+docs/build/
+
+Compiled TypeScript
+
+*.js.map

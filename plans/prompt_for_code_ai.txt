@@ -1,0 +1,21 @@
+Use the attached Markdown spec as the source of truth and implement it exactly.
+
+Task:
+Refactor the audio system from mixed server/local blob sources to a single Foundry-style server upload workflow.
+
+Execution rules:
+- follow the md file strictly
+- make the smallest safe changes
+- do not refactor unrelated systems
+- remove blob/local audio mode completely
+- implement the missing `/api/upload-audio` endpoint
+- store and use full public `/uploads/...` paths in tracks
+- preserve existing playback and multiplayer behavior
+- keep TypeScript clean and avoid dead code
+
+Required output:
+1. code changes
+2. list of modified files
+3. short verification checklist
+
+Do not ask for clarification. Inspect the codebase and implement end-to-end.

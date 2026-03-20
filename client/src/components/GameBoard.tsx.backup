@@ -1,0 +1,2520 @@
+import { useEffect, useRef, useState } from 'react';
+import * as PIXI from 'pixi.js';
+import { useGameStore } from '../store/gameStore';
+import { socketService } from '../services/socket';
+import { Icon, getIconByEmoji } from './Icon';
+
+export function GameBoard() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const appRef = useRef<PIXI.Application | null>(null);
+  const [appReady, setAppReady] = useState(false);
+  const isInitializingRef = useRef(false);
+  const tokensRef = useRef<Map<string, PIXI.Sprite>>(new Map());
+  const tokenSelectionRef = useRef<Map<string, PIXI.Graphics>>(new Map());
+  const tokenStatusRef = useRef<Map<string, PIXI.Container>>(new Map());
+  const tokenLabelRef = useRef<Map<string, PIXI.Container>>(new Map());
+  const tokenBarsRef = useRef<Map<string, PIXI.Container>>(new Map());
+  const selectionRectRef = useRef<PIXI.Graphics | null>(null);
+  const dragSelectStart = useRef<{ x: number; y: number } | null>(null);
+  const dragSelectCurrent = useRef<{ x: number; y: number } | null>(null);
+  const isDragSelecting = useRef(false);
+  const backgroundRef = useRef<PIXI.Sprite | null>(null);
+  const [fogEnabled, setFogEnabled] = useState(true);
+  
+  const isMiddleMouseDownRef = useRef(false);
+
+  const { 
+    currentBoard, 
+    tokens, 
+    fogReveals, 
+    tool, 
+    setTool, 
+    selectedTokenId, 
+    selectedTokenIds,
+    isGM, 
+    setSelectedToken,
+    setSelectedTokenIds,
+    showMoveMeasure,
+    setShowMoveMeasure,
+    backgroundColor,
+    gridColor,
+    setBackgroundColor,
+    setGridColor,
+    gridSize,
+    setGridSize,
+    gridOffsetX,
+    gridOffsetY,
+    setGridOffsetX,
+    setGridOffsetY,
+    gridEditMode,
+    squareValue,
+    toolbarWidth,
+    setToolbarWidth,
+    dragMode,
+    tokenContextMenu,
+    setTokenContextMenu,
+    pendingDropType,
+    setPendingDropType,
+    colorScheme,
+    statusIconColor,
+  } = useGameStore();
+  
+  // Status icons for token conditions
+  const conditionIcons = [
+    { icon: '', label: 'None' },
+    { icon: 'heart', label: 'Bloodied' },
+    { icon: 'heart-crack', label: 'Healing' },
+    { icon: 'tint', label: 'Blessed' },
+    { icon: 'certificate', label: 'Charmed' },
+    { icon: 'skull', label: 'Unconscious' },
+    { icon: 'fire', label: 'On Fire' },
+    { icon: 'shield', label: 'Shielded' },
+    { icon: 'hand-fist', label: 'Attacking' },
+    { icon: 'user-secret', label: 'Invisible' },
+    { icon: 'moon', label: 'Asleep' },
+    { icon: 'bug', label: 'Poisoned' },
+    { icon: 'face-dizzy', label: 'Dead' },
+  ];
+  
+  // Map icon names to Font Awesome Unicode for canvas rendering
+  // Using Font Awesome 6 Free Solid icons
+  const iconToFaUnicode: Record<string, string> = {
+    'heart': '\uF004',
+    'heart-crack': '\uF7A2',
+    'tint': '\uF043',
+    'certificate': '\uF0A3',
+    'skull': '\uF54C',
+    'fire': '\uF06A',
+    'shield': '\uF3ED',
+    'hand-fist': '\uF6DE',
+    'user-secret': '\uF21B',
+    'moon': '\uF186',
+    'bug': '\uF188',
+    'face-dizzy': '\uF567',
+  };
+  
+  const handleTokenRightClick = (tokenId: string, clientX: number, clientY: number) => {
+    if (!isGM) return;
+    setTokenContextMenu({ x: clientX, y: clientY, tokenId });
+  };
+  
+  // For now, disable fog rendering (needs render texture setup)
+  const showFog = false;
+
+  // Helper to get effective grid size (store value overrides board value)
+  const effectiveGridSize = gridSize || currentBoard?.gridSize || 50;
+
+  // Initialize PixiJS
+  useEffect(() => {
+    if (!containerRef.current || appRef.current || isInitializingRef.current) {
+      return;
+    }
+    
+    // Set initializing ref immediately to prevent duplicate inits
+    isInitializingRef.current = true;
+    
+    const initApp = async () => {
+      try {
+        const app = new PIXI.Application();
+        console.log('Creating PIXI app with preference canvas');
+        
+        await app.init({
+          preference: 'canvas',
+          resizeTo: containerRef.current!,
+          backgroundColor: backgroundColor,
+          antialias: false,
+          resolution: window.devicePixelRatio || 1,
+          autoDensity: true,
+        });
+
+        console.log('PIXI app init complete, canvas:', app.canvas);
+        containerRef.current!.appendChild(app.canvas);
+        appRef.current = app;
+        setAppReady(true);
+        isInitializingRef.current = false;
+
+        const backgroundLayer = new PIXI.Container();
+        const gridLayer = new PIXI.Container();
+        const tokenLayer = new PIXI.Container();
+        const fogLayer = new PIXI.Container();
+        const uiLayer = new PIXI.Container();
+      
+        // Fog of War using render texture
+        let fogVisionRT: PIXI.RenderTexture | null = null;
+        let fogVisionSprite: PIXI.Sprite | null = null;
+        let fogBlackGraphics: PIXI.Graphics | null = null;
+        
+        const initFogOfWar = (width: number, height: number) => {
+          // Create render texture for visibility mask
+          fogVisionRT = PIXI.RenderTexture.create({ width, height });
+      
+      // Fill with black (everything hidden)
+      const g = new PIXI.Graphics();
+      g.fill({ color: 0x000000 });
+      g.rect(0, 0, width, height);
+      app.renderer.render({ container: g, target: fogVisionRT, clear: true });
+      
+      // Create sprite from render texture
+      fogVisionSprite = new PIXI.Sprite(fogVisionRT);
+      
+      // Black fog layer
+      fogBlackGraphics = new PIXI.Graphics();
+      fogBlackGraphics.fill({ color: 0x000000, alpha: 0.9 });
+      fogBlackGraphics.rect(0, 0, width, height);
+      
+      // Apply mask - fog is hidden where vision is white
+      fogBlackGraphics.mask = fogVisionSprite;
+      
+      fogLayer.addChild(fogVisionSprite);
+      fogLayer.addChild(fogBlackGraphics);
+    };
+    
+    // Store for external access
+    (app as any).initFogOfWar = initFogOfWar;
+    (app as any).fogVisionRT = () => fogVisionRT;
+
+    app.stage.addChild(backgroundLayer);
+    app.stage.addChild(gridLayer);
+    app.stage.addChild(fogLayer); // Fog between grid and tokens
+    app.stage.addChild(tokenLayer);
+    app.stage.addChild(uiLayer);
+
+    (app as any).backgroundLayer = backgroundLayer;
+    (app as any).gridLayer = gridLayer;
+    (app as any).tokenLayer = tokenLayer;
+    (app as any).fogLayer = fogLayer;
+    (app as any).uiLayer = uiLayer;
+
+    app.stage.eventMode = 'static';
+    app.stage.hitArea = new PIXI.Rectangle(-5000, -5000, 10000, 10000);
+
+    // Pan/Zoom
+    let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+    let isPanning = false;
+    let isMiddleMouseDown = false;
+    let startPan = { x: 0, y: 0 };
+
+    const canvas = app.canvas as HTMLCanvasElement;
+
+    canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.button === 1 || (e.altKey && e.button === 0)) {
+        e.preventDefault();
+        e.stopPropagation();
+        isPanning = true;
+        isMiddleMouseDown = true;
+        startPan = { x: e.clientX, y: e.clientY };
+        canvas.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('pointermove', (e: PointerEvent) => {
+      if (isPanning) {
+        offsetX += e.clientX - startPan.x;
+        offsetY += e.clientY - startPan.y;
+        startPan = { x: e.clientX, y: e.clientY };
+        app.stage.position.set(offsetX, offsetY);
+      }
+    });
+
+    window.addEventListener('pointerup', (e: PointerEvent) => {
+      isPanning = false;
+      if (e.button === 1) {
+        isMiddleMouseDown = false;
+      }
+      canvas.style.cursor = 'default';
+    });
+
+    canvas.addEventListener('wheel', (e: Event) => {
+      const we = e as WheelEvent;
+      
+      // Grid adjustments only work when grid edit mode is ON
+      const isGridEditMode = useGameStore.getState().gridEditMode;
+      if (!isGridEditMode) {
+        // Allow canvas zoom without any modifier
+        we.preventDefault();
+        const zoomFactor = we.deltaY > 0 ? 0.9 : 1.1;
+        const newScale = Math.max(0.25, Math.min(4, scale * zoomFactor));
+        
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = we.clientX - rect.left;
+        const mouseY = we.clientY - rect.top;
+        
+        offsetX = mouseX - (mouseX - offsetX) * (newScale / scale);
+        offsetY = mouseY - (mouseY - offsetY) * (newScale / scale);
+        
+        scale = newScale;
+        app.stage.scale.set(scale);
+        app.stage.position.set(offsetX, offsetY);
+        return;
+      }
+      
+      // Grid size adjustment with Cmd + wheel
+      if (we.metaKey) {
+        we.preventDefault();
+        const delta = we.deltaY > 0 ? 5 : -5;
+        const currentGridSize = useGameStore.getState().gridSize;
+        const newSize = Math.max(20, Math.min(200, currentGridSize + delta));
+        setGridSize(newSize);
+        return;
+      }
+      
+      // Grid offset X adjustment with Ctrl + wheel
+      if (we.ctrlKey) {
+        we.preventDefault();
+        const rawDelta = Math.abs(we.deltaY);
+        const delta = rawDelta > 10 ? (we.deltaY > 0 ? 5 : -5) : (we.deltaY > 0 ? 1 : -1);
+        const currentOffsetX = useGameStore.getState().gridOffsetX;
+        setGridOffsetX(Math.max(-100, Math.min(100, currentOffsetX + delta)));
+        return;
+      }
+      
+      // Grid offset Y adjustment with Opt/Alt + wheel
+      if (we.altKey) {
+        we.preventDefault();
+        const rawDelta = Math.abs(we.deltaY);
+        const delta = rawDelta > 10 ? (we.deltaY > 0 ? 5 : -5) : (we.deltaY > 0 ? 1 : -1);
+        const currentOffsetY = useGameStore.getState().gridOffsetY;
+        setGridOffsetY(Math.max(-100, Math.min(100, currentOffsetY + delta)));
+        return;
+      }
+      
+      // Canvas zoom without any modifier when grid edit mode is ON
+      we.preventDefault();
+      const zoomFactor = we.deltaY > 0 ? 0.9 : 1.1;
+      const newScale = Math.max(0.25, Math.min(4, scale * zoomFactor));
+      
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = we.clientX - rect.left;
+      const mouseY = we.clientY - rect.top;
+      
+      offsetX = mouseX - (mouseX - offsetX) * (newScale / scale);
+      offsetY = mouseY - (mouseY - offsetY) * (newScale / scale);
+      
+      scale = newScale;
+      app.stage.scale.set(scale);
+      app.stage.position.set(offsetX, offsetY);
+    }, { passive: false });
+
+    return () => {
+      app.destroy(true, { children: true, texture: true });
+      appRef.current = null;
+    };
+      } catch (error) {
+        console.error('Failed to initialize PixiJS:', error);
+      }
+    };
+
+    initApp();
+  }, []);
+
+  // Update background
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+
+    const backgroundLayer = (app as any).backgroundLayer as PIXI.Container;
+    
+    if (backgroundRef.current) {
+      backgroundLayer.removeChild(backgroundRef.current);
+      backgroundRef.current.destroy();
+    }
+
+    if (currentBoard?.backgroundUrl) {
+      PIXI.Assets.load<PIXI.Texture>(currentBoard.backgroundUrl).then((texture) => {
+        const sprite = new PIXI.Sprite(texture);
+        
+        // Calculate aspect ratio corrected dimensions
+        const boardAspect = currentBoard.width / currentBoard.height;
+        const texAspect = texture.width / texture.height;
+        
+        let w = currentBoard.width;
+        let h = currentBoard.height;
+        
+        if (texAspect > boardAspect) {
+          // Image is wider than board - fit to width
+          h = w / texAspect;
+        } else {
+          // Image is taller than board - fit to height
+          w = h * texAspect;
+        }
+        
+        sprite.width = w;
+        sprite.height = h;
+        // Center the background
+        sprite.x = (currentBoard.width - w) / 2;
+        sprite.y = (currentBoard.height - h) / 2;
+        
+        backgroundLayer.addChild(sprite);
+        backgroundRef.current = sprite;
+        
+        // Initialize fog of war when board loads
+        const initFog = (app as any).initFogOfWar;
+        if (initFog) {
+          initFog(currentBoard.width, currentBoard.height);
+        }
+      });
+    }
+  }, [currentBoard?.backgroundUrl]);
+
+  // Draw grid
+  useEffect(() => {
+    console.log('Grid effect check: appReady:', appReady, 'currentBoard:', !!currentBoard);
+    if (!appReady || !currentBoard) {
+      return;
+    }
+    const app = appRef.current;
+    if (!app || !currentBoard) return;
+
+    const gridLayer = (app as any).gridLayer as PIXI.Container;
+    const graphics = new PIXI.Graphics();
+    gridLayer.removeChildren();
+    gridLayer.addChild(graphics);
+
+    const { width, height, gridType } = currentBoard;
+    const gridSize = effectiveGridSize;
+    const offsetX = gridOffsetX;
+    const offsetY = gridOffsetY;
+
+    if (gridType === 'hex') {
+      // Hex grid
+      const hexWidth = gridSize;
+      const hexHeight = gridSize * Math.sqrt(3) / 2;
+      
+      for (let row = 0; row < height / hexHeight; row++) {
+        for (let col = 0; col < width / hexWidth; col++) {
+          const x = col * hexWidth + (row % 2) * (hexWidth / 2) + offsetX;
+          const y = row * hexHeight + offsetY;
+          
+          // Draw hexagon using moveTo/lineTo
+          graphics.moveTo(x + hexWidth / 2, y);
+          graphics.lineTo(x + hexWidth, y + hexHeight / 4);
+          graphics.lineTo(x + hexWidth, y + hexHeight * 3 / 4);
+          graphics.lineTo(x + hexWidth / 2, y + hexHeight);
+          graphics.lineTo(x, y + hexHeight * 3 / 4);
+          graphics.lineTo(x, y + hexHeight / 4);
+          graphics.closePath();
+        }
+      }
+      // Stroke after defining all paths
+      graphics.stroke({ width: 1, color: gridColor, alpha: 0.5 });
+    } else {
+      // Square grid
+      for (let x = offsetX; x <= width; x += gridSize) {
+        graphics.moveTo(x, offsetY);
+        graphics.lineTo(x, height + offsetY);
+      }
+      
+      for (let y = offsetY; y <= height; y += gridSize) {
+        graphics.moveTo(offsetX, y);
+        graphics.lineTo(width + offsetX, y);
+      }
+      // Stroke after defining all paths
+      graphics.stroke({ width: 1, color: gridColor, alpha: 0.5 });
+    }
+  }, [appReady, currentBoard?.width, currentBoard?.height, currentBoard?.gridType, gridColor, gridSize, gridOffsetX, gridOffsetY]);
+
+  // Render tokens
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app || !currentBoard) return;
+
+    const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+    const existingIds = new Set(tokens.map(t => t.id));
+    
+    // Remove deleted tokens
+    for (const [id, sprite] of tokensRef.current) {
+      if (!existingIds.has(id)) {
+        tokenLayer.removeChild(sprite);
+        sprite.destroy();
+        tokensRef.current.delete(id);
+        
+        // Also clean up selection and status refs
+        const selection = tokenSelectionRef.current.get(id);
+        if (selection) {
+          tokenLayer.removeChild(selection);
+          selection.destroy();
+          tokenSelectionRef.current.delete(id);
+        }
+        const statusContainer = tokenStatusRef.current.get(id);
+        if (statusContainer) {
+          tokenLayer.removeChild(statusContainer);
+          statusContainer.destroy();
+          tokenStatusRef.current.delete(id);
+        }
+        const labelContainer = tokenLabelRef.current.get(id);
+        if (labelContainer) {
+          tokenLayer.removeChild(labelContainer);
+          labelContainer.destroy();
+          tokenLabelRef.current.delete(id);
+        }
+        const barsContainer = tokenBarsRef.current.get(id);
+        if (barsContainer) {
+          tokenLayer.removeChild(barsContainer);
+          barsContainer.destroy();
+          tokenBarsRef.current.delete(id);
+        }
+      }
+    }
+
+    // Add/update tokens
+    tokens.forEach(token => {
+      let sprite = tokensRef.current.get(token.id);
+      
+      if (!sprite && token.imageUrl) {
+        PIXI.Assets.load<PIXI.Texture>(token.imageUrl).then((texture) => {
+          sprite = new PIXI.Sprite(texture);
+          // Use top-left anchor for grid alignment
+          sprite.anchor.set(0, 0);
+          
+          // Token footprint: size × size cells
+          // Medium=1, Large=2, Huge=3, Gargantuan=4
+          const footprint = token.size || 1;
+          const width = effectiveGridSize * footprint;
+          const height = effectiveGridSize * footprint;
+          sprite.width = width;
+          sprite.height = height;
+          
+          // Position token at its stored position (top-left corner)
+          sprite.x = token.x;
+          sprite.y = token.y;
+          
+          sprite.eventMode = 'static';
+          sprite.cursor = 'pointer';
+          
+          // Right-click handler for context menu
+          sprite.on('rightclick', (event: any) => {
+            const globalPos = event.data.global;
+            handleTokenRightClick(token.id, globalPos.x, globalPos.y);
+          });
+          
+          tokenLayer.addChild(sprite);
+          tokensRef.current.set(token.id, sprite);
+        });
+      }
+      
+      if (sprite) {
+        // Position token at its stored position (top-left corner)
+        sprite.x = token.x;
+        sprite.y = token.y;
+        
+        // Update size when grid size changes
+        // Token footprint: size × size cells
+        const footprint = token.size || 1;
+        const width = effectiveGridSize * footprint;
+        const height = effectiveGridSize * footprint;
+        const size = width; // Use for backward compatibility in status/label calculations
+        sprite.width = width;
+        sprite.height = height;
+        
+        // Highlight selected - check both single selection and multi-select array
+        const isSelected = selectedTokenIds.includes(token.id) || token.id === selectedTokenId;
+        sprite.alpha = isSelected ? 1 : 0.9;
+        
+        // Handle selection outline
+        let selection = tokenSelectionRef.current.get(token.id);
+        if (isSelected) {
+          if (!selection) {
+            selection = new PIXI.Graphics();
+            tokenLayer.addChild(selection);
+            tokenSelectionRef.current.set(token.id, selection);
+          }
+          selection.clear();
+          selection.rect(
+            token.x - 2,
+            token.y - 2,
+            width + 4,
+            height + 4
+          );
+          selection.stroke({ width: 3, color: 0xed8936, alpha: 1 }); // Orange outline
+          selection.visible = true;
+        } else if (selection) {
+          selection.visible = false;
+        }
+        
+        // Handle status emojis
+        let statusContainer = tokenStatusRef.current.get(token.id);
+        const statuses: string[] = token.status ? JSON.parse(token.status) : [];
+        
+        if (statuses.length > 0) {
+          if (!statusContainer) {
+            statusContainer = new PIXI.Container();
+            statusContainer.eventMode = 'none';
+            tokenLayer.addChild(statusContainer);
+            tokenStatusRef.current.set(token.id, statusContainer);
+          }
+          statusContainer.removeChildren();
+          
+          // Position emojis in a circle around the token, spreading symmetrically from top
+          // Get custom settings from token properties
+          const tokenProps = (token.properties || {}) as Record<string, unknown>;
+          const statusRadiusCustom = typeof tokenProps.statusRadius === 'number' ? tokenProps.statusRadius : 25;
+          const statusSpreadCustom = typeof tokenProps.statusSpread === 'number' ? tokenProps.statusSpread : 0.75;
+          const statusIconSizeCustom = typeof tokenProps.statusIconSize === 'number' ? tokenProps.statusIconSize : 14;
+          
+          const radius = size / 2 + statusRadiusCustom;
+          const maxSpread = Math.PI * statusSpreadCustom; // Configurable spread
+          
+          // Token center (since anchor is now top-left)
+          const tokenCenterX = token.x + size / 2;
+          const tokenCenterY = token.y + size / 2;
+          
+          statuses.forEach((iconName, index) => {
+            // Convert icon name to Font Awesome Unicode for display
+            const faUnicode = iconToFaUnicode[iconName] || iconName;
+            const iconText = new PIXI.Text(faUnicode, {
+              fontSize: statusIconSizeCustom,
+              fill: statusIconColor,
+              fontFamily: '"Font Awesome 6 Free", Arial',
+              fontWeight: '900',
+              stroke: {
+                color: 0x000000,
+                width: 2,
+              },
+              dropShadow: {
+                color: 0x000000,
+                alpha: 0.8,
+                blur: 2,
+                distance: 1,
+                angle: 45,
+              },
+            });
+            // Get current stage scale for resolution calculation
+            const stageScale = app.stage.scale.x || 1;
+            const resolution = Math.max(3, (window.devicePixelRatio || 1) * 3 / stageScale);
+            iconText.resolution = resolution;
+            iconText.anchor.set(0.5);
+            
+            // Calculate angle: start from top (-PI/2) and spread symmetrically left and right
+            const startAngle = -Math.PI / 2 - maxSpread;
+            const angle = statuses.length === 1 
+              ? -Math.PI / 2 // Single icon at top
+              : startAngle + (maxSpread * 2 / (statuses.length - 1)) * index;
+            iconText.x = tokenCenterX + radius * Math.cos(angle);
+            iconText.y = tokenCenterY + radius * Math.sin(angle);
+            statusContainer!.addChild(iconText);
+          });
+          statusContainer.visible = true;
+        } else if (statusContainer) {
+          statusContainer.visible = false;
+        }
+        
+        // Handle token label
+        const showLabel = token.showLabel ?? false;
+        const labelText = token.label || token.name || '';
+        const labelOffset = 4; // Fixed offset below token
+        const tokenProps = (token.properties || {}) as Record<string, unknown>;
+        const customLabelFontSize = typeof tokenProps.labelFontSize === 'number' ? tokenProps.labelFontSize : null;
+        const labelFontSize = customLabelFontSize || Math.max(10, size * 0.25);
+        let labelContainer = tokenLabelRef.current.get(token.id);
+        
+        if (showLabel && labelText) {
+          if (!labelContainer) {
+            labelContainer = new PIXI.Container();
+            labelContainer.eventMode = 'static';
+            labelContainer.cursor = 'pointer';
+            tokenLayer.addChild(labelContainer);
+            tokenLabelRef.current.set(token.id, labelContainer);
+            
+            // Add double-click handler for inline editing
+            labelContainer.on('pointerdown', (event: PIXI.FederatedPointerEvent) => {
+              if (event.detail === 2) {
+                // Double-click detected - start inline editing
+                const globalPos = event.global;
+                const stagePos = app.stage.toLocal(globalPos);
+                
+                // Create input overlay
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = labelText;
+                input.style.position = 'absolute';
+                input.style.left = `${globalPos.x}px`;
+                input.style.top = `${globalPos.y}px`;
+                input.style.fontSize = `${labelFontSize * app.stage.scale.x}px`;
+                input.style.fontFamily = 'Arial';
+                input.style.padding = '4px';
+                input.style.border = '2px solid #ed8936';
+                input.style.borderRadius = '4px';
+                input.style.background = 'rgba(0,0,0,0.8)';
+                input.style.color = 'white';
+                input.style.outline = 'none';
+                input.style.zIndex = '1000';
+                input.style.transform = 'translate(-50%, -50%)';
+                input.style.minWidth = '100px';
+                
+                document.body.appendChild(input);
+                input.focus();
+                input.select();
+                
+                const finishEditing = (save: boolean) => {
+                  const newValue = input.value.trim();
+                  if (save && newValue !== labelText) {
+                    socketService.updateToken(token.id, { label: newValue, showLabel: true });
+                  }
+                  input.remove();
+                };
+                
+                input.addEventListener('keydown', (e) => {
+                  if (e.key === 'Enter') {
+                    finishEditing(true);
+                  } else if (e.key === 'Escape') {
+                    finishEditing(false);
+                  }
+                });
+                
+                input.addEventListener('blur', () => {
+                  finishEditing(true);
+                });
+              }
+            });
+          }
+          labelContainer.x = token.x + size / 2;
+          labelContainer.y = token.y + size / 2;
+          labelContainer.removeChildren();
+          
+          // Create label text with outline (no background)
+          // Get label settings from token properties
+          const labelColor = typeof tokenProps.labelColor === 'string' ? tokenProps.labelColor : '#ffffff';
+          const labelStrokeColor = typeof tokenProps.labelStrokeColor === 'string' ? tokenProps.labelStrokeColor : '#000000';
+          const labelPosition = typeof tokenProps.labelPosition === 'string' ? tokenProps.labelPosition : 'below';
+          
+          // Calculate label position
+          let labelY: number;
+          switch (labelPosition) {
+            case 'top':
+              labelY = -size / 2 - labelOffset;
+              break;
+            case 'inside-top':
+              labelY = -size / 4;
+              break;
+            case 'inside-bottom':
+              labelY = size / 4 + labelOffset + 3;
+              break;
+            case 'below':
+            default:
+              labelY = size / 2 + labelOffset;
+              break;
+          }
+          
+          // Parse color (handle both hex numbers and hex strings)
+          const parseColor = (color: string | number): number => {
+            if (typeof color === 'number') return color;
+            if (color.startsWith('#')) return parseInt(color.slice(1), 16);
+            return parseInt(color, 16);
+          };
+          
+          const label = new PIXI.Text({
+            text: String(labelText),
+            style: {
+              fontFamily: 'Arial',
+              fontSize: labelFontSize,
+              fill: parseColor(labelColor),
+              stroke: {
+                color: parseColor(labelStrokeColor),
+                width: 2,
+              },
+              align: 'center' as const,
+            },
+          });
+          // Get current stage scale for resolution calculation
+          const stageScale = app.stage.scale.x || 1;
+          const resolution = Math.max(3, (window.devicePixelRatio || 1) * 2 / stageScale);
+          
+          label.resolution = resolution;
+          label.anchor.set(0.5);
+          label.x = 0;
+          label.y = labelY;
+          labelContainer.addChild(label);
+          
+          labelContainer.visible = true;
+        } else if (labelContainer) {
+          labelContainer.visible = false;
+        }
+        
+        // Handle token bars (HP, mana, etc.)
+        let barsContainer = tokenBarsRef.current.get(token.id);
+        const bars: Array<{ name: string; current: number; max: number; color: string }> = token.bars ? JSON.parse(token.bars) : [];
+        const hasBars = bars.length > 0 && bars.some(b => b.max > 0);
+        
+        if (hasBars) {
+          if (!barsContainer) {
+            barsContainer = new PIXI.Container();
+            barsContainer.eventMode = 'none';
+            tokenLayer.addChild(barsContainer);
+            tokenBarsRef.current.set(token.id, barsContainer);
+          }
+          
+          // Calculate bars position based on label settings
+          const labelOffset = 4;
+          const showLabel = token.showLabel ?? false;
+          const labelText = token.label || token.name || '';
+          const tokenProps = (token.properties || {}) as Record<string, unknown>;
+          const customLabelFontSize = typeof tokenProps.labelFontSize === 'number' ? tokenProps.labelFontSize : null;
+          const labelFontSize = customLabelFontSize || Math.max(10, size * 0.25);
+          const labelPosition = typeof tokenProps.labelPosition === 'string' ? tokenProps.labelPosition : 'below';
+          
+          // Calculate label Y offset from token center
+          let labelYOffset: number;
+          switch (labelPosition) {
+            case 'top':
+              labelYOffset = -size / 2 - labelOffset;
+              break;
+            case 'inside-top':
+              labelYOffset = -size / 4;
+              break;
+            case 'inside-bottom':
+              labelYOffset = size / 4;
+              break;
+            case 'below':
+            default:
+              labelYOffset = size / 2 + labelOffset;
+              break;
+          }
+          
+          // Position bars: if label is shown and below token, bars go directly below label; otherwise bars go below token
+          const barsY = showLabel && labelText && labelPosition === 'below'
+            ? token.y + size / 2 + labelYOffset + labelFontSize + 2  // Directly below label (small gap)
+            : token.y + size;  // Below token (at token bottom)
+          
+          barsContainer.x = token.x + size / 2;
+          barsContainer.y = barsY;
+          barsContainer.removeChildren();
+          
+          const barWidth = size;
+          const barHeight = 6;
+          const barSpacing = 2;
+          
+          bars.forEach((bar, index) => {
+            if (bar.max <= 0) return;
+            
+            const percentage = Math.min(1, Math.max(0, bar.current / bar.max));
+            const barY = index * (barHeight + barSpacing);
+            
+            // Parse color from hex string
+            const barColor = parseInt(bar.color.replace('#', ''), 16) || 0xff0000;
+            
+            // Background bar (empty)
+            const barBg = new PIXI.Graphics();
+            barBg.roundRect(-barWidth / 2, barY, barWidth, barHeight, 2);
+            barBg.fill({ color: 0x333333, alpha: 0.8 });
+            barsContainer!.addChild(barBg);
+            
+            // Foreground bar (filled)
+            if (percentage > 0) {
+              const barFg = new PIXI.Graphics();
+              barFg.roundRect(-barWidth / 2, barY, barWidth * percentage, barHeight, 2);
+              barFg.fill({ color: barColor, alpha: 0.9 });
+              barsContainer!.addChild(barFg);
+            }
+            
+            // Bar label in the middle
+            if (bar.name) {
+              const barLabel = new PIXI.Text(`${bar.current}/${bar.max}`, {
+                fontFamily: 'Arial',
+                fontSize: Math.max(8, barHeight - 1),
+                fill: 0xffffff,
+                align: 'center',
+                stroke: {
+                  color: 0x000000,
+                  width: 2,
+                },
+                dropShadow: {
+                  color: 0x000000,
+                  alpha: 0.8,
+                  blur: 2,
+                  distance: 1,
+                  angle: 45,
+                },
+              });
+              // Get current stage scale for resolution calculation
+              const stageScale = app.stage.scale.x || 1;
+              const resolution = Math.max(3, (window.devicePixelRatio || 1) * 3 / stageScale);
+              
+              barLabel.resolution = resolution;
+              barLabel.anchor.set(0.5);
+              barLabel.x = 0;
+              barLabel.y = barY + barHeight / 2;
+              barsContainer!.addChild(barLabel);
+            }
+          });
+          
+          barsContainer.visible = true;
+        } else if (barsContainer) {
+          barsContainer.visible = false;
+        }
+      }
+    });
+  }, [tokens, currentBoard, selectedTokenId, selectedTokenIds]);
+
+  // Update background color when it changes
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.renderer.background.color = backgroundColor;
+  }, [backgroundColor]);
+
+  // Token drag - with ghost preview
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app || !currentBoard) return;
+
+    const stage = app.stage;
+    const currentBoardData = currentBoard;
+    
+    let draggingToken: PIXI.Sprite | null = null;
+    let dragTokenId: string | null = null;
+    let ghostAnchor: PIXI.Sprite | null = null;
+    // Track multiple tokens for multi-select dragging
+    let draggingTokenIds: string[] = [];
+    let ghostAnchors: PIXI.Sprite[] = [];
+    let originalPositions: Map<string, { x: number; y: number }> = new Map();
+    let dragStartTokenId: string | null = null; // The token that was clicked to start the drag
+    let moveMeasureLine: PIXI.Graphics | null = null;
+    let moveMeasureText: PIXI.Text | null = null;
+    let originalPos = { x: 0, y: 0 };
+
+    const onPointerDown = (e: PIXI.FederatedPointerEvent) => {
+      // Ignore if middle mouse button is pressed (used for panning)
+      if (isMiddleMouseDownRef.current) {
+        return;
+      }
+      
+      const currentTool = useGameStore.getState().tool;
+      const selectedTokenIds = useGameStore.getState().selectedTokenIds;
+      
+      // Ignore right-click - it should show context menu, not perform selection/drag
+      if (e.button === 2) {
+        return;
+      }
+      
+      // Ignore middle mouse button - it's used for panning only
+      if (e.button === 1) {
+        return;
+      }
+      
+      if (currentTool === 'move') {
+        const target = e.target;
+        
+        // Check if clicking on empty space - deselect all
+        let clickedOnEmptySpace = true;
+        if (target instanceof PIXI.Sprite) {
+          for (const [tokenId, sprite] of tokensRef.current) {
+            if (sprite === target) {
+              clickedOnEmptySpace = false;
+              break;
+            }
+          }
+        }
+        
+        if (clickedOnEmptySpace) {
+          useGameStore.getState().setSelectedToken(null);
+          useGameStore.getState().setSelectedTokenIds([]);
+          return;
+        }
+        
+        // Rest of the move tool logic...
+        // Check if we should do multi-token dragging (more than 1 selected)
+        if (selectedTokenIds && selectedTokenIds.length > 1 && target instanceof PIXI.Sprite) {
+          // Find which selected token was clicked
+          let clickedTokenId: string | null = null;
+          for (const [tokenId, sprite] of tokensRef.current) {
+            if (sprite === target && selectedTokenIds.includes(tokenId)) {
+              clickedTokenId = tokenId;
+              break;
+            }
+          }
+          
+          if (clickedTokenId) {
+            dragStartTokenId = clickedTokenId;
+            draggingTokenIds = [...selectedTokenIds];
+            originalPositions.clear();
+            ghostAnchors = [];
+            
+            const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+            const gridSize = effectiveGridSize;
+            const offsetX = gridOffsetX;
+            const offsetY = gridOffsetY;
+            
+            // Create ghosts for all selected tokens
+            for (const tokenId of selectedTokenIds) {
+              const sprite = tokensRef.current.get(tokenId);
+              if (sprite) {
+                // Store original position
+                originalPositions.set(tokenId, {
+                  x: sprite.x,
+                  y: sprite.y,
+                });
+                
+                // Create ghost
+                const ghost = new PIXI.Sprite(sprite.texture);
+                ghost.x = sprite.x;
+                ghost.y = sprite.y;
+                ghost.width = sprite.width;
+                ghost.height = sprite.height;
+                ghost.alpha = 0.4; // Ghost transparency when dragging
+                ghost.anchor.set(0, 0); // Top-left anchor
+                ghostAnchors.push(ghost);
+                tokenLayer.addChild(ghost);
+                
+                // Reduce opacity of original token while dragging
+                sprite.alpha = 0.2;
+              }
+            }
+            
+            // Set reference position for measurement
+            // Use center of the token (top-left + center offset)
+            const clickedSprite = tokensRef.current.get(clickedTokenId);
+            if (clickedSprite) {
+              const tokenFootprint = tokens.find(t => t.id === clickedTokenId)?.size || 1;
+              const tokenCenterOffsetX = (tokenFootprint * gridSize) / 2;
+              const tokenCenterOffsetY = (tokenFootprint * gridSize) / 2;
+              // Center = top-left position + offset
+              originalPos = {
+                x: clickedSprite.x + tokenCenterOffsetX,
+                y: clickedSprite.y + tokenCenterOffsetY,
+              };
+            }
+            return; // Exit early - don't do single token dragging
+          }
+        }
+        
+        // Single token dragging (only when not multi-selecting)
+        if (target instanceof PIXI.Sprite) {
+          for (const [tokenId, sprite] of tokensRef.current) {
+            if (sprite === target) {
+              draggingToken = sprite;
+              dragTokenId = tokenId;
+              useGameStore.getState().setSelectedToken(tokenId);
+              
+              // Get global mouse position and convert to stage coordinates manually
+              const pixiEvent = event as unknown as { data?: { global: PIXI.PointData } };
+              const globalPos = pixiEvent.data?.global;
+              if (globalPos) {
+                const stagePos = stage.toLocal(globalPos);
+                console.log('Drag start - global:', globalPos, 'stage:', stagePos);
+              }
+              
+              // Store original position - use center of the token for measurement
+              const gridSize = effectiveGridSize;
+              const tokenFootprint = tokens.find(t => t.id === dragTokenId)?.size || 1;
+              const tokenCenterOffsetX = (tokenFootprint * gridSize) / 2;
+              const tokenCenterOffsetY = (tokenFootprint * gridSize) / 2;
+              // Center = top-left position + offset
+              originalPos = {
+                x: sprite.x + tokenCenterOffsetX,
+                y: sprite.y + tokenCenterOffsetY,
+              };
+              
+              // Create ghost token (semi-transparent copy)
+              const ghost = new PIXI.Sprite(sprite.texture);
+              ghost.x = sprite.x;
+              ghost.y = sprite.y;
+              ghost.width = sprite.width;
+              ghost.height = sprite.height;
+              ghost.alpha = 0.4; // Ghost transparency when dragging
+              ghost.anchor.set(0, 0); // Top-left anchor
+              ghostAnchor = ghost;
+              const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+              tokenLayer.addChild(ghost);
+              
+              // Reduce opacity of original token while dragging
+              sprite.alpha = 0.2;
+              break;
+            }
+          }
+        }
+        
+        // Check if we should drag multiple selected tokens
+        if (selectedTokenIds && selectedTokenIds.length > 1) {
+          // Find the token that was clicked (the one matching dragTokenId or first in list)
+          const clickedTokenId = dragTokenId || selectedTokenIds[0];
+          dragStartTokenId = clickedTokenId;
+          
+          // Find the first selected token to use as reference
+          const firstTokenId = selectedTokenIds[0];
+          const firstSprite = tokensRef.current.get(firstTokenId);
+          
+          if (firstSprite) {
+            // Initialize arrays for multi-token dragging
+            draggingTokenIds = [...selectedTokenIds];
+            originalPositions.clear();
+            ghostAnchors = [];
+            
+            const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+            const gridSize = effectiveGridSize;
+            const offsetX = gridOffsetX;
+            const offsetY = gridOffsetY;
+            
+            // Create ghosts for all selected tokens
+            for (const tokenId of selectedTokenIds) {
+              const sprite = tokensRef.current.get(tokenId);
+              if (sprite) {
+                // Store original position
+                originalPositions.set(tokenId, {
+                  x: sprite.x,
+                  y: sprite.y,
+                });
+                
+                // Create ghost
+                const ghost = new PIXI.Sprite(sprite.texture);
+                ghost.x = sprite.x;
+                ghost.y = sprite.y;
+                ghost.width = sprite.width;
+                ghost.height = sprite.height;
+                ghost.alpha = 0.4; // Ghost transparency when dragging
+                ghost.anchor.set(0, 0); // Top-left anchor
+                ghostAnchors.push(ghost);
+                tokenLayer.addChild(ghost);
+                
+                // Reduce opacity of original token while dragging
+                sprite.alpha = 0.2;
+              }
+            }
+            
+            // Set reference position
+            // Use center of the token (top-left + center offset)
+            const tokenFootprint = tokens.find(t => t.id === firstTokenId)?.size || 1;
+            const tokenCenterOffsetX = (tokenFootprint * gridSize) / 2;
+            const tokenCenterOffsetY = (tokenFootprint * gridSize) / 2;
+            // Center = top-left position + offset
+            originalPos = {
+              x: firstSprite.x + tokenCenterOffsetX,
+              y: firstSprite.y + tokenCenterOffsetY,
+            };
+          }
+        }
+      }
+    };
+
+    const onPointerMove = (e: PIXI.FederatedPointerEvent) => {
+      // Ignore if middle mouse button is pressed (used for panning)
+      if (isMiddleMouseDownRef.current) {
+        return;
+      }
+      
+      const gridSize = effectiveGridSize;
+      
+      // Handle multi-token dragging
+      if (draggingTokenIds.length > 0 && ghostAnchors.length > 0) {
+        // Use global position and convert to local stage coordinates
+        // This correctly accounts for pan/zoom transformations
+        const globalPos = e.global;
+        const pos = stage.toLocal(globalPos);
+        
+        // For measurement: snap to center of target square
+        // Note: gridOffsetX/Y are grid adjustments, not stage position
+        // We include them in the snap calculation for proper grid alignment
+        const measureTargetX = Math.floor((pos.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX + gridSize / 2;
+        const measureTargetY = Math.floor((pos.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY + gridSize / 2;
+        
+        // For ghost display and placement: snap to top-left corner
+        const ghostTargetX = Math.floor((pos.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX;
+        const ghostTargetY = Math.floor((pos.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY;
+        
+        // Get the token's original position that was clicked to start the drag
+        const dragStartPos = originalPositions.get(dragStartTokenId || draggingTokenIds[0]);
+        if (dragStartPos) {
+          // Calculate delta from the clicked token's original position to target position
+          const dx = ghostTargetX - dragStartPos.x;
+          const dy = ghostTargetY - dragStartPos.y;
+          
+          // Move all ghosts - apply the same delta to each token
+          for (let i = 0; i < draggingTokenIds.length; i++) {
+            const origPos = originalPositions.get(draggingTokenIds[i]);
+            if (origPos && ghostAnchors[i]) {
+              // Simply add the delta to original position (no extra snap)
+              ghostAnchors[i].x = origPos.x + dx;
+              ghostAnchors[i].y = origPos.y + dy;
+            }
+          }
+        }
+        
+        // Draw move measurement if enabled - from center to center
+        if (showMoveMeasure) {
+          const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+          
+          // Clear previous measurement
+          if (moveMeasureLine) {
+            moveMeasureLine.destroy();
+          }
+          if (moveMeasureText) {
+            moveMeasureText.destroy();
+          }
+          
+          // Calculate distance from original to target (both using center positions)
+          // Recalculate start position dynamically to account for current token size
+          const dragStartPos = originalPositions.get(dragStartTokenId || draggingTokenIds[0]);
+          let startX = measureTargetX;
+          let startY = measureTargetY;
+          if (dragStartPos) {
+            const startToken = tokens.find(t => t.id === (dragStartTokenId || draggingTokenIds[0]));
+            const startFootprint = startToken?.size || 1;
+            const startCenterOffsetX = (startFootprint * gridSize) / 2;
+            const startCenterOffsetY = (startFootprint * gridSize) / 2;
+            startX = dragStartPos.x + startCenterOffsetX;
+            startY = dragStartPos.y + startCenterOffsetY;
+          }
+          const dx = measureTargetX - startX;
+          const dy = measureTargetY - startY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const squares = distance / gridSize;
+          const ftDistance = Math.round(squares) * squareValue;
+          
+          // Draw line from center to center
+          moveMeasureLine = new PIXI.Graphics();
+
+          // Calculate end position using ghostTarget (actual token position) + center offset
+          // ghostTargetX/Y is the top-left corner of where the token will be placed
+          const targetToken = tokens.find(t => t.id === (dragStartTokenId || draggingTokenIds[0]));
+          const targetFootprint = targetToken?.size || 1;
+          const targetCenterOffsetX = (targetFootprint * gridSize) / 2;
+          const targetCenterOffsetY = (targetFootprint * gridSize) / 2;
+          const endX = ghostTargetX + targetCenterOffsetX;
+          const endY = ghostTargetY + targetCenterOffsetY;
+
+          moveMeasureLine.moveTo(startX, startY);
+          moveMeasureLine.lineTo(endX, endY);
+          moveMeasureLine.stroke({ width: 2, color: 0x00FF00, alpha: 0.8 });
+          tokenLayer.addChild(moveMeasureLine);
+          
+          moveMeasureText = new PIXI.Text(`${ftDistance} ft`, {
+            fontFamily: 'Arial',
+            fontSize: 14,
+            fill: 0x00FF00,
+            stroke: { color: 0x000000, width: 2 },
+          });
+          moveMeasureText.x = endX + 5;
+          moveMeasureText.y = endY + 5;
+          tokenLayer.addChild(moveMeasureText);
+        }
+        return;
+      }
+      
+      // Single token dragging (original logic)
+      if (!draggingToken || !currentBoardData) return;
+      
+      // Use global position and convert to local stage coordinates
+      const globalPos = e.global;
+      const pos = stage.toLocal(globalPos);
+      
+      // For measurement: snap to center of target square
+      const measureX = Math.floor((pos.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX + gridSize / 2;
+      const measureY = Math.floor((pos.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY + gridSize / 2;
+      
+      // For ghost display and placement: snap to top-left corner
+      const ghostX = Math.floor((pos.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX;
+      const ghostY = Math.floor((pos.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY;
+      
+      // Move the ghost, keep original in place
+      if (ghostAnchor) {
+        ghostAnchor.x = ghostX;
+        ghostAnchor.y = ghostY;
+        
+        // Draw move measurement if enabled - from center to center
+        if (showMoveMeasure) {
+          const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+          
+          // Clear previous measurement
+          if (moveMeasureLine) {
+            moveMeasureLine.destroy();
+          }
+          if (moveMeasureText) {
+            moveMeasureText.destroy();
+          }
+          
+          // Calculate distance using same logic as measure tool
+          // Recalculate start position dynamically to account for current token size
+          const currentToken = tokens.find(t => t.id === dragTokenId);
+          const currentFootprint = currentToken?.size || 1;
+          const currentCenterOffsetX = (currentFootprint * gridSize) / 2;
+          const currentCenterOffsetY = (currentFootprint * gridSize) / 2;
+          const currentStartX = draggingToken.x + currentCenterOffsetX;
+          const currentStartY = draggingToken.y + currentCenterOffsetY;
+          const dx = measureX - currentStartX;
+          const dy = measureY - currentStartY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const squares = distance / gridSize;
+          const ftDistance = Math.round(squares) * squareValue;
+          
+          // Draw line from center to center
+          moveMeasureLine = new PIXI.Graphics();
+
+          // Calculate end position using ghost (actual token position) + center offset
+          const endX = ghostX + currentCenterOffsetX;
+          const endY = ghostY + currentCenterOffsetY;
+
+          moveMeasureLine.moveTo(currentStartX, currentStartY);
+          moveMeasureLine.lineTo(endX, endY);
+          moveMeasureLine.stroke({ width: 2, color: 0x00FF00, alpha: 0.8 });
+          tokenLayer.addChild(moveMeasureLine);
+          
+          // Draw text at end of line
+          moveMeasureText = new PIXI.Text(`${ftDistance} ft`, {
+            fontFamily: 'Arial',
+            fontSize: 14,
+            fill: 0x00FF00,
+            stroke: { color: 0x000000, width: 2 },
+          });
+          moveMeasureText.x = endX + 5;
+          moveMeasureText.y = endY + 5;
+          tokenLayer.addChild(moveMeasureText);
+        }
+      }
+    };
+
+    const onPointerUp = () => {
+      // Handle multi-token dragging
+      if (draggingTokenIds.length > 0 && ghostAnchors.length > 0) {
+        const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+        const gridSize = effectiveGridSize;
+        const offsetX = gridOffsetX;
+        const offsetY = gridOffsetY;
+        
+        // Get the token that was clicked to start the drag
+        const dragStartPos = originalPositions.get(dragStartTokenId || draggingTokenIds[0]);
+        
+        if (dragStartPos && ghostAnchors[0]) {
+          // Calculate delta from the clicked token's original position to its ghost position
+          const dx = ghostAnchors[0].x - dragStartPos.x;
+          const dy = ghostAnchors[0].y - dragStartPos.y;
+          
+          // Move all tokens - apply the same delta to each token
+          for (let i = 0; i < draggingTokenIds.length; i++) {
+            const tokenId = draggingTokenIds[i];
+            const origPos = originalPositions.get(tokenId);
+            const ghost = ghostAnchors[i];
+            
+            if (origPos && ghost) {
+              // Use ghost position directly (already correct from onPointerMove)
+              socketService.moveToken(tokenId, ghost.x, ghost.y);
+            }
+          }
+        }
+        
+        // Clean up ghosts
+        for (const ghost of ghostAnchors) {
+          tokenLayer.removeChild(ghost);
+          ghost.destroy();
+        }
+        
+        // Restore original token opacity after drag
+        for (const tokenId of draggingTokenIds) {
+          const sprite = tokensRef.current.get(tokenId);
+          if (sprite) {
+            sprite.alpha = 1;
+          }
+        }
+        
+        draggingTokenIds = [];
+        ghostAnchors = [];
+        originalPositions.clear();
+        dragStartTokenId = null;
+      }
+      
+      // Single token dragging (original logic)
+      if (draggingToken && dragTokenId && currentBoardData && ghostAnchor) {
+        // Move token to ghost position
+        socketService.moveToken(dragTokenId, ghostAnchor.x, ghostAnchor.y);
+        // Remove ghost
+        const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+        tokenLayer.removeChild(ghostAnchor);
+        ghostAnchor.destroy();
+        // Restore original token opacity
+        draggingToken.alpha = 1;
+      }
+      // Clean up move measurement graphics
+      if (moveMeasureLine) {
+        moveMeasureLine.destroy();
+        moveMeasureLine = null;
+      }
+      if (moveMeasureText) {
+        moveMeasureText.destroy();
+        moveMeasureText = null;
+      }
+      draggingToken = null;
+      dragTokenId = null;
+      ghostAnchor = null;
+    };
+
+    stage.on('pointerdown', onPointerDown);
+    stage.on('pointermove', onPointerMove);
+    stage.on('pointerup', onPointerUp);
+
+    return () => {
+      stage.off('pointerdown', onPointerDown);
+      stage.off('pointermove', onPointerMove);
+      stage.off('pointerup', onPointerUp);
+    };
+  }, [currentBoard, tool, showMoveMeasure, squareValue, tokens]);
+
+  // Stage interactions - measure and fog
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app || !currentBoard) return;
+
+    const stage = app.stage;
+    const uiLayer = (app as any).uiLayer as PIXI.Container;
+    const fogLayer = (app as any).fogLayer as PIXI.Container;
+    
+    let isDrawingFog = false;
+    let fogPoints: number[][] = [];
+    let measureStart: { x: number; y: number } | null = null;
+    let measureLine: PIXI.Graphics | null = null;
+    let measureText: PIXI.Text | null = null;
+    
+    // Multi-token dragging variables for unified select/move tool
+    let draggingTokenIds: string[] = [];
+    let ghostAnchors: PIXI.Sprite[] = [];
+    let originalPositions: Map<string, { x: number; y: number }> = new Map();
+    let dragStartTokenId: string | null = null;
+    let originalPos = { x: 0, y: 0 };
+
+    const clearMeasure = () => {
+      if (measureLine) { uiLayer.removeChild(measureLine); measureLine = null; }
+      if (measureText) { uiLayer.removeChild(measureText); measureText = null; }
+      measureStart = null;
+    };
+
+    const onPointerDown = (e: PIXI.FederatedPointerEvent) => {
+      // Ignore if middle mouse button is pressed (used for panning)
+      if (isMiddleMouseDownRef.current) {
+        return;
+      }
+      
+      const currentTool = useGameStore.getState().tool;
+      const currentIsGM = useGameStore.getState().isGM;
+      const pos = { x: e.global.x, y: e.global.y };
+      
+      // Ignore right-click - it should show context menu, not perform selection/drag
+      if (e.button === 2) {
+        return;
+      }
+      
+      // Ignore middle mouse button - it's used for panning only
+      if (e.button === 1) {
+        return;
+      }
+      
+      // Move tool handles selection and movement
+      if (currentTool === 'move') {
+        const selectedTokenIds = useGameStore.getState().selectedTokenIds;
+        
+        // Check if clicking on empty space (not on a token) to start drag select
+        let clickedOnToken = false;
+        let clickedTokenId: string | null = null;
+        let clickedTokenSprite: PIXI.Sprite | null = null;
+        let clickedTokenCenter = null as { x: number; y: number } | null;
+        
+        // Check if we clicked on a token by iterating through tokens
+        // Use toLocal to convert global coordinates to local stage coordinates
+        // This is critical for correct hit testing when zoomed/panned
+        const localPos = stage.toLocal(pos);
+        for (const [id, sprite] of tokensRef.current) {
+          if (localPos.x >= sprite.x && localPos.x <= sprite.x + sprite.width &&
+              localPos.y >= sprite.y && localPos.y <= sprite.y + sprite.height) {
+            clickedOnToken = true;
+            clickedTokenId = id;
+            clickedTokenSprite = sprite;
+            // Store the token's center position for selection box
+            clickedTokenCenter = { x: sprite.x, y: sprite.y };
+            break;
+          }
+        }
+        
+        // Check if clicking on a selected token - start moving
+        if (clickedOnToken && clickedTokenId && clickedTokenSprite && selectedTokenIds && selectedTokenIds.includes(clickedTokenId)) {
+          // Start multi-token moving
+          dragStartTokenId = clickedTokenId;
+          draggingTokenIds = [...selectedTokenIds];
+          originalPositions.clear();
+          ghostAnchors = [];
+          
+          const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+          const gridSize = effectiveGridSize;
+          const offsetX = gridOffsetX;
+          const offsetY = gridOffsetY;
+          
+          // Create ghosts for all selected tokens
+          for (const tokenId of selectedTokenIds) {
+            const sprite = tokensRef.current.get(tokenId);
+            if (sprite) {
+              // Store original position
+              originalPositions.set(tokenId, {
+                x: sprite.x,
+                y: sprite.y,
+              });
+              
+              // Create ghost
+              const ghost = new PIXI.Sprite(sprite.texture);
+              ghost.x = sprite.x;
+              ghost.y = sprite.y;
+              ghost.width = sprite.width;
+              ghost.height = sprite.height;
+              ghost.alpha = 0.4; // Ghost transparency when dragging
+              ghost.anchor.set(0, 0); // Top-left anchor
+              ghostAnchors.push(ghost);
+              tokenLayer.addChild(ghost);
+              
+              // Reduce opacity of original token while dragging
+              sprite.alpha = 0.8;
+            }
+          }
+          
+          // Set reference position for measurement
+          // Use center of the token (top-left + center offset)
+          const tokenFootprint1 = tokens.find(t => t.id === clickedTokenId)?.size || 1;
+          const tokenCenterOffsetX1 = (tokenFootprint1 * gridSize) / 2;
+          const tokenCenterOffsetY1 = (tokenFootprint1 * gridSize) / 2;
+          // Center = top-left position + offset
+          originalPos = {
+            x: clickedTokenSprite.x + tokenCenterOffsetX1,
+            y: clickedTokenSprite.y + tokenCenterOffsetY1,
+          };
+          return;
+        }
+        
+        // Not clicking on selected token - do selection logic (or box select)
+        if (!clickedOnToken) {
+          // Start drag selection from mouse position (box select)
+          dragSelectStart.current = { x: pos.x, y: pos.y };
+          dragSelectCurrent.current = { x: pos.x, y: pos.y };
+          isDragSelecting.current = true;
+          useGameStore.getState().setSelectedToken(null);
+          useGameStore.getState().setSelectedTokenIds([]);
+        } else if (clickedTokenCenter && clickedTokenId) {
+          // Clicked on unselected token - select it only, don't start drag
+          useGameStore.getState().setSelectedToken(clickedTokenId);
+          useGameStore.getState().setSelectedTokenIds([clickedTokenId]);
+        }
+      } else if (currentTool === 'fog' && currentIsGM) {
+        isDrawingFog = true;
+        fogPoints = [[pos.x, pos.y]];
+      } else if (currentTool === 'measure') {
+        measureStart = { x: pos.x, y: pos.y };
+      }
+    };
+
+    const onPointerMove = (e: PIXI.FederatedPointerEvent) => {
+      // Ignore if middle mouse button is pressed (used for panning)
+      if (isMiddleMouseDownRef.current) {
+        return;
+      }
+      
+      const currentTool = useGameStore.getState().tool;
+      if (!currentTool) return;
+      
+      // Ignore middle mouse button - it's used for panning only
+      if (e.button === 1) {
+        return;
+      }
+      
+      const pos = { x: e.global.x, y: e.global.y };
+      const gridSize = effectiveGridSize;
+      
+      // Handle multi-token dragging in select mode
+      if (draggingTokenIds.length > 0 && ghostAnchors.length > 0) {
+        // Convert global position to local stage coordinates
+        // This correctly accounts for pan/zoom transformations
+        const localPos = stage.toLocal(pos);
+        
+        // For measurement: snap to center of target square
+        const measureTargetX = Math.floor((localPos.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX + gridSize / 2;
+        const measureTargetY = Math.floor((localPos.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY + gridSize / 2;
+        
+        // For ghost display: snap to top-left corner
+        const ghostTargetX = Math.floor((localPos.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX;
+        const ghostTargetY = Math.floor((localPos.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY;
+        
+        // Get the token's original position that was clicked to start the drag
+        const dragStartPos = originalPositions.get(dragStartTokenId || draggingTokenIds[0]);
+        if (dragStartPos) {
+          // Calculate delta from the clicked token's original position to target position
+          const dx = ghostTargetX - dragStartPos.x;
+          const dy = ghostTargetY - dragStartPos.y;
+          
+          // Move all ghosts - apply the same delta to each token
+          for (let i = 0; i < draggingTokenIds.length; i++) {
+            const origPos = originalPositions.get(draggingTokenIds[i]);
+            if (origPos && ghostAnchors[i]) {
+              // Simply add the delta to original position (no extra snap)
+              ghostAnchors[i].x = origPos.x + dx;
+              ghostAnchors[i].y = origPos.y + dy;
+            }
+          }
+        }
+        return;
+      }
+      
+      // Handle drag selection rectangle
+      if (currentTool === 'move' && dragSelectStart.current) {
+        // Track current position
+        dragSelectCurrent.current = { x: pos.x, y: pos.y };
+        
+        // Remove previous selection rectangle
+        if (selectionRectRef.current) {
+          uiLayer.removeChild(selectionRectRef.current);
+        }
+        
+        // Calculate selection rectangle bounds
+        const startX = dragSelectStart.current.x;
+        const startY = dragSelectStart.current.y;
+        const rectX = Math.min(startX, pos.x);
+        const rectY = Math.min(startY, pos.y);
+        const rectWidth = Math.abs(pos.x - startX);
+        const rectHeight = Math.abs(pos.y - startY);
+        
+        // Only draw if we've moved enough (to distinguish from a click)
+        if (rectWidth > 5 || rectHeight > 5) {
+          // Convert global to local coordinates for drawing on stage
+          const stagePos = app.stage.position;
+          const stageScale = app.stage.scale;
+          const drawX = (rectX - stagePos.x) / stageScale.x;
+          const drawY = (rectY - stagePos.y) / stageScale.y;
+          const drawWidth = rectWidth / stageScale.x;
+          const drawHeight = rectHeight / stageScale.y;
+          
+          // Draw selection rectangle
+          selectionRectRef.current = new PIXI.Graphics();
+          selectionRectRef.current.rect(drawX, drawY, drawWidth, drawHeight);
+          selectionRectRef.current.fill({ color: 0xffa500, alpha: 0.1 });
+          selectionRectRef.current.stroke({ width: 2, color: 0xffa500 });
+          uiLayer.addChild(selectionRectRef.current);
+        }
+      }
+      
+      if (isDrawingFog && currentTool === 'fog') {
+        // Convert global position to local stage coordinates for proper grid snapping
+        const localPos = stage.toLocal(pos);
+        const snappedX = Math.round(localPos.x / gridSize) * gridSize;
+        const snappedY = Math.round(localPos.y / gridSize) * gridSize;
+        fogPoints.push([snappedX, snappedY]);
+        
+        const preview = new PIXI.Graphics();
+        preview.fill({ color: 0xffffff, alpha: 0.5 });
+        preview.circle(snappedX, snappedY, gridSize / 2);
+        fogLayer.addChild(preview);
+      } else if (measureStart && currentTool === 'measure') {
+        // Don't clear measureStart - just redraw the line
+        // Clear previous line and text (but keep measureStart)
+        if (measureLine) { uiLayer.removeChild(measureLine); measureLine = null; }
+        if (measureText) { uiLayer.removeChild(measureText); measureText = null; }
+        
+        // Convert global coordinates to local stage coordinates for proper grid snapping
+        const localStart = stage.toLocal(measureStart);
+        const localEnd = stage.toLocal(pos);
+        
+        // Snap to grid centers for measurement (use offset for proper center calculation)
+        const startX = Math.floor((localStart.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX + gridSize / 2;
+        const startY = Math.floor((localStart.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY + gridSize / 2;
+        const endX = Math.floor((localEnd.x - gridOffsetX) / gridSize) * gridSize + gridOffsetX + gridSize / 2;
+        const endY = Math.floor((localEnd.y - gridOffsetY) / gridSize) * gridSize + gridOffsetY + gridSize / 2;
+        
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const squares = distance / gridSize;
+        const totalValue = Math.round(squares) * squareValue;
+        
+        measureLine = new PIXI.Graphics();
+        measureLine.moveTo(startX, startY);
+        measureLine.lineTo(endX, endY);
+        measureLine.stroke({ width: 3, color: 0xffff00 });
+        uiLayer.addChild(measureLine);
+        
+        measureText = new PIXI.Text(`${totalValue} ft`, {
+          fontFamily: 'Arial', fontSize: 16, fill: 0xffffff, fontWeight: 'bold',
+        });
+        measureText.x = endX + 5;
+        measureText.y = endY + 5;
+        uiLayer.addChild(measureText);
+      }
+    };
+
+    const onPointerUp = () => {
+      const currentTool = useGameStore.getState().tool;
+      const currentIsGM = useGameStore.getState().isGM;
+      
+      // Handle multi-token dragging completion (both select and move tools)
+      if (draggingTokenIds.length > 0 && ghostAnchors.length > 0) {
+        const tokenLayer = (app as any).tokenLayer as PIXI.Container;
+        
+        // Move all tokens - use ghost positions directly
+        for (let i = 0; i < draggingTokenIds.length; i++) {
+          const tokenId = draggingTokenIds[i];
+          const ghost = ghostAnchors[i];
+          
+          if (ghost) {
+            socketService.moveToken(tokenId, ghost.x, ghost.y);
+          }
+        }
+        
+        // Clean up ghosts
+        for (const ghost of ghostAnchors) {
+          tokenLayer.removeChild(ghost);
+          ghost.destroy();
+        }
+        
+        // Restore original token opacity after drag
+        for (const tokenId of draggingTokenIds) {
+          const sprite = tokensRef.current.get(tokenId);
+          if (sprite) {
+            sprite.alpha = 1;
+          }
+        }
+        
+        draggingTokenIds = [];
+        ghostAnchors = [];
+        originalPositions.clear();
+        dragStartTokenId = null;
+      }
+      
+      // Handle drag selection completion
+      if (isDragSelecting.current && dragSelectStart.current && currentTool === 'move') {
+        const currentPos = dragSelectCurrent.current || dragSelectStart.current;
+        const startX = dragSelectStart.current.x;
+        const startY = dragSelectStart.current.y;
+        const endX = currentPos.x;
+        const endY = currentPos.y;
+        
+        // Only select if we've dragged enough (to distinguish from a click)
+        const rectWidth = Math.abs(endX - startX);
+        const rectHeight = Math.abs(endY - startY);
+        
+        if (rectWidth > 5 || rectHeight > 5) {
+          // Calculate selection rectangle bounds (already in global coordinates)
+          const rectMinX = Math.min(startX, endX);
+          const rectMaxX = Math.max(startX, endX);
+          const rectMinY = Math.min(startY, endY);
+          const rectMaxY = Math.max(startY, endY);
+          
+          // Find tokens within the selection rectangle
+          // Use toLocal to convert global coordinates to local stage coordinates
+          // This is critical for correct hit testing when zoomed/panned
+          const localStart = stage.toLocal({ x: rectMinX, y: rectMinY });
+          const localEnd = stage.toLocal({ x: rectMaxX, y: rectMaxY });
+          const selectedIds: string[] = [];
+          for (const [id, sprite] of tokensRef.current) {
+            const tokenCenterX = sprite.x + sprite.width / 2;
+            const tokenCenterY = sprite.y + sprite.height / 2;
+            
+            if (tokenCenterX >= localStart.x && tokenCenterX <= localEnd.x &&
+                tokenCenterY >= localStart.y && tokenCenterY <= localEnd.y) {
+              selectedIds.push(id);
+            }
+          }
+          
+          if (selectedIds.length > 0) {
+            setSelectedTokenIds(selectedIds);
+          }
+        }
+        
+        // Clear selection rectangle
+        isDragSelecting.current = false;
+        dragSelectStart.current = null;
+        dragSelectCurrent.current = null;
+        if (selectionRectRef.current) {
+          uiLayer.removeChild(selectionRectRef.current);
+          selectionRectRef.current = null;
+        }
+      }
+      
+      if (isDrawingFog && fogPoints.length > 2 && currentIsGM) {
+        socketService.revealFog(currentBoard.id, fogPoints);
+      }
+      isDrawingFog = false;
+      fogPoints = [];
+      fogLayer.removeChildren();
+      
+      if (measureStart && currentTool === 'measure') {
+        clearMeasure();
+      }
+    };
+
+    stage.on('pointerdown', onPointerDown);
+    stage.on('pointermove', onPointerMove);
+    stage.on('pointerup', onPointerUp);
+
+    return () => {
+      stage.off('pointerdown', onPointerDown);
+      stage.off('pointermove', onPointerMove);
+      stage.off('pointerup', onPointerUp);
+    };
+  }, [currentBoard, tool, isGM, squareValue]);
+
+  // Render fog of war - using render texture approach
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app || !currentBoard) return;
+
+    const fogLayer = (app as any).fogLayer as PIXI.Container;
+    fogLayer.visible = showFog;
+
+    if (!showFog) return;
+
+    const boardWidth = currentBoard.width || 1200;
+    const boardHeight = currentBoard.height || 800;
+    const gridSize = effectiveGridSize;
+
+    // Get the render texture
+    const fogVisionRT = (app as any).fogVisionRT?.();
+    
+    if (!fogVisionRT) {
+      // Initialize fog if not already done
+      const initFog = (app as any).initFogOfWar;
+      if (initFog) {
+        initFog(boardWidth, boardHeight);
+      }
+    }
+
+    // Apply all reveals to render texture
+    const rt = (app as any).fogVisionRT?.();
+    if (rt) {
+      fogReveals.forEach(reveal => {
+        const polygon = reveal.polygon.flat();
+        // Draw white circles at each point to reveal
+        for (let i = 0; i < polygon.length; i += 2) {
+          const x = polygon[i];
+          const y = polygon[i + 1];
+          if (x !== undefined && y !== undefined) {
+            const g = new PIXI.Graphics();
+            g.fill({ color: 0xffffff, alpha: 0.8 });
+            g.circle(x, y, gridSize / 2);
+            app.renderer.render({ container: g, target: rt, clear: false });
+            g.destroy();
+          }
+        }
+      });
+    }
+    
+    console.log('Fog rendered, showFog:', showFog, 'reveals:', fogReveals.length);
+  }, [fogReveals, currentBoard, showFog]);
+
+  const tools: { id: 'move' | 'token' | 'fog' | 'measure'; icon: string; label: string }[] = [
+    { id: 'move', icon: 'hand-pointer', label: 'Move' },
+    { id: 'measure', icon: 'ruler', label: 'Measure' },
+    { id: 'fog', icon: 'cloud', label: 'Fog' },
+  ];
+
+  return (
+    <div 
+      className="game-board-container" 
+      ref={containerRef}
+      onClick={() => {
+        if (tokenContextMenu) setTokenContextMenu(null);
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (tokenContextMenu) setTokenContextMenu(null);
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={async (e) => {
+        e.preventDefault();
+        if (!currentBoard || !isGM) return;
+        
+        const files = Array.from(e.dataTransfer.files);
+        const imageFile = files.find(f => f.type.startsWith('image/'));
+        if (!imageFile) return;
+        
+        // Calculate drop position relative to canvas
+        // Account for pan/zoom by converting to stage local coordinates
+        const app = appRef.current;
+        const stage = app?.stage;
+        if (!stage) return;
+        
+        // Convert DOM coordinates to stage local coordinates (accounts for pan/zoom)
+        const globalPos = { x: e.clientX, y: e.clientY };
+        const localPos = stage.toLocal(globalPos);
+        const x = localPos.x;
+        const y = localPos.y;
+        const gridSize = currentBoard.gridSize || 50;
+        // Snap to top-left corner (not center)
+        const snapX = Math.floor(x / gridSize) * gridSize;
+        const snapY = Math.floor(y / gridSize) * gridSize;
+        
+        // Upload the file first
+        try {
+          const formData = new FormData();
+          formData.append('file', imageFile);
+          
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          const data = await res.json();
+          if (data.url) {
+            // Store pending drop info for type selection
+            setPendingDropType({
+              x: snapX,
+              y: snapY,
+              imageUrl: data.url,
+            });
+          }
+        } catch (error) {
+          console.error('Drop upload failed:', error);
+        }
+      }}
+    >
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        left: '10px',
+        zIndex: 100,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        background: 'var(--bg-secondary, rgba(0,0,0,0.8))',
+        padding: '10px',
+        paddingRight: '20px',
+        paddingBottom: '20px',
+        borderRadius: '8px',
+        width: toolbarWidth,
+        minHeight: 'auto',
+        transition: 'width 0.1s ease, height 0.1s ease',
+      }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {tools.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTool(t.id)}
+              title={t.label}
+              style={{
+                padding: '8px',
+                background: tool === t.id ? 'var(--accent, #e94560)' : 'var(--bg-tertiary, #333)',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '18px',
+              }}
+            >
+              {t.icon}
+            </button>
+          ))}
+        </div>
+        
+        {isGM && (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button 
+              onClick={() => setFogEnabled(!fogEnabled)}
+              title={fogEnabled ? 'Hide Fog' : 'Show Fog'}
+              style={{
+                padding: '8px',
+                background: fogEnabled ? 'var(--accent, #e94560)' : 'var(--bg-tertiary, #333)',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              {fogEnabled ? <><Icon name="cloud" /> ON</> : <><Icon name="cloud" /> OFF</>}
+            </button>
+          </div>
+        )}
+        
+        {/* Resize handle */}
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            bottom: 0,
+            width: '16px',
+            height: '16px',
+            cursor: 'se-resize',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '10px',
+            color: '#666',
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startWidth = toolbarWidth;
+            const startHeight = containerRef.current?.clientHeight || 100;
+            
+            const onMouseMove = (moveEvent: MouseEvent) => {
+              const deltaX = moveEvent.clientX - startX;
+              const deltaY = moveEvent.clientY - startY;
+              // Use the larger delta for more natural resizing
+              const newWidth = Math.max(40, Math.min(200, startWidth + deltaX));
+              setToolbarWidth(newWidth);
+            };
+            
+            const onMouseUp = () => {
+              document.removeEventListener('mousemove', onMouseMove);
+              document.removeEventListener('mouseup', onMouseUp);
+            };
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+          }}
+        >
+          <Icon name="arrows-alt" />
+        </div>
+      </div>
+      
+      {/* Token Context Menu */}
+      {tokenContextMenu && (() => {
+        const token = tokens.find(t => t.id === tokenContextMenu.tokenId);
+        if (!token) return null;
+        
+        const size = (effectiveGridSize) * (token.size || 1);
+        const statuses: string[] = token.status ? JSON.parse(token.status) : [];
+        const tokenProps = (token.properties || {}) as Record<string, unknown>;
+        const statusRadiusCustom = typeof tokenProps.statusRadius === 'number' ? tokenProps.statusRadius : 25;
+        const statusSpreadCustom = typeof tokenProps.statusSpread === 'number' ? tokenProps.statusSpread : 0.75;
+        const statusIconSizeCustom = typeof tokenProps.statusIconSize === 'number' ? tokenProps.statusIconSize : 14;
+        const statusRadius = size / 2 + statusRadiusCustom;
+        
+        return (
+        <div
+          style={{
+            position: 'absolute',
+            left: tokenContextMenu.x,
+            top: tokenContextMenu.y,
+            zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.95)',
+            borderRadius: '8px',
+            padding: '8px',
+            minWidth: '220px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Debug Info - DISABLED
+          <div style={{ 
+            color: '#88ff88', 
+            fontSize: '10px', 
+            marginBottom: '8px',
+            borderBottom: '1px solid #444',
+            paddingBottom: '4px',
+            fontFamily: 'monospace'
+          }}>
+            <div><Icon name="map-marker" /> Pos: ({Math.round(token.x)}, {Math.round(token.y)})</div>
+            <div><Icon name="ruler" /> Size: {token.size} ({Math.round(size)}px)</div>
+            <div><Icon name="layer-group" /> Layer: {token.layer}</div>
+            <div><Icon name="tag" /> Label: {token.showLabel ? 'visible' : 'hidden'}</div>
+            {statuses.length > 0 && (
+              <div><Icon name="smile" /> Status: {statuses.length} icon(s) @ r={Math.round(statusRadius)}px</div>
+            )}
+          </div>
+          */}
+          
+          {/* Token Size (D&D) */}
+          <div style={{ 
+            color: '#fff', 
+            fontSize: '12px', 
+            marginBottom: '4px',
+            borderBottom: '1px solid #444',
+            paddingBottom: '4px'
+          }}>
+            Token Size
+          </div>
+          <div style={{ marginBottom: '8px' }}>
+            <select
+              value={token.size}
+              onChange={(e) => {
+                socketService.updateToken(token.id, { size: parseInt(e.target.value) });
+              }}
+              style={{ width: '100%', padding: '4px', background: '#333', color: '#fff', border: 'none', borderRadius: '4px' }}
+            >
+              <option value="0.5">Tiny (½ sq)</option>
+              <option value="1">Small/Medium (1 sq)</option>
+              <option value="2">Large (2×2 sq)</option>
+              <option value="3">Huge (3×3 sq)</option>
+              <option value="4">Gargantuan (4×4 sq)</option>
+            </select>
+          </div>
+          
+          <div style={{ 
+            color: '#fff', 
+            fontSize: '12px', 
+            marginBottom: '8px',
+            borderBottom: '1px solid #444',
+            paddingBottom: '4px'
+          }}>
+            Set Status
+          </div>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(4, 1fr)', 
+            gap: '4px',
+            marginBottom: '8px'
+          }}>
+            {conditionIcons.map((item) => (
+              <button
+                key={item.icon || 'none'}
+                onClick={() => {
+                  if (token && item.icon) {
+                    socketService.toggleTokenStatus(token.id, item.icon);
+                  }
+                  setTokenContextMenu(null);
+                }}
+                style={{
+                  padding: '6px',
+                  fontSize: '16px',
+                  background: statuses.includes(item.icon || '') ? '#e94560' : '#333',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+                title={item.label}
+              >
+                {item.icon ? <Icon name={item.icon} /> : <Icon name="times-circle" />}
+              </button>
+            ))}
+          </div>
+          
+          {/* Status Icon Settings */}
+          {statuses.length > 0 && (
+            <>
+              <div style={{ 
+                color: '#fff', 
+                fontSize: '12px', 
+                marginBottom: '4px',
+                borderBottom: '1px solid #444',
+                paddingBottom: '4px'
+              }}>
+                Status Icon Settings
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '2px' }}>
+                  Radius: {statusRadiusCustom}px
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="50"
+                  value={statusRadiusCustom}
+                  onChange={(e) => {
+                    const newProps = { ...tokenProps, statusRadius: parseInt(e.target.value) };
+                    socketService.updateToken(token.id, { properties: newProps });
+                  }}
+                  style={{ width: '100%', cursor: 'pointer' }}
+                />
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '2px' }}>
+                  Spread: {Math.round(statusSpreadCustom * 100)}%
+                </div>
+                <input
+                  type="range"
+                  min="25"
+                  max="100"
+                  value={statusSpreadCustom * 100}
+                  onChange={(e) => {
+                    const newProps = { ...tokenProps, statusSpread: parseInt(e.target.value) / 100 };
+                    socketService.updateToken(token.id, { properties: newProps });
+                  }}
+                  style={{ width: '100%', cursor: 'pointer' }}
+                />
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '2px' }}>
+                  Icon Size: {typeof tokenProps.statusIconSize === 'number' ? tokenProps.statusIconSize : 14}px
+                </div>
+                <input
+                  type="range"
+                  min="8"
+                  max="32"
+                  value={typeof tokenProps.statusIconSize === 'number' ? tokenProps.statusIconSize : 14}
+                  onChange={(e) => {
+                    const newProps = { ...tokenProps, statusIconSize: parseInt(e.target.value) };
+                    socketService.updateToken(token.id, { properties: newProps });
+                  }}
+                  style={{ width: '100%', cursor: 'pointer' }}
+                />
+              </div>
+            </>
+          )}
+          
+          {/* Label Toggle */}
+          <div style={{ 
+            color: '#fff', 
+            fontSize: '12px', 
+            marginBottom: '4px',
+            borderBottom: '1px solid #444',
+            paddingBottom: '4px'
+          }}>
+            Label
+          </div>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                socketService.updateToken(token.id, { showLabel: !token.showLabel });
+              }}
+              style={{
+                padding: '4px 8px',
+                fontSize: '11px',
+                background: token.showLabel ? '#e94560' : '#333',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+            >
+              {token.showLabel ? <><Icon name="eye" /> ON</> : <><Icon name="eye" /> OFF</>}
+            </button>
+            <button
+              onClick={() => {
+                const newLabel = prompt('Enter label text:', token.label || token.name || '');
+                if (newLabel !== null) {
+                  socketService.updateToken(token.id, { label: newLabel, showLabel: true });
+                }
+              }}
+              style={{
+                padding: '4px 8px',
+                fontSize: '11px',
+                background: '#4a5568',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="pen" /> Edit
+            </button>
+          </div>
+          
+          {/* Label Settings */}
+          {token.showLabel && (
+            <>
+              <div style={{ 
+                color: '#fff', 
+                fontSize: '12px', 
+                marginBottom: '4px',
+                borderBottom: '1px solid #444',
+                paddingBottom: '4px'
+              }}>
+                Label Settings
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '2px' }}>Position</div>
+                <select
+                  value={typeof tokenProps.labelPosition === 'string' ? tokenProps.labelPosition : 'below'}
+                  onChange={(e) => {
+                    const newProps = { ...tokenProps, labelPosition: e.target.value };
+                    socketService.updateToken(token.id, { properties: newProps });
+                  }}
+                  style={{ width: '100%', padding: '4px', background: '#333', color: '#fff', border: 'none', borderRadius: '4px' }}
+                >
+                  <option value="below">Below Token</option>
+                  <option value="top">Above Token</option>
+                  <option value="inside-top">Inside (Top)</option>
+                  <option value="inside-bottom">Inside (Bottom)</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '2px' }}>Color</div>
+                <input
+                  type="color"
+                  value={typeof tokenProps.labelColor === 'string' ? tokenProps.labelColor : '#ffffff'}
+                  onChange={(e) => {
+                    const newProps = { ...tokenProps, labelColor: e.target.value };
+                    socketService.updateToken(token.id, { properties: newProps });
+                  }}
+                  style={{ width: '100%', height: '25px', cursor: 'pointer' }}
+                />
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '2px' }}>
+                  Font Size: {typeof tokenProps.labelFontSize === 'number' ? tokenProps.labelFontSize : 'auto'}
+                </div>
+                <input
+                  type="range"
+                  min="8"
+                  max="32"
+                  value={typeof tokenProps.labelFontSize === 'number' ? tokenProps.labelFontSize : 14}
+                  onChange={(e) => {
+                    const newProps = { ...tokenProps, labelFontSize: parseInt(e.target.value) };
+                    socketService.updateToken(token.id, { properties: newProps });
+                  }}
+                  style={{ width: '100%', cursor: 'pointer' }}
+                />
+              </div>
+            </>
+          )}
+          
+          {/* Bars Configuration */}
+          <div style={{ 
+            color: '#fff', 
+            fontSize: '12px', 
+            marginBottom: '4px',
+            borderBottom: '1px solid #444',
+            paddingBottom: '4px'
+          }}>
+            Bars
+          </div>
+          {(() => {
+            const bars: Array<{ name: string; current: number; max: number; color: string }> = token.bars ? JSON.parse(token.bars) : [];
+            const hpBar = bars.find(b => b.name === 'HP');
+            const manaBar = bars.find(b => b.name === 'Mana');
+            const hpEnabled = !!hpBar;
+            const manaEnabled = !!manaBar;
+            return (
+            <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  const newCurrent = prompt('HP current value:', hpBar ? String(hpBar.current) : '10');
+                  const newMax = prompt('HP max value:', hpBar ? String(hpBar.max) : '10');
+                  if (newCurrent !== null && newMax !== null) {
+                    const newBars = bars.filter(b => b.name !== 'HP');
+                    newBars.push({ name: 'HP', current: parseInt(newCurrent) || 0, max: parseInt(newMax) || 1, color: '#e94560' });
+                    socketService.updateToken(token.id, { bars: JSON.stringify(newBars) });
+                  }
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  background: hpEnabled ? '#e94560' : '#4a5568',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icon name="heart" /> HP {hpEnabled ? 'ON' : ''}
+              </button>
+              <button
+                onClick={() => {
+                  const newCurrent = prompt('Mana current value:', manaBar ? String(manaBar.current) : '10');
+                  const newMax = prompt('Mana max value:', manaBar ? String(manaBar.max) : '10');
+                  if (newCurrent !== null && newMax !== null) {
+                    const newBars = bars.filter(b => b.name !== 'Mana');
+                    newBars.push({ name: 'Mana', current: parseInt(newCurrent) || 0, max: parseInt(newMax) || 1, color: '#4299e1' });
+                    socketService.updateToken(token.id, { bars: JSON.stringify(newBars) });
+                  }
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  background: manaEnabled ? '#4299e1' : '#4a5568',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icon name="tint" /> Mana {manaEnabled ? 'ON' : ''}
+              </button>
+            </div>
+            );
+          })()}
+            <button
+              onClick={() => {
+                const bars: Array<{ name: string; current: number; max: number; color: string }> = token.bars ? JSON.parse(token.bars) : [];
+                const newName = prompt('Bar name (e.g., Stamina):');
+                if (!newName) return;
+                const newCurrent = prompt(`${newName} current value:`, '10');
+                const newMax = prompt(`${newName} max value:`, '10');
+                const newColor = prompt('Bar color (hex, e.g., #48bb78):', '#48bb78');
+                if (newCurrent !== null && newMax !== null && newColor !== null) {
+                  const newBars = bars.filter(b => b.name !== newName);
+                  newBars.push({ name: newName, current: parseInt(newCurrent) || 0, max: parseInt(newMax) || 1, color: newColor || '#48bb78' });
+                  socketService.updateToken(token.id, { bars: JSON.stringify(newBars) });
+                }
+              }}
+              style={{
+                padding: '4px 8px',
+                fontSize: '11px',
+                background: '#4a5568',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="plus" /> Custom
+            </button>
+            <button
+              onClick={() => {
+                socketService.updateToken(token.id, { bars: '[]' });
+              }}
+              style={{
+                padding: '4px 8px',
+                fontSize: '11px',
+                background: '#e94560',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="trash" /> Clear
+            </button>
+          </div>
+          
+          {/* Layer Selection */}
+          <div style={{ 
+            color: '#fff', 
+            fontSize: '12px', 
+            marginBottom: '4px',
+            borderBottom: '1px solid #444',
+            paddingBottom: '4px'
+          }}>
+            Layer
+          </div>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+            {(['tokens', 'tiles', 'objects'] as const).map(layer => (
+              <button
+                key={layer}
+                onClick={() => {
+                  socketService.setTokenLayer(token.id, layer);
+                  setTokenContextMenu(null);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  background: token.layer === layer ? '#e94560' : '#333',
+                  border: 'none',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                {layer}
+              </button>
+            ))}
+          </div>
+          
+          {/* Delete Token */}
+          <button
+            onClick={() => {
+              if (confirm('Delete this token?')) {
+                socketService.deleteToken(token.id);
+              }
+              setTokenContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              padding: '8px',
+              fontSize: '12px',
+              background: '#e94560',
+              border: 'none',
+              borderRadius: '4px',
+              color: 'white',
+              cursor: 'pointer',
+            }}
+          >
+            <Icon name="trash" /> Delete Token
+          </button>
+        </div>
+      );})()}
+
+      {/* Pending Drop Type Selection Modal */}
+      {pendingDropType && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: '#2d3748',
+            padding: '20px',
+            borderRadius: '8px',
+            zIndex: 1000,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            minWidth: '280px',
+          }}
+        >
+          <div style={{ color: '#fff', marginBottom: '12px', fontWeight: 'bold' }}>
+            What would you like to add?
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                if (currentBoard)
+                  socketService.createToken(currentBoard.id, {
+                    name: 'Token',
+                    imageUrl: pendingDropType.imageUrl,
+                    x: pendingDropType.x,
+                    y: pendingDropType.y,
+                    size: 1,
+                  });
+                setPendingDropType(null);
+              }}
+              style={{
+                flex: '1 1 45%',
+                padding: '12px',
+                background: '#4a5568',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              <Icon name="theater-masks" /> Token
+            </button>
+            <button
+              onClick={() => {
+                if (currentBoard)
+                  socketService.setBackground(currentBoard.id, pendingDropType.imageUrl);
+                setPendingDropType(null);
+              }}
+              style={{
+                flex: '1 1 45%',
+                padding: '12px',
+                background: '#4a5568',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              <Icon name="image" /> Background
+            </button>
+            <button
+              onClick={() => {
+                if (currentBoard)
+                  socketService.createToken(currentBoard.id, {
+                    name: 'Tile',
+                    imageUrl: pendingDropType.imageUrl,
+                    x: pendingDropType.x,
+                    y: pendingDropType.y,
+                    size: 1,
+                  });
+                setPendingDropType(null);
+              }}
+              style={{
+                flex: '1 1 45%',
+                padding: '12px',
+                background: '#4a5568',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              <Icon name="border-all" /> Tile
+            </button>
+          </div>
+          <button
+            onClick={() => setPendingDropType(null)}
+            style={{
+              width: '100%',
+              marginTop: '12px',
+              padding: '8px',
+              background: 'transparent',
+              border: '1px solid #555',
+              borderRadius: '4px',
+              color: '#aaa',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,575 @@
+// Prisma schema for VTT Database
+// This defines the database models for Stage 1
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================
+// User Management
+// ====================
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Account-level settings
+  settings     Json      @default("{}")  // User preferences (theme, UI settings, etc.)
+
+  // Relations
+  sessionsAsGM      Session[]       @relation("GM_Sessions")
+  sessionMemberships SessionPlayer[]
+  tokens            Token[]
+  chatMessages      ChatMessage[]
+  fogReveals        FogReveal[]
+  fogAdds           FogAdd[]
+
+  @@map("users")
+}
+
+// ====================
+// Sessions
+// ====================
+
+model Session {
+  id        String   @id @default(uuid())
+  name      String
+  roomCode  String   @unique @map("room_code")
+  gmId      String   @map("gm_id")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  gm            User             @relation("GM_Sessions", fields: [gmId], references: [id])
+  players       SessionPlayer[]
+  boards        Board[]
+  chatMessages  ChatMessage[]
+  sessionModules SessionModule[]
+  journals      Journal[]
+  characterSheets CharacterSheet[]
+
+  @@map("sessions")
+}
+
+model SessionPlayer {
+  sessionId String   @map("session_id")
+  userId    String   @map("user_id")
+  role      String   @default("player") // 'gm', 'player'
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  // Player settings for this session
+  playerColor       String   @default("#4488ff")  // Color identifier for this player
+  controlledTokens  String[] @default([])  // Token IDs this player can control
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, userId])
+  @@map("session_players")
+}
+
+// ====================
+// Journals
+// ====================
+
+model Journal {
+  id          String   @id @default(uuid())
+  sessionId   String   @map("session_id")
+  title       String
+  type        String   @default("general") // 'general', 'player', 'location', 'world', 'lore', 'quest', 'npc', 'item'
+  content     String   @db.Text // Main content in markdown
+  layout      String   @default("standard") // Layout style: 'standard', 'timeline', 'grid', 'map', 'character', 'codex'
+  color       String?  @default("#2d2d2d") // Custom accent color
+  icon        String?  // Optional icon name
+  tags        String[] @default([]) // Tags for filtering
+  isPrivate   Boolean  @default(false) // Only visible to GM
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, type])
+  @@index([sessionId])
+  @@map("journals")
+}
+
+// ====================
+// Character Sheets
+// ====================
+
+model CharacterSheet {
+  id          String   @id @default(uuid())
+  sessionId   String   @map("session_id")
+  name        String
+  playerName  String?  @map("player_name") // Player who owns this character
+  
+  // Core Stats (D&D 5e oriented)
+  level       Int      @default(1)
+  experience  Int      @default(0)
+  
+  // Ability Scores
+  strength    Int      @default(10)
+  dexterity   Int      @default(10)
+  constitution Int    @default(10)
+  intelligence Int     @default(10)
+  wisdom      Int      @default(10)
+  charisma    Int      @default(10)
+  
+  // Combat Stats
+  armorClass  Int      @default(10) @map("armor_class")
+  initiative  Int      @default(0)
+  speed       Int      @default(30)
+  maxHp       Int      @default(10) @map("max_hp")
+  currentHp   Int      @default(10) @map("current_hp")
+  tempHp      Int      @default(0) @map("temp_hp")
+  hitDice     String   @default("1d8") @map("hit_dice")
+  hitDiceUsed Int      @default(0) @map("hit_dice_used")
+  
+  // Death Saves
+  deathSavesSuccess Int @default(0) @map("death_saves_success")
+  deathSavesFail    Int @default(0) @map("death_saves_fail")
+  
+  // Currency
+  copper      Int      @default(0)
+  silver      Int      @default(0)
+  gold        Int      @default(0)
+  platinum    Int      @default(0)
+  
+  // Proficiencies & Skills
+  proficiencyBonus Int @default(2) @map("proficiency_bonus")
+  savingThrows    String[] @default([]) @map("saving_throws")
+  skills          String[] @default([])
+  
+  // Equipment & Inventory (stored as JSON array of item IDs or embedded items)
+  inventory    Json     @default("[]")
+  
+  // Spellcasting
+  spellcastingAbility String? @map("spellcasting_ability")
+  spellSaveDc     Int      @default(10) @map("spell_save_dc")
+  spellAttack    Int      @default(0) @map("spell_attack")
+  
+  // Spells (stored as JSON array)
+  spells         Json     @default("[]")
+  knownSpells    String[] @default([]) @map("known_spells")
+  preparedSpells String[] @default([]) @map("prepared_spells")
+  
+  // Features & Traits
+  features    Json     @default("[]") // Array of feature objects
+  traits      String   @db.Text
+  flaws       String?  @db.Text
+  bonds       String?  @db.Text
+  ideals      String?  @db.Text
+  backstory   String?  @db.Text
+  
+  // Notes
+  notes       String?  @db.Text
+  
+  // Appearance
+  race        String?
+  class       String?
+  background  String?
+  alignment   String?
+  age         String?
+  height      String?
+  weight      String?
+  eyes        String?
+  skin        String?
+  hair        String?
+  imageUrl    String?  @map("image_url")
+  
+  // Token Reference
+  tokenId     String?  @map("token_id") // Associated token on the board
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([sessionId, name])
+  @@map("character_sheets")
+}
+
+// ====================
+// Boards & Maps
+// ====================
+
+model Board {
+  id         String   @id @default(uuid())
+  sessionId  String   @map("session_id")
+  name       String
+  backgroundUrl String? @map("background_url")
+  gridSize   Int      @default(50) @map("grid_size")
+  gridType   String   @default("square") @map("grid_type") // 'square', 'hex'
+  width      Int      @default(2000)
+  height     Int      @default(2000)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  session    Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokens     Token[]
+  fogReveals FogReveal[]
+  fogAdds    FogAdd[]
+
+  @@map("boards")
+}
+
+// ====================
+// Tokens
+// ====================
+
+model Token {
+  id        String   @id @default(uuid())
+  boardId   String   @map("board_id")
+  ownerId   String?  @map("owner_id")
+  name      String
+  imageUrl  String   @map("image_url")
+  x         Int      @default(0)
+  y         Int      @default(0)
+  size      Int      @default(1)
+  visible   Boolean  @default(true)
+  locked    Boolean  @default(false)
+  status    String?  @default("")  // JSON string of status emojis array
+  layer     String   @default("tokens") // 'tokens', 'tiles', 'objects'
+  label     String?  @default("")  // Token label text
+  showLabel Boolean  @default(false)  // Whether to show the label
+  bars      String?  @default("[]")  // JSON string of bar configuration
+  properties Json    @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  owner   User?  @relation(fields: [ownerId], references: [id])
+
+  @@map("tokens")
+}
+
+// ====================
+// Fog of War
+// ====================
+
+model FogReveal {
+  id        String   @id @default(uuid())
+  boardId   String   @map("board_id")
+  polygon   Json     // Array of [x, y] points
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  board   Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator User  @relation(fields: [createdBy], references: [id])
+
+  @@map("fog_reveals")
+}
+
+model FogAdd {
+  id        String   @id @default(uuid())
+  boardId   String   @map("board_id")
+  polygon   Json     // Array of [x, y] points
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  board   Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator User  @relation(fields: [createdBy], references: [id])
+
+  @@map("fog_adds")
+}
+
+// ====================
+// Chat
+// ====================
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  userId    String   @map("user_id")
+  text      String
+  timestamp DateTime @default(now())
+  
+  // Visibility settings for GM-only, blind GM, self-only rolls
+  isPrivate  Boolean  @default(false)  // GM only
+  isBlindGM  Boolean  @default(false)  // Visible to everyone except GM
+  isSelfRoll Boolean  @default(false)  // Only visible to sender
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([sessionId, timestamp])
+  @@map("chat_messages")
+}
+
+// ====================
+// API Keys (for future plugin API)
+// ====================
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  keyHash     String    @map("key_hash")
+  permissions Json      @default("[]")
+  lastUsed    DateTime? @map("last_used")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("api_keys")
+}
+
+// ====================
+// Data Modules (Game System Data)
+// ====================
+
+model DataModule {
+  id          String   @id @default(uuid())
+  name        String   // e.g., "D&D 5e 2014", "Pathfinder 2"
+  system      String   // e.g., "dnd5e", "pf2e", "coc"
+  version     String?  // e.g., "2014", "2024", "SRD"
+  description String?  @db.Text
+  itemCount   Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  compendiumEntries CompendiumEntry[]
+  legacyItems       DataItem[]
+  sessionLinks      SessionModule[]
+
+  @@unique([name, system, version])
+  @@map("data_modules")
+}
+
+// ====================
+// Compendium Entry (Base Model)
+// ====================
+
+model CompendiumEntry {
+  id          String   @id @default(uuid())
+  moduleId    String   @map("module_id")
+  system      String   // e.g., "dnd5e", "pf2e"
+  type        String   // spell, monster, item, feat, class, race, background, condition
+  name        String
+  slug        String   @unique // URL-friendly identifier
+  source      String?
+  summary     String?  @db.Text
+  raw         Json?    // Raw JSON for traceability
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  module      DataModule       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  spell       CompendiumSpell?
+  monster     CompendiumMonster?
+  item        CompendiumItem?
+  feat        CompendiumFeat?
+  characterClass  CompendiumClass?
+  race        CompendiumRace?
+  background  CompendiumBackground?
+  condition   CompendiumCondition?
+
+  @@index([moduleId, type])
+  @@index([name])
+  @@index([system, type])
+  @@index([source])
+  @@index([slug])
+  @@map("compendium_entries")
+}
+
+// ====================
+// Spell
+// ====================
+
+model CompendiumSpell {
+  id          String  @id @map("compendium_entry_id")
+  level       Int
+  school      String
+  castingTime String  @map("casting_time")
+  components  String
+  range       String
+  duration    String
+  saveType    String? @map("save_type")
+  damageType  String? @map("damage_type")
+  description String  @db.Text
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@index([level])
+  @@index([school])
+  @@map("compendium_spells")
+}
+
+// ====================
+// Monster
+// ====================
+
+model CompendiumMonster {
+  id               String  @id @map("compendium_entry_id")
+  size             String
+  creatureType     String  @map("creature_type")
+  challengeRating Float   @map("challenge_rating")
+  hitPoints       Int     @map("hit_points")
+  armorClass      Int     @map("armor_class")
+  alignment        String
+  actions          Json
+  traits           Json
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@index([challengeRating])
+  @@index([size])
+  @@map("compendium_monsters")
+}
+
+// ====================
+// Item
+// ====================
+
+model CompendiumItem {
+  id             String  @id @map("compendium_entry_id")
+  itemCategory   String  @map("item_category")
+  rarity         String
+  requiresAttune Boolean @map("requires_attune")
+  damage         String?
+  damageType     String? @map("damage_type")
+  armorClass     Int?    @map("armor_class")
+  properties     Json    @default("{}")
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@index([itemCategory])
+  @@index([rarity])
+  @@map("compendium_items")
+}
+
+// ====================
+// Feat
+// ====================
+
+model CompendiumFeat {
+  id           String  @id @map("compendium_entry_id")
+  prerequisites String?
+  benefits     String  @db.Text
+  repeatable   Boolean @default(false)
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("compendium_feats")
+}
+
+// ====================
+// Character Class
+// ====================
+
+model CompendiumClass {
+  id                 String  @id @map("compendium_entry_id")
+  hitDie             Int     @map("hit_die")
+  spellcastingAbility String? @map("spellcasting_ability")
+  features           Json
+  subclasses         Json
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("compendium_classes")
+}
+
+// ====================
+// Race
+// ====================
+
+model CompendiumRace {
+  id              String @id @map("compendium_entry_id")
+  size            String
+  speed           Int
+  abilityBonuses  Json   @map("ability_bonuses")
+  traits          Json
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("compendium_races")
+}
+
+// ====================
+// Background
+// ====================
+
+model CompendiumBackground {
+  id                 String @id @map("compendium_entry_id")
+  skillProficiencies Json  @map("skill_proficiencies")
+  toolProficiencies  Json  @map("tool_proficiencies")
+  feature            String @db.Text
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("compendium_backgrounds")
+}
+
+// ====================
+// Condition
+// ====================
+
+model CompendiumCondition {
+  id       String @id @map("compendium_entry_id")
+  effects  String @db.Text
+
+  // Relation
+  entry CompendiumEntry @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("compendium_conditions")
+}
+
+// Legacy DataItem model - kept for backward compatibility during migration
+model DataItem {
+  id          String   @id @default(uuid())
+  moduleId    String   @map("module_id")
+  name        String
+  type        String   // spell, weapon, item, monster, class, race, feat, etc.
+  data        Json     // flexible storage for all properties
+  source      String?  // original source of the item
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  module      DataModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId, type])
+  @@index([name])
+  @@map("data_items")
+}
+
+// Per-session module enablement
+model SessionModule {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  moduleId  String   @map("module_id")
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  session Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  module  DataModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, moduleId])
+  @@map("session_modules")
+}

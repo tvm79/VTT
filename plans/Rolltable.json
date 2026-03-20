@@ -1,0 +1,110 @@
+{
+  "name": "Dark Omens",
+  "img": "icons/svg/d20-grey.svg",
+  "description": "",
+  "results": [
+    {
+      "type": "text",
+      "weight": 1,
+      "range": [
+        1,
+        1
+      ],
+      "_id": "0xssTBCSn0T5Bu5c",
+      "name": "Raven",
+      "img": "icons/svg/d20-black.svg",
+      "description": "<p>A raven drops a blood-red feather</p>",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "dnd5e",
+        "systemVersion": "5.2.5",
+        "createdTime": 1773753088578,
+        "modifiedTime": 1773753106483,
+        "lastModifiedBy": "nG5lynQd4TsU4u3K"
+      },
+      "documentUuid": null
+    },
+    {
+      "type": "text",
+      "weight": 1,
+      "range": [
+        2,
+        2
+      ],
+      "_id": "lBKqxPWppt061aRo",
+      "name": "Mirror",
+      "img": "icons/svg/d20-black.svg",
+      "description": "<p>A mirror fogs with an unknown name</p>",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "dnd5e",
+        "systemVersion": "5.2.5",
+        "createdTime": 1773753108352,
+        "modifiedTime": 1773753116296,
+        "lastModifiedBy": "nG5lynQd4TsU4u3K"
+      },
+      "documentUuid": null
+    },
+    {
+      "type": "text",
+      "weight": 1,
+      "range": [
+        3,
+        3
+      ],
+      "_id": "WLqgh5FQjZK3eU5c",
+      "name": "Bells",
+      "img": "icons/svg/d20-black.svg",
+      "description": "<p>Distant bells ring once, then silence</p>",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "dnd5e",
+        "systemVersion": "5.2.5",
+        "createdTime": 1773753122151,
+        "modifiedTime": 1773753128620,
+        "lastModifiedBy": "nG5lynQd4TsU4u3K"
+      },
+      "documentUuid": null
+    }
+  ],
+  "replacement": true,
+  "displayRoll": true,
+  "folder": null,
+  "flags": {},
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": {
+      "worldId": "walsharess",
+      "uuid": "RollTable.3i8JJ06xL8czITUa",
+      "coreVersion": "13.351",
+      "systemId": "dnd5e",
+      "systemVersion": "5.2.5"
+    },
+    "coreVersion": "13.351",
+    "systemId": "dnd5e",
+    "systemVersion": "5.2.5",
+    "createdTime": 1773753038367,
+    "modifiedTime": 1773753158799,
+    "lastModifiedBy": "nG5lynQd4TsU4u3K"
+  },
+  "formula": "1d3",
+  "ownership": {
+    "default": 0
+  }
+}
