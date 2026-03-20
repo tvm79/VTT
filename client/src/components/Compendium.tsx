@@ -85,6 +85,9 @@ interface CompendiumProps {
   } | null;
 }
 
+// Threshold below which list view is shown instead of cards
+const LIST_VIEW_THRESHOLD = 0.5;
+
 export function Compendium({
   activeTab,
   activeBrowseTab,
@@ -216,7 +219,7 @@ export function Compendium({
       {(activeTab === 'compendium' || activeTab === 'modules') && (
         <div className="compendium-view">
           <div className="card-size-slider">
-            <span className="slider-label">Card Size:</span>
+            <span className="slider-label">View:</span>
             <input
               type="range"
               min="0.5"
@@ -226,7 +229,7 @@ export function Compendium({
               onChange={(e) => setCardSizeScale(parseFloat(e.target.value))}
               className="size-slider"
             />
-            <span className="slider-value">{Math.round(cardSizeScale * 100)}%</span>
+            <span className="slider-value">{cardSizeScale <= LIST_VIEW_THRESHOLD ? 'List' : `${Math.round(cardSizeScale * 100)}%`}</span>
           </div>
 
           {/* Wrapper for filter sidebar and items grid */}
@@ -246,7 +249,7 @@ export function Compendium({
               </div>
             )}
 
-          <div className="items-grid" style={{ '--card-size-scale': cardSizeScale } as CSSProperties}>
+          <div className={`items-grid ${cardSizeScale <= LIST_VIEW_THRESHOLD ? 'items-list' : ''}`} style={{ '--card-size-scale': cardSizeScale } as CSSProperties}>
             {activeTab === 'modules' ? (
               <>
                 <div className="module-header">
@@ -311,97 +314,130 @@ export function Compendium({
                 {loadingTypeItems ? (
                   <div className="loading">Loading...</div>
                 ) : typeItems.length > 0 ? (
-                  typeItems.map((item: any) => {
-                    const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item));
-                    const cardStyle = {
-                      cursor: 'grab',
-                      '--card-accent': visual.accent,
-                    } as CSSProperties;
+                  cardSizeScale <= LIST_VIEW_THRESHOLD ? (
+                    typeItems.map((item: any) => {
+                      const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item));
+                      return (
+                        <div
+                          key={item.id}
+                          className={`list-item ${floatingPanels.some((panel) => panel.item.id === item.id) ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedItem(item);
+                            openItemPanel(item);
+                          }}
+                          draggable
+                          onDragStart={(e) => {
+                            const payload = JSON.stringify(item);
+                            e.dataTransfer.setData('application/json', payload);
+                            e.dataTransfer.setData('text/plain', payload);
+                            e.dataTransfer.effectAllowed = 'copy';
+                          }}
+                        >
+                          <div className="list-item-image">
+                            <img
+                              src={visual.schoolIcon && String(item?.type || '').toLowerCase().includes('spell') ? visual.schoolIcon : getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
+                              alt={item?.name || 'Item image'}
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="list-item-name">{item.name}</div>
+                          <div className="list-item-source">{item.book || item.source || 'Unknown source'}</div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    typeItems.map((item: any) => {
+                      const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item));
+                      const cardStyle = {
+                        cursor: 'grab',
+                        '--card-accent': visual.accent,
+                      } as CSSProperties;
 
-                    return (
-                      <div
-                        key={item.id}
-                        className={`item-card ${floatingPanels.some((panel) => panel.item.id === item.id) ? 'selected' : ''}`}
-                        data-type={String(item.type || '').toLowerCase()}
-                        onClick={() => {
-                          setSelectedItem(item);
-                          openItemPanel(item);
-                        }}
-                        draggable
-                        onDragStart={(e) => {
-                          const payload = JSON.stringify(item);
-                          e.dataTransfer.setData('application/json', payload);
-                          e.dataTransfer.setData('text/plain', payload);
-                          e.dataTransfer.effectAllowed = 'copy';
-                        }}
-                        style={cardStyle}
-                      >
-                        <div className="card-art">
+                      return (
+                        <div
+                          key={item.id}
+                          className={`item-card ${floatingPanels.some((panel) => panel.item.id === item.id) ? 'selected' : ''}`}
+                          data-type={String(item.type || '').toLowerCase()}
+                          onClick={() => {
+                            setSelectedItem(item);
+                            openItemPanel(item);
+                          }}
+                          draggable
+                          onDragStart={(e) => {
+                            const payload = JSON.stringify(item);
+                            e.dataTransfer.setData('application/json', payload);
+                            e.dataTransfer.setData('text/plain', payload);
+                            e.dataTransfer.effectAllowed = 'copy';
+                          }}
+                          style={cardStyle}
+                        >
+                          <div className="card-art">
+                            <img
+                              className="card-art-image"
+                              src={visual.schoolIcon && String(item?.type || '').toLowerCase().includes('spell') ? visual.schoolIcon : getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
+                              alt={item?.name || 'Compendium entry image'}
+                              loading="lazy"
+                            />
+                            <span className="card-type-overlay">
+                              {item.type}
+                            </span>
+                            <div className="card-name-overlay">{item.name}</div>
+                            <div className="card-meta-overlay">
+                              {item.book || item.source || 'Unknown source'}
+                            </div>
+                          </div>
                           <img
-                            className="card-art-image"
+                            className="card-bg-image"
                             src={visual.schoolIcon && String(item?.type || '').toLowerCase().includes('spell') ? visual.schoolIcon : getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
-                            alt={item?.name || 'Compendium entry image'}
-                            loading="lazy"
+                            alt=""
                           />
-                          <span className="card-type-overlay">
-                            {item.type}
-                          </span>
-                          <div className="card-name-overlay">{item.name}</div>
-                          <div className="card-meta-overlay">
-                            {item.book || item.source || 'Unknown source'}
+                          <div className="card-header">
+                            <div className="card-actions">
+                              <button
+                                className="card-action-btn"
+                                onClick={(e) => { e.stopPropagation(); openItemPanel(item); }}
+                                title="Open"
+                              >
+                                <Icon name="external-link-alt" />
+                              </button>
+                              <button
+                                className="card-action-btn"
+                                onClick={(e) => { e.stopPropagation(); duplicateItem(item); }}
+                                title="Duplicate"
+                              >
+                                <Icon name="copy" />
+                              </button>
+                              <button
+                                className="card-action-btn"
+                                onClick={(e) => { e.stopPropagation(); autoResolveBestImageForItem(item); }}
+                                title="Auto retrieve best image"
+                              >
+                                <Icon name="image" />
+                              </button>
+                              <button
+                                className="card-action-btn card-action-btn-danger"
+                                onClick={(e) => { e.stopPropagation(); deleteItem(item); }}
+                                title="Delete"
+                              >
+                                <Icon name="trash" />
+                              </button>
+                            </div>
+                          </div>
+                          {(item.description || item.system?.description) && (
+                            <div className="card-desc">
+                              {typeof (item.description || item.system?.description) === 'string'
+                                ? (item.description || item.system?.description).slice(0, 100) + ((item.description || item.system?.description).length > 100 ? '...' : '')
+                                : JSON.stringify(item.description || item.system?.description).slice(0, 100)}
+                            </div>
+                          )}
+                          <div className="card-footer">
+                            <Icon name="hand-pointer" />
+                            Drag to canvas
                           </div>
                         </div>
-                        <img
-                          className="card-bg-image"
-                          src={visual.schoolIcon && String(item?.type || '').toLowerCase().includes('spell') ? visual.schoolIcon : getEntryDisplayImage(item, String(item?.type || '').toLowerCase() === 'monster')}
-                          alt=""
-                        />
-                        <div className="card-header">
-                          <div className="card-actions">
-                            <button
-                              className="card-action-btn"
-                              onClick={(e) => { e.stopPropagation(); openItemPanel(item); }}
-                              title="Open"
-                            >
-                              <Icon name="external-link-alt" />
-                            </button>
-                            <button
-                              className="card-action-btn"
-                              onClick={(e) => { e.stopPropagation(); duplicateItem(item); }}
-                              title="Duplicate"
-                            >
-                              <Icon name="copy" />
-                            </button>
-                            <button
-                              className="card-action-btn"
-                              onClick={(e) => { e.stopPropagation(); autoResolveBestImageForItem(item); }}
-                              title="Auto retrieve best image"
-                            >
-                              <Icon name="image" />
-                            </button>
-                            <button
-                              className="card-action-btn card-action-btn-danger"
-                              onClick={(e) => { e.stopPropagation(); deleteItem(item); }}
-                              title="Delete"
-                            >
-                              <Icon name="trash" />
-                            </button>
-                          </div>
-                        </div>
-                        {(item.description || item.system?.description) && (
-                          <div className="card-desc">
-                            {typeof (item.description || item.system?.description) === 'string'
-                              ? (item.description || item.system?.description).slice(0, 100) + ((item.description || item.system?.description).length > 100 ? '...' : '')
-                              : JSON.stringify(item.description || item.system?.description).slice(0, 100)}
-                          </div>
-                        )}
-                        <div className="card-footer">
-                          <Icon name="hand-pointer" />
-                          Drag to canvas
-                        </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
+                  )
                 ) : (
                   <div className="empty">
                     <p>No {activeBrowseTab}s found.</p>
