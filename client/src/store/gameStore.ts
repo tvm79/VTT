@@ -198,6 +198,7 @@ export interface ScreenShakeSettings {
 
 type Dice3DQuality = 'off' | 'low' | 'high';
 type Dice3DMaterial = 'plastic' | 'metal' | 'glass' | 'stone';
+type Dice3DTheme = 'default' | 'rock' | 'smooth' | 'wooden' | 'blueGreenMetal' | 'rust' | 'gemstone' | 'gemstoneMarble' | 'diceOfRolling';
 type Dice3DRollDirectionMode = 'random' | 'fixed';
 
 export interface Dice3DRollArea {
@@ -210,6 +211,7 @@ export interface Dice3DRollArea {
 interface Dice3DSettingsPersisted {
   color: string;
   material: Dice3DMaterial;
+  theme: Dice3DTheme;
   size: number;
   rollForce: number;
   torque: number;
@@ -230,6 +232,7 @@ const DICE3D_SETTINGS_STORAGE_KEY = 'vtt-dice3d-settings';
 const DEFAULT_DICE3D_SETTINGS: Dice3DSettingsPersisted = {
   color: '#ffffff',
   material: 'plastic',
+  theme: 'default',
   size: 1,
   rollForce: 1,
   torque: 1,
@@ -255,7 +258,14 @@ const loadSavedDice3DSettings = (): Dice3DSettingsPersisted => {
 
     const parsed = JSON.parse(saved) as Partial<Dice3DSettingsPersisted>;
     const material = parsed.material;
+    const theme = parsed.theme;
     const rollDirectionMode = parsed.rollDirectionMode;
+
+    // Valid themes from /client/public/assets/dice-box/themes/
+    const validThemes = [
+      'default', 'rock', 'smooth', 'wooden', 'blueGreenMetal', 'rust',
+      'gemstone', 'gemstoneMarble', 'diceOfRolling'
+    ];
 
     return {
       color: typeof parsed.color === 'string' ? parsed.color : DEFAULT_DICE3D_SETTINGS.color,
@@ -263,6 +273,7 @@ const loadSavedDice3DSettings = (): Dice3DSettingsPersisted => {
         material === 'plastic' || material === 'metal' || material === 'glass' || material === 'stone'
           ? material
           : DEFAULT_DICE3D_SETTINGS.material,
+      theme: typeof theme === 'string' && validThemes.includes(theme) ? theme : DEFAULT_DICE3D_SETTINGS.theme,
       size:
         typeof parsed.size === 'number' && Number.isFinite(parsed.size)
           ? clampNumber(parsed.size, 0.6, 1.4)
@@ -1246,6 +1257,7 @@ interface GameState {
   dice3dRollArea: Dice3DRollArea;
   dice3dColor: string;
   dice3dMaterial: Dice3DMaterial;
+  dice3dTheme: Dice3DTheme;
   dice3dSize: number;
   dice3dRollForce: number;
   dice3dTorque: number;
@@ -1563,6 +1575,7 @@ interface GameState {
   setDice3dRollArea: (area: Dice3DRollArea) => void;
   setDice3dColor: (color: string) => void;
   setDice3dMaterial: (material: Dice3DMaterial) => void;
+  setDice3dTheme: (theme: Dice3DTheme) => void;
   setDice3dSize: (size: number) => void;
   setDice3dRollForce: (force: number) => void;
   setDice3dTorque: (torque: number) => void;
@@ -1614,6 +1627,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     return {
       dice3dColor: dice3d.color,
       dice3dMaterial: dice3d.material,
+      dice3dTheme: dice3d.theme,
       dice3dSize: dice3d.size,
       dice3dRollForce: dice3d.rollForce,
       dice3dTorque: dice3d.torque,
@@ -2002,6 +2016,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveDice3DSettingsToStorage({
         color,
         material: state.dice3dMaterial,
+        theme: state.dice3dTheme,
         size: state.dice3dSize,
         rollForce: state.dice3dRollForce,
         torque: state.dice3dTorque,
@@ -2024,6 +2039,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveDice3DSettingsToStorage({
         color: state.dice3dColor,
         material,
+        theme: state.dice3dTheme,
         size: state.dice3dSize,
         rollForce: state.dice3dRollForce,
         torque: state.dice3dTorque,
@@ -2041,12 +2057,36 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
       return { dice3dMaterial: material };
     }),
+  setDice3dTheme: (theme: Dice3DTheme) =>
+    set((state) => {
+      saveDice3DSettingsToStorage({
+        color: state.dice3dColor,
+        material: state.dice3dMaterial,
+        theme,
+        size: state.dice3dSize,
+        rollForce: state.dice3dRollForce,
+        torque: state.dice3dTorque,
+        scaleMultiplier: state.dice3dScaleMultiplier,
+        worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
+        startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
+        restitutionMultiplier: state.dice3dRestitutionMultiplier,
+        frictionMultiplier: state.dice3dFrictionMultiplier,
+        lightIntensityMultiplier: state.dice3dLightIntensityMultiplier,
+        shadowTransparencyMultiplier: state.dice3dShadowTransparencyMultiplier,
+        torqueThrowCoupling: state.dice3dTorqueThrowCoupling,
+        rollDirectionMode: state.dice3dRollDirectionMode,
+        rollDirectionDegrees: state.dice3dRollDirectionDegrees,
+        showBoundariesOverlay: state.dice3dShowBoundariesOverlay,
+      });
+      return { dice3dTheme: theme };
+    }),
   setDice3dSize: (size: number) =>
     set((state) => {
       const clamped = clampNumber(size, 0.6, 1.4);
       saveDice3DSettingsToStorage({
         color: state.dice3dColor,
         material: state.dice3dMaterial,
+        theme: state.dice3dTheme,
         size: clamped,
         rollForce: state.dice3dRollForce,
         torque: state.dice3dTorque,
@@ -2070,6 +2110,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveDice3DSettingsToStorage({
         color: state.dice3dColor,
         material: state.dice3dMaterial,
+        theme: state.dice3dTheme,
         size: state.dice3dSize,
         rollForce: clamped,
         torque: state.dice3dTorque,
@@ -2093,6 +2134,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveDice3DSettingsToStorage({
         color: state.dice3dColor,
         material: state.dice3dMaterial,
+        theme: state.dice3dTheme,
         size: state.dice3dSize,
         rollForce: state.dice3dRollForce,
         torque: clamped,
@@ -2114,7 +2156,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.6, 1.6);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: clamped, worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
         startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
@@ -2131,7 +2173,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.6, 1.6);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: state.dice3dScaleMultiplier, worldSizeMultiplier: clamped,
         startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
@@ -2148,7 +2190,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.6, 1.8);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: state.dice3dScaleMultiplier, worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
         startingHeightMultiplier: clamped,
@@ -2165,7 +2207,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.4, 1.8);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: state.dice3dScaleMultiplier, worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
         startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
@@ -2182,7 +2224,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.6, 1.4);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: state.dice3dScaleMultiplier, worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
         startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
@@ -2199,7 +2241,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.5, 1.8);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: state.dice3dScaleMultiplier, worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
         startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
@@ -2216,7 +2258,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.5, 1.6);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: state.dice3dScaleMultiplier, worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
         startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
@@ -2233,7 +2275,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const clamped = clampNumber(value, 0.4, 1.4);
       saveDice3DSettingsToStorage({
-        color: state.dice3dColor, material: state.dice3dMaterial, size: state.dice3dSize,
+        color: state.dice3dColor, material: state.dice3dMaterial, theme: state.dice3dTheme, size: state.dice3dSize,
         rollForce: state.dice3dRollForce, torque: state.dice3dTorque,
         scaleMultiplier: state.dice3dScaleMultiplier, worldSizeMultiplier: state.dice3dWorldSizeMultiplier,
         startingHeightMultiplier: state.dice3dStartingHeightMultiplier,
@@ -2251,6 +2293,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveDice3DSettingsToStorage({
         color: state.dice3dColor,
         material: state.dice3dMaterial,
+        theme: state.dice3dTheme,
         size: state.dice3dSize,
         rollForce: state.dice3dRollForce,
         torque: state.dice3dTorque,
@@ -2274,6 +2317,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveDice3DSettingsToStorage({
         color: state.dice3dColor,
         material: state.dice3dMaterial,
+        theme: state.dice3dTheme,
         size: state.dice3dSize,
         rollForce: state.dice3dRollForce,
         torque: state.dice3dTorque,
@@ -2296,6 +2340,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       saveDice3DSettingsToStorage({
         color: state.dice3dColor,
         material: state.dice3dMaterial,
+        theme: state.dice3dTheme,
         size: state.dice3dSize,
         rollForce: state.dice3dRollForce,
         torque: state.dice3dTorque,

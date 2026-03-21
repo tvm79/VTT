@@ -129,6 +129,22 @@
   background: rgba(50, 70, 100, 0.8);
 }
 
+.login-button-dev {
+  background: rgba(80, 60, 40, 0.5);
+  font-size: 12px;
+  height: 32px;
+  border: 1px dashed rgba(255, 200, 100, 0.3);
+}
+
+.login-button-dev:hover {
+  background: rgba(100, 80, 50, 0.7);
+  border-color: rgba(255, 200, 100, 0.5);
+}
+
+.login-dev {
+  margin-top: 4px;
+}
+
 .login-button-icon {
   font-size: 16px;
 }

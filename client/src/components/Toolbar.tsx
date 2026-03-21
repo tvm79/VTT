@@ -6,6 +6,7 @@ import { DEFAULT_COLOR_SCHEMES } from '../../../shared/src/index';
 import type { ColorScheme } from '../../../shared/src/index';
 import { Icon } from './Icon';
 import { Button, Dropdown, Slider } from './ui/primitives';
+import { colors, radius, shadows, spacing } from '../ui/tokens';
 import {
   createDefaultWeatherFilterEffect,
   getDefaultWeatherFilterEffects,
@@ -180,6 +181,8 @@ export const Toolbar = memo(function Toolbar() {
     setDice3dColor,
     dice3dMaterial,
     setDice3dMaterial,
+    dice3dTheme,
+    setDice3dTheme,
     dice3dSize,
     setDice3dSize,
     dice3dRollForce,
@@ -242,6 +245,8 @@ export const Toolbar = memo(function Toolbar() {
   const [themeExpanded, setThemeExpanded] = useState(false);
   const [tweenExpanded, setTweenExpanded] = useState(false);
   const [screenShakeExpanded, setScreenShakeExpanded] = useState(false);
+  const [showDice3dAdvancedModal, setShowDice3dAdvancedModal] = useState(false);
+  const [showTokenDefaultsAdvancedModal, setShowTokenDefaultsAdvancedModal] = useState(false);
   const [selectedWeatherEffectId, setSelectedWeatherEffectId] = useState<string | null>(null);
   const [weatherFilterExpanded, setWeatherFilterExpanded] = useState<Partial<Record<WeatherFilterType, boolean>>>({});
   const [fullScreenEffectsExpanded, setFullScreenEffectsExpanded] = useState(true);
@@ -391,8 +396,270 @@ export const Toolbar = memo(function Toolbar() {
     if (turnTokenInputRef.current) turnTokenInputRef.current.value = '';
   };
 
+  // Advanced Settings Modal Component
+  function AdvancedModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+    const modalRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState({ x: 360, y: 80 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+    const isCustomTheme = colorScheme && (colorScheme.id.includes('-custom-') || colorScheme.id === 'custom');
+    const modalBackground = isCustomTheme ? colorScheme.surface : '#1a1a2e';
+    const modalText = isCustomTheme ? colorScheme.text : '#e0e0e0';
+    const modalBorder = isCustomTheme ? `1px solid ${colorScheme.accent}` : '1px solid #444';
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('.slider') || (e.target as HTMLElement).closest('select')) return;
+      setIsDragging(true);
+      setDragOffset({ x: e.clientX - position.x, y: e.clientY - position.y });
+    };
+
+    useEffect(() => {
+      if (!isDragging) return;
+      const handleMouseMove = (e: MouseEvent) => {
+        setPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
+      };
+      const handleMouseUp = () => setIsDragging(false);
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }, [isDragging, dragOffset]);
+
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647 }} onClick={onClose}>
+        <div
+          ref={modalRef}
+          style={{
+            position: 'absolute',
+            left: position.x,
+            top: position.y,
+            background: modalBackground,
+            padding: spacing[5],
+            borderRadius: radius.lg,
+            border: modalBorder,
+            width: '380px',
+            maxHeight: 'calc(100vh - 100px)',
+            overflowY: 'auto',
+            boxShadow: shadows.md,
+            cursor: isDragging ? 'grabbing' : 'default',
+            userSelect: 'none',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', cursor: 'grab' }}
+            onMouseDown={handleMouseDown}
+          >
+            <h3 style={{ color: modalText, margin: 0, fontSize: '16px' }}>{title}</h3>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: modalText, opacity: 0.6, cursor: 'pointer', padding: '4px', fontSize: '18px' }}>
+              <Icon name="times" />
+            </button>
+          </div>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
+      {/* 3D Dice Advanced Modal */}
+      {showDice3dAdvancedModal && (
+        <AdvancedModal title="3D Dice Advanced Settings" onClose={() => setShowDice3dAdvancedModal(false)}>
+          <div className="toolbar-settings-stack">
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Size: ${dice3dSize.toFixed(2)}x`} min="0.6" max="1.4" step="0.01" value={dice3dSize} onChange={(e) => setDice3dSize(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Roll Force: ${dice3dRollForce.toFixed(2)}x`} min="0.5" max="1.8" step="0.01" value={dice3dRollForce} onChange={(e) => setDice3dRollForce(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Torque: ${dice3dTorque.toFixed(2)}x`} min="0.5" max="2.0" step="0.01" value={dice3dTorque} onChange={(e) => setDice3dTorque(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Scale Multiplier: ${dice3dScaleMultiplier.toFixed(2)}x`} min="0.6" max="1.6" step="0.01" value={dice3dScaleMultiplier} onChange={(e) => setDice3dScaleMultiplier(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`World Size Multiplier: ${dice3dWorldSizeMultiplier.toFixed(2)}x`} min="0.6" max="1.6" step="0.01" value={dice3dWorldSizeMultiplier} onChange={(e) => setDice3dWorldSizeMultiplier(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Spawn Height: ${dice3dStartingHeightMultiplier.toFixed(2)}x`} min="0.6" max="1.8" step="0.01" value={dice3dStartingHeightMultiplier} onChange={(e) => setDice3dStartingHeightMultiplier(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Restitution: ${dice3dRestitutionMultiplier.toFixed(2)}x`} min="0.4" max="1.8" step="0.01" value={dice3dRestitutionMultiplier} onChange={(e) => setDice3dRestitutionMultiplier(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Friction: ${dice3dFrictionMultiplier.toFixed(2)}x`} min="0.6" max="1.4" step="0.01" value={dice3dFrictionMultiplier} onChange={(e) => setDice3dFrictionMultiplier(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Light Intensity: ${dice3dLightIntensityMultiplier.toFixed(2)}x`} min="0.5" max="1.8" step="0.01" value={dice3dLightIntensityMultiplier} onChange={(e) => setDice3dLightIntensityMultiplier(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Shadow Transparency: ${dice3dShadowTransparencyMultiplier.toFixed(2)}x`} min="0.5" max="1.6" step="0.01" value={dice3dShadowTransparencyMultiplier} onChange={(e) => setDice3dShadowTransparencyMultiplier(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <Slider label={`Torque→Force: ${dice3dTorqueThrowCoupling.toFixed(2)}x`} min="0.4" max="1.4" step="0.01" value={dice3dTorqueThrowCoupling} onChange={(e) => setDice3dTorqueThrowCoupling(parseFloat(e.target.value))} />
+            </div>
+            <div className="toolbar-settings-card toolbar-settings-card-stack">
+              <div className="toolbar-settings-inline toolbar-settings-spread">
+                <span className="toolbar-settings-caption">Roll Direction</span>
+                <Button onClick={() => setDice3dRollDirectionMode(dice3dRollDirectionMode === 'random' ? 'fixed' : 'random')} variant={dice3dRollDirectionMode === 'random' ? 'ghost' : 'primary'} size="sm">{dice3dRollDirectionMode === 'random' ? 'Random' : 'Fixed'}</Button>
+              </div>
+              <Slider label={`Direction: ${Math.round(dice3dRollDirectionDegrees)}°`} min="0" max="360" step="1" value={dice3dRollDirectionDegrees} onChange={(e) => setDice3dRollDirectionDegrees(parseFloat(e.target.value))} disabled={dice3dRollDirectionMode === 'random'} />
+            </div>
+            <div className="toolbar-settings-card">
+              <span className="toolbar-settings-caption">Show Boundaries Overlay</span>
+              <Button onClick={() => setDice3dShowBoundariesOverlay(!dice3dShowBoundariesOverlay)} variant={dice3dShowBoundariesOverlay ? 'primary' : 'ghost'} size="sm">{dice3dShowBoundariesOverlay ? 'ON' : 'OFF'}</Button>
+            </div>
+          </div>
+        </AdvancedModal>
+      )}
+
+      {/* Token Display Defaults Advanced Modal */}
+      {showTokenDefaultsAdvancedModal && (
+        <AdvancedModal title="Token Display Advanced Settings" onClose={() => setShowTokenDefaultsAdvancedModal(false)}>
+          <button onClick={() => setTweenExpanded(!tweenExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }}>
+            <span className="toolbar-settings-title">Tween Settings</span>
+            <span className="toolbar-settings-title">{tweenExpanded ? '▾' : '▸'}</span>
+          </button>
+          {tweenExpanded && (
+            <div className="toolbar-settings-block">
+              <div className="toolbar-settings-card toolbar-settings-card-stack">
+                <div className="toolbar-settings-group-title">Duration (ms)</div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Move Min: ${tweenSettings.moveMin}`} min="50" max="500" step="10" value={tweenSettings.moveMin} onChange={(e) => setTweenSettings({ moveMin: parseInt(e.target.value) })} />
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Move Max: ${tweenSettings.moveMax}`} min="100" max="1000" step="10" value={tweenSettings.moveMax} onChange={(e) => setTweenSettings({ moveMax: parseInt(e.target.value) })} />
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Attack: ${tweenSettings.attack}`} min="50" max="500" step="10" value={tweenSettings.attack} onChange={(e) => setTweenSettings({ attack: parseInt(e.target.value) })} />
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Damage: ${tweenSettings.damage}`} min="50" max="500" step="10" value={tweenSettings.damage} onChange={(e) => setTweenSettings({ damage: parseInt(e.target.value) })} />
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Heal: ${tweenSettings.heal}`} min="50" max="500" step="10" value={tweenSettings.heal} onChange={(e) => setTweenSettings({ heal: parseInt(e.target.value) })} />
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Miss: ${tweenSettings.miss}`} min="50" max="500" step="10" value={tweenSettings.miss} onChange={(e) => setTweenSettings({ miss: parseInt(e.target.value) })} />
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Downed: ${tweenSettings.downed}`} min="50" max="500" step="10" value={tweenSettings.downed} onChange={(e) => setTweenSettings({ downed: parseInt(e.target.value) })} />
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Select: ${tweenSettings.selectPulse}`} min="100" max="2000" step="50" value={tweenSettings.selectPulse} onChange={(e) => setTweenSettings({ selectPulse: parseInt(e.target.value) })} />
+                </div>
+              </div>
+              <div className="toolbar-settings-card toolbar-settings-card-stack">
+                <div className="toolbar-settings-group-title">Easing Functions</div>
+                <div className="toolbar-settings-card">
+                  <span className="toolbar-settings-caption">Move</span>
+                  <Dropdown value={tweenSettings.moveEasing} onChange={(e) => setTweenSettings({ moveEasing: e.target.value as any })} className="toolbar-compact-select">
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                  </Dropdown>
+                </div>
+                <div className="toolbar-settings-card">
+                  <span className="toolbar-settings-caption">Attack</span>
+                  <Dropdown value={tweenSettings.attackEasing} onChange={(e) => setTweenSettings({ attackEasing: e.target.value as any })} className="toolbar-compact-select">
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                  </Dropdown>
+                </div>
+                <div className="toolbar-settings-card">
+                  <span className="toolbar-settings-caption">Damage</span>
+                  <Dropdown value={tweenSettings.damageEasing} onChange={(e) => setTweenSettings({ damageEasing: e.target.value as any })} className="toolbar-compact-select">
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                  </Dropdown>
+                </div>
+                <div className="toolbar-settings-card">
+                  <span className="toolbar-settings-caption">Heal</span>
+                  <Dropdown value={tweenSettings.healEasing} onChange={(e) => setTweenSettings({ healEasing: e.target.value as any })} className="toolbar-compact-select">
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                  </Dropdown>
+                </div>
+                <div className="toolbar-settings-card">
+                  <span className="toolbar-settings-caption">Miss</span>
+                  <Dropdown value={tweenSettings.missEasing} onChange={(e) => setTweenSettings({ missEasing: e.target.value as any })} className="toolbar-compact-select">
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                  </Dropdown>
+                </div>
+                <div className="toolbar-settings-card">
+                  <span className="toolbar-settings-caption">Downed</span>
+                  <Dropdown value={tweenSettings.downedEasing} onChange={(e) => setTweenSettings({ downedEasing: e.target.value as any })} className="toolbar-compact-select">
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                  </Dropdown>
+                </div>
+                <div className="toolbar-settings-card">
+                  <span className="toolbar-settings-caption">Select</span>
+                  <Dropdown value={tweenSettings.selectEasing} onChange={(e) => setTweenSettings({ selectEasing: e.target.value as any })} className="toolbar-compact-select">
+                    <option value="easeOutQuad">easeOutQuad</option>
+                    <option value="easeInOutQuad">easeInOutQuad</option>
+                    <option value="easeInOutCubic">easeInOutCubic</option>
+                    <option value="easeOutCubic">easeOutCubic</option>
+                    <option value="easeOutBack">easeOutBack</option>
+                  </Dropdown>
+                </div>
+              </div>
+              <Button onClick={() => setTweenSettings({ moveMin: 160, moveMax: 420, attack: 180, damage: 140, heal: 220, miss: 160, downed: 260, selectPulse: 900, moveEasing: 'easeInOutCubic', attackEasing: 'easeOutCubic', damageEasing: 'easeOutCubic', healEasing: 'easeOutQuad', missEasing: 'easeOutQuad', downedEasing: 'easeOutQuad', selectEasing: 'easeOutBack' })} variant="secondary" className="toolbar-full-width-button">Reset to Defaults</Button>
+            </div>
+          )}
+          <button onClick={() => setScreenShakeExpanded(!screenShakeExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }}>
+            <span className="toolbar-settings-title">Screen Shake</span>
+            <span className="toolbar-settings-title">{screenShakeExpanded ? '▾' : '▸'}</span>
+          </button>
+          {screenShakeExpanded && (
+            <div className="toolbar-settings-block">
+              <div className="toolbar-settings-card toolbar-settings-card-stack">
+                <div className="toolbar-settings-inline toolbar-settings-spread">
+                  <span className="toolbar-settings-caption">Global Enable</span>
+                  <Button onClick={() => setScreenShakeSettings({ enabled: !screenShakeSettings.enabled })} variant={screenShakeSettings.enabled ? 'primary' : 'ghost'} size="sm">{screenShakeSettings.enabled ? 'ON' : 'OFF'}</Button>
+                </div>
+                <div className="toolbar-settings-card toolbar-settings-card-stack">
+                  <Slider label={`Duration: ${screenShakeSettings.durationMs}ms`} min="80" max="1200" step="20" value={screenShakeSettings.durationMs} onChange={(e) => setScreenShakeSettings({ durationMs: parseInt(e.target.value, 10) })} />
+                </div>
+                {([{ key: 'damage', label: 'Damage', value: screenShakeSettings.damage }, { key: 'heal', label: 'Heal', value: screenShakeSettings.heal }, { key: 'downed', label: 'Downed', value: screenShakeSettings.downed }, { key: 'attack', label: 'Attack', value: screenShakeSettings.attack }, { key: 'miss', label: 'Miss', value: screenShakeSettings.miss }] as const).map(({ key, label, value }) => (
+                  <div key={key} className="toolbar-settings-card toolbar-settings-card-stack">
+                    <div className="toolbar-settings-inline toolbar-settings-spread">
+                      <span className="toolbar-settings-caption">{label}</span>
+                      <Button onClick={() => setScreenShakeSettings({ [key]: { ...value, enabled: !value.enabled } } as any)} variant={value.enabled ? 'primary' : 'ghost'} size="sm">{value.enabled ? 'ON' : 'OFF'}</Button>
+                    </div>
+                    <Slider label={`Intensity: ${value.intensity.toFixed(2)}`} min="0" max="2" step="0.05" value={value.intensity} onChange={(e) => setScreenShakeSettings({ [key]: { ...value, intensity: parseFloat(e.target.value) } } as any)} />
+                  </div>
+                ))}
+                <Button onClick={() => setScreenShakeSettings({ enabled: false, durationMs: 260, damage: { enabled: false, intensity: 0.6 }, heal: { enabled: false, intensity: 0.35 }, downed: { enabled: false, intensity: 1 }, attack: { enabled: false, intensity: 0.3 }, miss: { enabled: false, intensity: 0.2 } })} variant="secondary" className="toolbar-full-width-button">Reset Shake Defaults</Button>
+              </div>
+            </div>
+          )}
+        </AdvancedModal>
+      )}
+
       <div className="toolbar-anchor">
       {isGM && (
         <div className="toolbar">
@@ -1060,101 +1327,37 @@ export const Toolbar = memo(function Toolbar() {
                 </Dropdown>
               </div>
 
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider
-                  label={`Size: ${dice3dSize.toFixed(2)}x`}
-                  min="0.6"
-                  max="1.4"
-                  step="0.01"
-                  value={dice3dSize}
-                  onChange={(e) => setDice3dSize(parseFloat(e.target.value))}
-                />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider
-                  label={`Roll Force: ${dice3dRollForce.toFixed(2)}x`}
-                  min="0.5"
-                  max="1.8"
-                  step="0.01"
-                  value={dice3dRollForce}
-                  onChange={(e) => setDice3dRollForce(parseFloat(e.target.value))}
-                />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider
-                  label={`Torque: ${dice3dTorque.toFixed(2)}x`}
-                  min="0.5"
-                  max="2.0"
-                  step="0.01"
-                  value={dice3dTorque}
-                  onChange={(e) => setDice3dTorque(parseFloat(e.target.value))}
-                />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`Scale Multiplier: ${dice3dScaleMultiplier.toFixed(2)}x`} min="0.6" max="1.6" step="0.01" value={dice3dScaleMultiplier} onChange={(e) => setDice3dScaleMultiplier(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`World Size Multiplier: ${dice3dWorldSizeMultiplier.toFixed(2)}x`} min="0.6" max="1.6" step="0.01" value={dice3dWorldSizeMultiplier} onChange={(e) => setDice3dWorldSizeMultiplier(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`Spawn Height Multiplier: ${dice3dStartingHeightMultiplier.toFixed(2)}x`} min="0.6" max="1.8" step="0.01" value={dice3dStartingHeightMultiplier} onChange={(e) => setDice3dStartingHeightMultiplier(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`Restitution Multiplier: ${dice3dRestitutionMultiplier.toFixed(2)}x`} min="0.4" max="1.8" step="0.01" value={dice3dRestitutionMultiplier} onChange={(e) => setDice3dRestitutionMultiplier(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`Friction Multiplier: ${dice3dFrictionMultiplier.toFixed(2)}x`} min="0.6" max="1.4" step="0.01" value={dice3dFrictionMultiplier} onChange={(e) => setDice3dFrictionMultiplier(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`Light Intensity Multiplier: ${dice3dLightIntensityMultiplier.toFixed(2)}x`} min="0.5" max="1.8" step="0.01" value={dice3dLightIntensityMultiplier} onChange={(e) => setDice3dLightIntensityMultiplier(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`Shadow Transparency Multiplier: ${dice3dShadowTransparencyMultiplier.toFixed(2)}x`} min="0.5" max="1.6" step="0.01" value={dice3dShadowTransparencyMultiplier} onChange={(e) => setDice3dShadowTransparencyMultiplier(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <Slider label={`Torque→Force Coupling: ${dice3dTorqueThrowCoupling.toFixed(2)}x`} min="0.4" max="1.4" step="0.01" value={dice3dTorqueThrowCoupling} onChange={(e) => setDice3dTorqueThrowCoupling(parseFloat(e.target.value))} />
-              </div>
-
-              <div className="toolbar-settings-card toolbar-settings-card-stack">
-                <div className="toolbar-settings-inline toolbar-settings-spread">
-                  <span className="toolbar-settings-caption">Roll Direction</span>
-                  <Button
-                    onClick={() => setDice3dRollDirectionMode(dice3dRollDirectionMode === 'random' ? 'fixed' : 'random')}
-                    variant={dice3dRollDirectionMode === 'random' ? 'ghost' : 'primary'}
-                    size="sm"
-                  >
-                    {dice3dRollDirectionMode === 'random' ? 'Random' : 'Fixed'}
-                  </Button>
-                </div>
-                <Slider
-                  label={`Direction: ${Math.round(dice3dRollDirectionDegrees)}°`}
-                  min="0"
-                  max="360"
-                  step="1"
-                  value={dice3dRollDirectionDegrees}
-                  onChange={(e) => setDice3dRollDirectionDegrees(parseFloat(e.target.value))}
-                  disabled={dice3dRollDirectionMode === 'random'}
-                />
+              <div className="toolbar-settings-card">
+                <span className="toolbar-settings-caption">Theme</span>
+                <Dropdown
+                  value={dice3dTheme}
+                  onChange={(e) => {
+                    const newTheme = e.target.value as 'default' | 'rock' | 'smooth' | 'wooden' | 'blueGreenMetal' | 'rust' | 'gemstone' | 'gemstoneMarble' | 'diceOfRolling';
+                    // Add small delay to ensure state propagates to Dice3DOverlay
+                    setTimeout(() => setDice3dTheme(newTheme), 50);
+                  }}
+                  className="toolbar-compact-select"
+                >
+                  <option value="default">Default</option>
+                  <option value="rock">Rock</option>
+                  <option value="smooth">Smooth</option>
+                  <option value="wooden">Wooden</option>
+                  <option value="blueGreenMetal">Blue Green Metal</option>
+                  <option value="rust">Rust</option>
+                  <option value="gemstone">Gemstone</option>
+                  <option value="gemstoneMarble">Gemstone Marble</option>
+                  <option value="diceOfRolling">Dice of Rolling</option>
+                </Dropdown>
               </div>
 
               <div className="toolbar-settings-card">
-                <span className="toolbar-settings-caption">Show Boundaries Overlay</span>
                 <Button
-                  onClick={() => setDice3dShowBoundariesOverlay(!dice3dShowBoundariesOverlay)}
-                  variant={dice3dShowBoundariesOverlay ? 'primary' : 'ghost'}
+                  onClick={() => setShowDice3dAdvancedModal(true)}
+                  variant="secondary"
                   size="sm"
+                  className="toolbar-full-width-button"
                 >
-                  {dice3dShowBoundariesOverlay ? 'ON' : 'OFF'}
+                  Advanced
                 </Button>
               </div>
             </div>
@@ -1246,7 +1449,7 @@ export const Toolbar = memo(function Toolbar() {
             onClick={() => setSettingsTokenDefaultsExpanded(!settingsTokenDefaultsExpanded)}
             className="toolbar-settings-section-toggle"
           >
-            <span className="toolbar-settings-title">Token Display Defaults</span>
+            <span className="toolbar-settings-title">Token Settings</span>
             <span className="toolbar-settings-title">{settingsTokenDefaultsExpanded ? '▾' : '▸'}</span>
           </button>
 
@@ -1408,313 +1611,17 @@ export const Toolbar = memo(function Toolbar() {
               />
             </div>
 
-            {/* Tween Settings - Section Header */}
-            <button
-              onClick={() => setTweenExpanded(!tweenExpanded)}
-              className="toolbar-settings-section-toggle"
-            >
-              <span className="toolbar-settings-title">Tween Settings</span>
-              <span className="toolbar-settings-title">{tweenExpanded ? '▾' : '▸'}</span>
-            </button>
-
-            {tweenExpanded && (
-              <div className="toolbar-settings-block">
-                {/* Duration Settings */}
-                <div className="toolbar-settings-card toolbar-settings-card-stack">
-                  <div className="toolbar-settings-group-title">
-                    Duration (ms)
-                  </div>
-                  
-                  {/* Move Min */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Move Min: ${tweenSettings.moveMin}`}
-                      min="50"
-                      max="500"
-                      step="10"
-                      value={tweenSettings.moveMin}
-                      onChange={(e) => setTweenSettings({ moveMin: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  {/* Move Max */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Move Max: ${tweenSettings.moveMax}`}
-                      min="100"
-                      max="1000"
-                      step="10"
-                      value={tweenSettings.moveMax}
-                      onChange={(e) => setTweenSettings({ moveMax: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  {/* Attack */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Attack: ${tweenSettings.attack}`}
-                      min="50"
-                      max="500"
-                      step="10"
-                      value={tweenSettings.attack}
-                      onChange={(e) => setTweenSettings({ attack: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  {/* Damage */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Damage: ${tweenSettings.damage}`}
-                      min="50"
-                      max="500"
-                      step="10"
-                      value={tweenSettings.damage}
-                      onChange={(e) => setTweenSettings({ damage: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  {/* Heal */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Heal: ${tweenSettings.heal}`}
-                      min="50"
-                      max="500"
-                      step="10"
-                      value={tweenSettings.heal}
-                      onChange={(e) => setTweenSettings({ heal: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  {/* Miss */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Miss: ${tweenSettings.miss}`}
-                      min="50"
-                      max="500"
-                      step="10"
-                      value={tweenSettings.miss}
-                      onChange={(e) => setTweenSettings({ miss: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  {/* Downed */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Downed: ${tweenSettings.downed}`}
-                      min="50"
-                      max="500"
-                      step="10"
-                      value={tweenSettings.downed}
-                      onChange={(e) => setTweenSettings({ downed: parseInt(e.target.value) })}
-                    />
-                  </div>
-                  
-                  {/* Select */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Select: ${tweenSettings.selectPulse}`}
-                      min="100"
-                      max="2000"
-                      step="50"
-                      value={tweenSettings.selectPulse}
-                      onChange={(e) => setTweenSettings({ selectPulse: parseInt(e.target.value) })}
-                    />
-                  </div>
-                </div>
-                
-                  {/* Easing Function Settings */}
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <div className="toolbar-settings-group-title">
-                      Easing Functions
-                    </div>
-                  
-                  {/* Move Easing */}
-                    <div className="toolbar-settings-card">
-                      <span className="toolbar-settings-caption">Move</span>
-                      <Dropdown
-                        value={tweenSettings.moveEasing}
-                        onChange={(e) => setTweenSettings({ moveEasing: e.target.value as any })}
-                        className="toolbar-compact-select"
-                      >
-                      <option value="easeOutQuad">easeOutQuad</option>
-                      <option value="easeInOutQuad">easeInOutQuad</option>
-                      <option value="easeInOutCubic">easeInOutCubic</option>
-                      <option value="easeOutCubic">easeOutCubic</option>
-                      <option value="easeOutBack">easeOutBack</option>
-                      </Dropdown>
-                    </div>
-                  
-                  {/* Attack Easing */}
-                    <div className="toolbar-settings-card">
-                      <span className="toolbar-settings-caption">Attack</span>
-                      <Dropdown
-                        value={tweenSettings.attackEasing}
-                        onChange={(e) => setTweenSettings({ attackEasing: e.target.value as any })}
-                        className="toolbar-compact-select"
-                      >
-                      <option value="easeOutQuad">easeOutQuad</option>
-                      <option value="easeInOutQuad">easeInOutQuad</option>
-                      <option value="easeInOutCubic">easeInOutCubic</option>
-                      <option value="easeOutCubic">easeOutCubic</option>
-                      <option value="easeOutBack">easeOutBack</option>
-                      </Dropdown>
-                    </div>
-                  
-                  {/* Downed Easing */}
-                    <div className="toolbar-settings-card">
-                      <span className="toolbar-settings-caption">Downed</span>
-                      <Dropdown
-                        value={tweenSettings.downedEasing}
-                        onChange={(e) => setTweenSettings({ downedEasing: e.target.value as any })}
-                        className="toolbar-compact-select"
-                      >
-                      <option value="easeOutQuad">easeOutQuad</option>
-                      <option value="easeInOutQuad">easeInOutQuad</option>
-                      <option value="easeInOutCubic">easeInOutCubic</option>
-                      <option value="easeOutCubic">easeOutCubic</option>
-                      <option value="easeOutBack">easeOutBack</option>
-                      </Dropdown>
-                    </div>
-                  
-                  {/* Select Easing */}
-                    <div className="toolbar-settings-card">
-                      <span className="toolbar-settings-caption">Select</span>
-                      <Dropdown
-                        value={tweenSettings.selectEasing}
-                        onChange={(e) => setTweenSettings({ selectEasing: e.target.value as any })}
-                        className="toolbar-compact-select"
-                      >
-                      <option value="easeOutQuad">easeOutQuad</option>
-                      <option value="easeInOutQuad">easeInOutQuad</option>
-                      <option value="easeInOutCubic">easeInOutCubic</option>
-                      <option value="easeOutCubic">easeOutCubic</option>
-                      <option value="easeOutBack">easeOutBack</option>
-                      </Dropdown>
-                    </div>
-                  </div>
-                
-                {/* Reset Button */}
-                  <Button
-                    onClick={() => {
-                      setTweenSettings({
-                      moveMin: 160,
-                      moveMax: 420,
-                      attack: 180,
-                      damage: 140,
-                      heal: 220,
-                      miss: 160,
-                      downed: 260,
-                      selectPulse: 900,
-                      moveEasing: 'easeInOutCubic',
-                      attackEasing: 'easeOutCubic',
-                      damageEasing: 'easeOutCubic',
-                      healEasing: 'easeOutQuad',
-                      missEasing: 'easeOutQuad',
-                      downedEasing: 'easeOutQuad',
-                        selectEasing: 'easeOutBack',
-                      });
-                    }}
-                    variant="secondary"
-                    className="toolbar-full-width-button"
-                  >
-                    Reset to Defaults
-                  </Button>
-                </div>
-            )}
-
-            {/* Screen Shake Settings - Section Header */}
-            <button
-              onClick={() => setScreenShakeExpanded(!screenShakeExpanded)}
-              className="toolbar-settings-section-toggle"
-            >
-              <span className="toolbar-settings-title">Screen Shake</span>
-              <span className="toolbar-settings-title">{screenShakeExpanded ? '▾' : '▸'}</span>
-            </button>
-
-            {screenShakeExpanded && (
-              <div className="toolbar-settings-block">
-                <div className="toolbar-settings-card toolbar-settings-card-stack">
-                  <div className="toolbar-settings-inline toolbar-settings-spread">
-                    <span className="toolbar-settings-caption">Global Enable</span>
-                    <Button
-                      onClick={() => setScreenShakeSettings({ enabled: !screenShakeSettings.enabled })}
-                      variant={screenShakeSettings.enabled ? 'primary' : 'ghost'}
-                      size="sm"
-                    >
-                      {screenShakeSettings.enabled ? 'ON' : 'OFF'}
-                    </Button>
-                  </div>
-
-                  <div className="toolbar-settings-card toolbar-settings-card-stack">
-                    <Slider
-                      label={`Duration: ${screenShakeSettings.durationMs}ms`}
-                      min="80"
-                      max="1200"
-                      step="20"
-                      value={screenShakeSettings.durationMs}
-                      onChange={(e) => setScreenShakeSettings({ durationMs: parseInt(e.target.value, 10) })}
-                    />
-                  </div>
-
-                  {([
-                    { key: 'damage', label: 'Damage', value: screenShakeSettings.damage },
-                    { key: 'heal', label: 'Heal', value: screenShakeSettings.heal },
-                    { key: 'downed', label: 'Downed', value: screenShakeSettings.downed },
-                    { key: 'attack', label: 'Attack', value: screenShakeSettings.attack },
-                    { key: 'miss', label: 'Miss', value: screenShakeSettings.miss },
-                  ] as const).map(({ key, label, value }) => (
-                    <div key={key} className="toolbar-settings-card toolbar-settings-card-stack">
-                      <div className="toolbar-settings-inline toolbar-settings-spread">
-                        <span className="toolbar-settings-caption">{label}</span>
-                        <Button
-                          onClick={() => setScreenShakeSettings({
-                            [key]: {
-                              ...value,
-                              enabled: !value.enabled,
-                            },
-                          } as any)}
-                          variant={value.enabled ? 'primary' : 'ghost'}
-                          size="sm"
-                        >
-                          {value.enabled ? 'ON' : 'OFF'}
-                        </Button>
-                      </div>
-                      <Slider
-                        label={`Intensity: ${value.intensity.toFixed(2)}`}
-                          min="0"
-                          max="2"
-                          step="0.05"
-                          value={value.intensity}
-                          onChange={(e) => setScreenShakeSettings({
-                            [key]: {
-                              ...value,
-                              intensity: parseFloat(e.target.value),
-                            },
-                          } as any)}
-                      />
-                    </div>
-                  ))}
-
-                  <Button
-                    onClick={() => {
-                      setScreenShakeSettings({
-                        enabled: false,
-                        durationMs: 260,
-                        damage: { enabled: false, intensity: 0.6 },
-                        heal: { enabled: false, intensity: 0.35 },
-                        downed: { enabled: false, intensity: 1 },
-                        attack: { enabled: false, intensity: 0.3 },
-                        miss: { enabled: false, intensity: 0.2 },
-                      });
-                    }}
-                    variant="secondary"
-                    className="toolbar-full-width-button"
-                  >
-                    Reset Shake Defaults
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Advanced Settings */}
+            <div className="toolbar-settings-card">
+              <Button
+                onClick={() => setShowTokenDefaultsAdvancedModal(true)}
+                variant="secondary"
+                size="sm"
+                className="toolbar-full-width-button"
+              >
+                Advanced
+              </Button>
+            </div>
           </div>
           )}
           

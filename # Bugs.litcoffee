@@ -4,5 +4,9 @@
 - Scene manager displayes double light counts in stats
 - Clicking on a token in Asset Browser, closes the Asset Browser
 
+
 # TODO
 - Shapes should have button/icons like audio and light sources, which we can use to drag the shapes around
+- Rename Token Display Defaults to Token
+- Give more spae to Offset X and Y boxes in Map Settings/Grid Settings
+- The Token Display Settings "Display Name section needs to be fixed. The name label is short and the visibility button is taking up all the space.

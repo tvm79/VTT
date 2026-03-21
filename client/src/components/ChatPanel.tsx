@@ -414,6 +414,8 @@ export function ChatPanel() {
   // Handle rolling selected dice
   const handleRollSelectedDice = () => {
     if (selectedDice.length === 0) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     
     // Build formula from selected dice
     const diceCounts: Record<number, number> = {};
@@ -455,7 +457,8 @@ export function ChatPanel() {
         })
         .catch((error) => {
           console.error('Authoritative quick roll failed, falling back to legacy local roll:', error);
-        });
+        })
+        .finally(() => setIsSubmitting(false));
       return;
     }
     
@@ -517,6 +520,7 @@ export function ChatPanel() {
       setSelectedDice([]);
       setAdvantage('none');
     }
+    setIsSubmitting(false);
   };
 
   // Clear selected dice
@@ -656,10 +660,10 @@ export function ChatPanel() {
           <button
             className="chat-roll-btn"
             onClick={handleRollSelectedDice}
-            disabled={selectedDice.length === 0}
+            disabled={selectedDice.length === 0 || isSubmitting}
             title="Roll dice"
           >
-            ROLL
+            {isSubmitting ? 'ROLLING...' : 'ROLL'}
           </button>
         </div>
       </div>

@@ -56,6 +56,10 @@ export function LoginPanel({ onSettingsClick }: LoginPanelProps) {
     setError('');
   };
 
+  const handleAutoLogin = () => {
+    socketService.createSession('Test Session');
+  };
+
   return (
     <div className="login-panel">
       {/* Title */}
@@ -157,6 +161,17 @@ export function LoginPanel({ onSettingsClick }: LoginPanelProps) {
         >
           <span className="login-button-icon">⚙️</span>
           <span>Settings</span>
+        </button>
+      </div>
+
+      {/* Auto Login (Dev Only) */}
+      <div className="login-dev">
+        <button 
+          className="login-button login-button-dev" 
+          onClick={handleAutoLogin}
+        >
+          <span className="login-button-icon">⚡</span>
+          <span>Auto Login (Dev)</span>
         </button>
       </div>
     </div>

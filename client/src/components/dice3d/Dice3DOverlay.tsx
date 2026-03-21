@@ -19,6 +19,7 @@ type DiceBoxInstance = {
   show: () => unknown;
   resizeWorld: () => void;
   updateConfig: (config: Record<string, unknown>) => unknown;
+  onThemeLoaded?: (config: unknown) => void;
   roll: (
     notation: string | DiceSpec[] | DiceSpec,
     options?: { newStartPoint?: boolean; theme?: string; themeColor?: string },
@@ -163,12 +164,14 @@ function buildDiceSpecsFromFormula(formula: string): DiceSpec[] {
 export function Dice3DOverlay() {
   const DISSOLVE_HOLD_MS = 1100;
   const DISSOLVE_DURATION_MS = 700;
+
   const {
     dice3dEnabled,
     dice3dQuality,
     dice3dRollArea,
     dice3dColor,
     dice3dMaterial,
+    dice3dTheme,
     dice3dSize,
     dice3dRollForce,
     dice3dTorque,
@@ -191,6 +194,7 @@ export function Dice3DOverlay() {
     dice3dRollArea: state.dice3dRollArea,
     dice3dColor: state.dice3dColor,
     dice3dMaterial: state.dice3dMaterial,
+    dice3dTheme: state.dice3dTheme,
     dice3dSize: state.dice3dSize,
     dice3dRollForce: state.dice3dRollForce,
     dice3dTorque: state.dice3dTorque,
@@ -215,6 +219,7 @@ export function Dice3DOverlay() {
   const rollingRef = useRef<Promise<void> | null>(null);
   const dissolveTimerRef = useRef<number | null>(null);
   const dissolveFrameRef = useRef<number | null>(null);
+  const themeReadyRef = useRef<boolean>(false);
   const [isDissolving, setIsDissolving] = useState(false);
   const [dissolveProgress, setDissolveProgress] = useState(0);
   const [authoritativeSummary, setAuthoritativeSummary] = useState<{
@@ -235,6 +240,7 @@ export function Dice3DOverlay() {
     parts: string[];
     dice: Array<{ sides: number; value: number }>;
   }>());
+  const previousThemeRef = useRef<string | null>(null);
   const dragStateRef = useRef<null | {
     edge: 'left' | 'right' | 'top' | 'bottom';
     area: { x: number; y: number; width: number; height: number };
@@ -386,7 +392,7 @@ export function Dice3DOverlay() {
     diceBoxRef.current?.resizeWorld();
   };
 
-  const applyAreaPhysicsConfig = (reason: 'init' | 'bridge-roll' | 'authoritative-roll') => {
+  const applyAreaPhysicsConfig = (reason: 'init' | 'bridge-roll' | 'authoritative-roll' | 'theme-change') => {
     const box = diceBoxRef.current;
     if (!box) return;
 
@@ -525,11 +531,33 @@ export function Dice3DOverlay() {
   }, []);
 
   useEffect(() => {
+    // Reinitialize if theme changed
+    if (diceBoxRef.current && previousThemeRef.current !== null && previousThemeRef.current !== dice3dTheme) {
+      console.info('[dice3d] theme changed, reinitializing', { oldTheme: previousThemeRef.current, newTheme: dice3dTheme });
+      diceBoxRef.current.clear();
+      diceBoxRef.current = null;
+      initializingRef.current = null;
+      themeReadyRef.current = false;
+      
+      // Small delay to ensure clean state before reinitialization
+      setTimeout(() => {
+        initializeDiceBox();
+      }, 100);
+      return;
+    }
+
     if (!dice3dEnabled || !containerRef.current || diceBoxRef.current || initializingRef.current) return;
 
+    initializeDiceBox();
+  }, [dice3dEnabled, dice3dQuality, dice3dRollArea.x, dice3dRollArea.y, dice3dRollArea.width, dice3dRollArea.height, dice3dTheme]);
+
+  const initializeDiceBox = () => {
+    themeReadyRef.current = false; // Mark as not ready during initialization
     initializingRef.current = (async () => {
       const module = await import('@3d-dice/dice-box');
       const DiceBoxCtor = module.default as new (config?: Record<string, unknown>) => DiceBoxInstance;
+
+      const theme = dice3dTheme;
 
       const box = new DiceBoxCtor({
         container: '#dice-box-overlay',
@@ -538,7 +566,7 @@ export function Dice3DOverlay() {
         // Offscreen worker path can look softer on some GPUs/displays.
         offscreen: false,
         scale: dice3dQuality === 'high' ? 8 : 7,
-        theme: 'default',
+        theme,
         gravity: 3.8,
         lightIntensity: 1.3,
         throwForce: dice3dQuality === 'high' ? 7.2 : 6.4,
@@ -547,16 +575,24 @@ export function Dice3DOverlay() {
         onRollComplete: () => {
           // no-op for now; hook retained for future deterministic reconciliation
         },
+        onThemeLoaded: () => {
+          // Theme and all its assets are now loaded
+          themeReadyRef.current = true;
+          console.info('[dice3d] theme loaded callback', { theme });
+        },
       });
 
       await box.init();
       diceBoxRef.current = box;
+      previousThemeRef.current = theme;
+      // Theme will be marked ready via onThemeLoaded callback
+      console.info('[dice3d] init complete, waiting for theme load', { theme });
       syncCanvasLayout();
       applyAreaPhysicsConfig('init');
     })().finally(() => {
       initializingRef.current = null;
     });
-  }, [dice3dEnabled, dice3dQuality, dice3dRollArea.x, dice3dRollArea.y, dice3dRollArea.width, dice3dRollArea.height]);
+  };
 
   useEffect(() => {
     if (!dice3dEnabled) {
@@ -565,8 +601,15 @@ export function Dice3DOverlay() {
     }
 
     registerDice3DRoller(async ({ requestId, formula }) => {
+      // Wait for initialization to complete
       if (!diceBoxRef.current && initializingRef.current) {
         await initializingRef.current;
+      }
+      // Wait for theme to be ready (models loaded)
+      if (!themeReadyRef.current) {
+        console.info('[dice3d] waiting for theme to be ready');
+        // Wait a bit for theme to load
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       if (!diceBoxRef.current) return null;
 
@@ -597,6 +640,7 @@ export function Dice3DOverlay() {
 
         visualResult = await diceBoxRef.current.roll(notationSpecs.length > 0 ? notationSpecs : formula, {
           newStartPoint: dice3dRollDirectionMode === 'random',
+          theme: dice3dTheme,
           themeColor: dice3dColor,
         });
       } catch (error) {
@@ -625,7 +669,7 @@ export function Dice3DOverlay() {
     return () => {
       registerDice3DRoller(null);
     };
-  }, [dice3dEnabled, dice3dRollArea, dice3dColor, dice3dMaterial, dice3dSize, dice3dRollForce, dice3dTorque, dice3dRollDirectionMode, dice3dRollDirectionDegrees]);
+  }, [dice3dEnabled, dice3dRollArea, dice3dColor, dice3dMaterial, dice3dTheme, dice3dSize, dice3dRollForce, dice3dTorque, dice3dRollDirectionMode, dice3dRollDirectionDegrees]);
 
   useEffect(() => {
     const handleResize = () => syncCanvasLayout();
@@ -684,6 +728,12 @@ export function Dice3DOverlay() {
       if (!diceBoxRef.current && initializingRef.current) {
         await initializingRef.current;
       }
+      
+      // Wait for theme to be ready (models loaded)
+      if (!themeReadyRef.current) {
+        console.info('[dice3d] waiting for theme to be ready (authoritative)');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
       if (!diceBoxRef.current) return;
 
@@ -707,6 +757,7 @@ export function Dice3DOverlay() {
       diceBoxRef.current.show?.();
       const visualResult = await diceBoxRef.current.roll(parsedNotation, {
         newStartPoint: dice3dRollDirectionMode === 'random',
+        theme: dice3dTheme,
         themeColor: dice3dColor,
       });
       const visualMapped = buildClientResultFromVisual(visualResult, lastAuthoritativeDiceRoll.formula);

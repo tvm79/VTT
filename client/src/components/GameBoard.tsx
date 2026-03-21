@@ -7594,7 +7594,7 @@ export function GameBoard() {
         emitters={manualEmitters}
         presets={getParticlePresets()}
         selectedEmitterKeys={selectedParticleEmitterKeys}
-        isVisible={manualEmitters.length > 0}
+        isVisible={tool !== 'select' ? true : selectableTypes.includes('particle')}
         gridCellPx={gridSize}
         stagePosition={{ x: stageTransform.x, y: stageTransform.y }}
         stageScale={stageTransform.scale}
@@ -7788,7 +7788,7 @@ export function GameBoard() {
           style={{
             position: 'absolute',
             top: `${filterPanelPos.top}px`,
-            left: `${filterPanelPos.left + 83}px`,
+            left: `${filterPanelPos.left + 65}px`,
             zIndex: 110,
           }}
         >

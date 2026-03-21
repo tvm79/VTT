@@ -1682,6 +1682,8 @@ canvas {
   padding: var(--space-2);
   display: flex;
   align-items: center;
+  min-width: auto;
+  width: auto;
 }
 
 .filter-panel .game-toolbar-filters {
