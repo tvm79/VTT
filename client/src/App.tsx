@@ -129,25 +129,34 @@ function App() {
     const surfaceAlpha = colorScheme.surfaceAlpha ?? 1;
     const tokenVariables = createCssVariables();
     
+    const surfaceColor = hexToRgba(colorScheme.surface, surfaceAlpha);
+    const surfaceTranslucent = hexToRgba(colorScheme.surface, Math.min(1, surfaceAlpha + 0.05));
+    const accentColor = isCustomized ? colorScheme.accent : '#e94560';
+    const textColor = isCustomized ? colorScheme.text : '#eee';
+    
     return {
       ...tokenVariables,
       ...(colorScheme.fontFamily ? { fontFamily: colorScheme.fontFamily } : {}),
-      ...(isCustomized ? {
-        '--bg-primary': hexToRgba(colorScheme.background, surfaceAlpha),
-        '--bg-secondary': hexToRgba(colorScheme.surface, surfaceAlpha),
-        '--bg-tertiary': hexToRgba(colorScheme.surface, surfaceAlpha),
-        '--surface': hexToRgba(colorScheme.surface, surfaceAlpha),
-        '--accent': colorScheme.accent,
-        '--border': colorScheme.accent,
-        '--text-primary': colorScheme.text,
-        '--text-secondary': colorScheme.text,
-        '--panel-blur': `${panelBlurValue}px`,
-      } : {
-        '--panel-blur': `${panelBlurValue}px`,
-        '--bg-primary': hexToRgba(colorScheme.background, surfaceAlpha),
-        '--bg-secondary': hexToRgba(colorScheme.surface, surfaceAlpha),
-        '--bg-tertiary': hexToRgba(colorScheme.surface, surfaceAlpha),
-        '--surface': hexToRgba(colorScheme.surface, surfaceAlpha),
+      '--bg-primary': hexToRgba(colorScheme.background, surfaceAlpha),
+      '--bg-secondary': surfaceColor,
+      '--bg-tertiary': surfaceColor,
+      '--surface': surfaceColor,
+      '--color-surface-translucent': surfaceTranslucent,
+      '--color-surface-overlay': surfaceTranslucent,
+      '--color-border-subtle': isCustomized ? hexToRgba(colorScheme.accent, 0.3) : 'rgba(255, 255, 255, 0.1)',
+      '--color-border-strong': accentColor,
+      '--color-accent-primary': accentColor,
+      '--color-accent-hover': accentColor,
+      '--color-state-hover': isCustomized ? hexToRgba(colorScheme.surface, Math.min(1, surfaceAlpha + 0.1)) : 'rgba(255, 255, 255, 0.1)',
+      '--accent': accentColor,
+      '--border': accentColor,
+      '--text-primary': textColor,
+      '--text-secondary': textColor,
+      '--panel-blur': `${panelBlurValue}px`,
+      ...(isCustomized ? {} : {
+        '--bg-primary': '#1a1a2e',
+        '--bg-secondary': '#16213e',
+        '--surface': '#2d3748',
       }),
     };
   }, [colorScheme]);
@@ -217,17 +226,16 @@ function App() {
 
   return (
     <div className={`app ${themeClass}`} style={themeStyle}>
-      <header className="header">
-        <div className="header-left">
-          <h1 className="logo"><Icon name="dice" /> VTT</h1>
-          <span className="session-name">{session.name}</span>
-          <span className="room-code">Code: {session.roomCode}</span>
+      {/* Container for hover detection - wraps trigger and toolbar */}
+      <div 
+        className="toolbar-hover-container"
+        onMouseLeave={() => window.dispatchEvent(new CustomEvent('closeToolbarPanels'))}
+      >
+        <div className="header-hover-trigger" />
+        <div className="toolbar-wrapper">
+          <Toolbar />
         </div>
-        <div className="header-center">
-        </div>
-        <div className="header-right">
-        </div>
-      </header>
+      </div>
 
       <main className="main-content">
         {currentBoard ? (
@@ -238,11 +246,6 @@ function App() {
           </div>
         )}
       </main>
-
-      {/* Toolbar rendered AFTER main-content so panels appear above canvas */}
-      <div className="toolbar-wrapper">
-        <Toolbar />
-      </div>
 
       {/* Container for toolbar panels - rendered outside header to appear above map/canvas */}
       <div id="toolbar-panels" className="toolbar-panels-container"></div>

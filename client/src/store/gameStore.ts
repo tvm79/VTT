@@ -830,6 +830,9 @@ export interface WeatherEffectConfig {
   wobbleAmplitude: number;
   particleShape?: 'circle' | 'star' | 'heart' | 'snowflake' | 'drop' | 'spark' | 'flare';
   customTextureUrl?: string;
+  belowTokens: boolean;
+  lifetime: number;
+  opacity: number;
 }
 
 export type WeatherFilterType =

@@ -30,6 +30,19 @@ const getContrastTextColor = (hexColor: string): string => {
   return brightness > 128 ? '#000000' : '#ffffff';
 };
 
+const WEATHER_TYPE_TO_PRESET: Record<WeatherType, string> = {
+  none: '',
+  rain: 'WeatherRain',
+  snow: 'WeatherSnow',
+  fog: 'WeatherFog',
+  clouds: 'WeatherClouds',
+  fireflies: 'WeatherFireflies',
+  embers: 'WeatherEmbers',
+  sparkles: 'WeatherSparkles',
+  hearts: 'WeatherSparkles',
+  blizzard: 'WeatherBlizzard',
+};
+
 const FREE_TEXTURE_PRESETS = [
   { label: 'Smoke A', url: 'https://opengameart.org/sites/default/files/smoke1.png' },
   { label: 'Smoke B', url: 'https://opengameart.org/sites/default/files/smoke3.png' },
@@ -223,6 +236,8 @@ export const Toolbar = memo(function Toolbar() {
     toggleFileBrowser,
     particleEmitterVisible,
     toggleParticleEmitter,
+    setTool,
+    setParticlePreset,
     // Game time controls
     gameTimeVisible,
     toggleGameTime,
@@ -232,6 +247,41 @@ export const Toolbar = memo(function Toolbar() {
   
   const [showUpload, setShowUpload] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  
+  // Close all toolbar panels when toolbar hides
+  useEffect(() => {
+    const handleCloseToolbarPanels = () => {
+      setShowSettings(false);
+      setShowUpload(false);
+      setMapGridExpanded(false);
+      setMapBleedExpanded(false);
+      setMapFogExpanded(false);
+      setSettingsPanningExpanded(false);
+      setSettingsAudioFadeExpanded(false);
+      setSettingsKeyBindingsExpanded(false);
+      setSettingsTokenDefaultsExpanded(false);
+      setSettingsDice3dExpanded(false);
+      setSettingsBattleExpanded(false);
+      setSettingsChatExpanded(false);
+      setThemeExpanded(false);
+      setTweenExpanded(false);
+      setScreenShakeExpanded(false);
+      setWeatherFilterExpanded({});
+      setFullScreenEffectsExpanded(true);
+      setWeatherParticlesExpanded(true);
+      setFogShaderExpanded(false);
+      setExpandedWeatherEffectId(null);
+      setShowDice3dAdvancedModal(false);
+      setShowTokenDefaultsAdvancedModal(false);
+      if (weatherVisible) {
+        toggleWeather();
+      }
+    };
+    
+    window.addEventListener('closeToolbarPanels', handleCloseToolbarPanels);
+    return () => window.removeEventListener('closeToolbarPanels', handleCloseToolbarPanels);
+  }, [weatherVisible, toggleWeather]);
+  
   const [mapGridExpanded, setMapGridExpanded] = useState(false);
   const [mapBleedExpanded, setMapBleedExpanded] = useState(false);
   const [mapFogExpanded, setMapFogExpanded] = useState(false);
@@ -248,8 +298,10 @@ export const Toolbar = memo(function Toolbar() {
   const [showDice3dAdvancedModal, setShowDice3dAdvancedModal] = useState(false);
   const [showTokenDefaultsAdvancedModal, setShowTokenDefaultsAdvancedModal] = useState(false);
   const [selectedWeatherEffectId, setSelectedWeatherEffectId] = useState<string | null>(null);
+  const [expandedWeatherEffectId, setExpandedWeatherEffectId] = useState<string | null>(null);
   const [weatherFilterExpanded, setWeatherFilterExpanded] = useState<Partial<Record<WeatherFilterType, boolean>>>({});
   const [fullScreenEffectsExpanded, setFullScreenEffectsExpanded] = useState(true);
+  const [weatherParticlesExpanded, setWeatherParticlesExpanded] = useState(true);
   const [fogShaderExpanded, setFogShaderExpanded] = useState(false);
   
   // Fog shader settings - initialized from VISUAL_OPTIONS
@@ -1819,281 +1871,225 @@ export const Toolbar = memo(function Toolbar() {
             <span className="toolbar-settings-title">Weather Effects</span>
           </div>
 
-          <div className="toolbar-settings-subtitle">
-            Particle effects
-          </div>
+          <div className="toolbar-fullscreen-panel">
+            <button
+              onClick={() => setWeatherParticlesExpanded((prev) => !prev)}
+              className="toolbar-fullscreen-toggle"
+            >
+              <span>Particle effects</span>
+              <span>{weatherParticlesExpanded ? '▾' : '▸'}</span>
+            </button>
 
-          <div style={WEATHER_SECTION_STYLE}>
+            {weatherParticlesExpanded && (
+              <div style={WEATHER_SECTION_STYLE}>
 
-          {/* Toggle buttons for each weather effect type */}
-          <div className="toolbar-settings-chip-grid">
-            {(['rain', 'snow', 'fog', 'clouds', 'fireflies', 'embers', 'sparkles', 'hearts'] as WeatherType[]).map((type) => {
-              const isEnabled = activeWeatherEffects.some(e => e.type === type);
-              return (
-                <Button
-                  key={type}
-                  onClick={() => {
-                    const existing = activeWeatherEffects.find(e => e.type === type);
-                    if (existing) {
-                      removeWeatherEffect(existing.id);
-                    } else {
-                      const preset = getPresetForType(type);
-                      addWeatherEffect({
-                        id: crypto.randomUUID(),
-                        type,
-                        enabled: true,
-                        intensity: preset?.intensity ?? 50,
-                        speed: preset?.speed ?? 50,
-                        size: preset?.size ?? 5,
-                        color: preset?.color ?? '#ffffff',
-                        direction: preset?.direction ?? 270,
-                        wobble: preset?.wobble ?? 50,
-                        wobbleAmplitude: preset?.wobbleAmplitude ?? 50,
-                        particleShape: preset?.particleShape,
-                      });
-                    }
-                  }}
-                  title={`Toggle ${WEATHER_LABELS[type] ?? type}`}
-                  variant={isEnabled ? 'primary' : 'secondary'}
-                  size="sm"
-                  className="toolbar-chip-button"
-                >
-                  {WEATHER_LABELS[type] ?? type}
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* Show controls for active effects */}
-          {activeWeatherEffects.length > 0 && (
-            <div className="toolbar-settings-block">
-              <Dropdown
-                label="Edit Effect"
-                value={selectedWeatherEffectId || ''}
-                onChange={(e) => setSelectedWeatherEffectId(e.target.value || null)}
-                className="toolbar-full-width-select"
-              >
-                <option value="">Select an effect...</option>
-                {activeWeatherEffects.map((effect) => (
-                  <option key={effect.id} value={effect.id}>
-                    {WEATHER_LABELS[effect.type] ?? effect.type} {effect.enabled ? '(on)' : '(off)'}
-                  </option>
-                ))}
-              </Dropdown>
-            </div>
-          )}
-
-          {/* Show config controls for selected effect */}
-          {selectedWeatherEffectId && activeWeatherEffects.find(e => e.id === selectedWeatherEffectId) && (
-            <div>
-              {(() => {
-                const effect = activeWeatherEffects.find(e => e.id === selectedWeatherEffectId)!;
-                return (
-                  <>
-                    {/* Enable/Disable toggle */}
-                    <div className="toolbar-settings-inline toolbar-settings-toggle-row">
-                      <label className="toolbar-settings-caption">Enabled</label>
-                      <input
-                        type="checkbox"
-                        checked={effect.enabled}
-                        onChange={(e) => updateWeatherEffect(effect.id, { enabled: e.target.checked })}
-                      />
-                    </div>
-
-                    <Button
-                      onClick={() => {
-                        const preset = getPresetForType(effect.type as WeatherType);
-                        updateWeatherEffect(effect.id, {
-                          intensity: preset.intensity ?? effect.intensity,
-                          speed: preset.speed ?? effect.speed,
-                          size: preset.size ?? effect.size,
-                          color: preset.color ?? effect.color,
-                          direction: preset.direction ?? effect.direction,
-                          wobble: preset.wobble ?? effect.wobble,
-                          wobbleAmplitude: preset.wobbleAmplitude ?? effect.wobbleAmplitude,
-                          particleShape: preset.particleShape,
-                        });
-                      }}
-                      variant="secondary"
-                      className="toolbar-full-width-button"
-                    >
-                      Reset To Type Preset
-                    </Button>
-
-                    {/* Intensity slider */}
-                    <div className="toolbar-settings-card toolbar-settings-card-stack">
-                      <Slider
-                        label={`Amount: ${effect.intensity}%`}
-                        min="0"
-                        max="100"
-                        value={effect.intensity}
-                        onChange={(e) => updateWeatherEffect(effect.id, { intensity: parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    {/* Speed slider */}
-                    <div className="toolbar-settings-card toolbar-settings-card-stack">
-                      <Slider
-                        label={`Speed: ${effect.speed}%`}
-                        min="0"
-                        max="100"
-                        value={effect.speed}
-                        onChange={(e) => updateWeatherEffect(effect.id, { speed: parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    {/* Size slider */}
-                    <div className="toolbar-settings-card toolbar-settings-card-stack">
-                      <Slider
-                        label={`Size: ${effect.size}`}
-                        min="1"
-                        max="100"
-                        value={effect.size}
-                        onChange={(e) => updateWeatherEffect(effect.id, { size: parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    {/* Color picker */}
-                    <div className="toolbar-settings-card toolbar-settings-card-stack">
-                      <label className="toolbar-settings-caption">Color</label>
-                      <input
-                        type="color"
-                        value={effect.color}
-                        onChange={(e) => updateWeatherEffect(effect.id, { color: e.target.value })}
-                        className="toolbar-color-input-full"
-                      />
-                    </div>
-
-                    {/* Direction slider */}
-                    <div className="toolbar-settings-card toolbar-settings-card-stack">
-                      <Slider
-                        label={`Direction: ${effect.direction}°`}
-                        min="0"
-                        max="360"
-                        value={effect.direction}
-                        onChange={(e) => updateWeatherEffect(effect.id, { direction: parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    {/* Wobble Amount slider */}
-                    <div className="toolbar-settings-card toolbar-settings-card-stack">
-                      <Slider
-                        label={`Wobble Amount: ${effect.wobbleAmplitude}%`}
-                        min="0"
-                        max="100"
-                        value={effect.wobbleAmplitude}
-                        onChange={(e) => updateWeatherEffect(effect.id, { wobbleAmplitude: parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    {/* Wobble Speed slider */}
-                    <div className="toolbar-settings-card toolbar-settings-card-stack">
-                      <Slider
-                        label={`Wobble Speed: ${effect.wobble}%`}
-                        min="0"
-                        max="100"
-                        value={effect.wobble}
-                        onChange={(e) => updateWeatherEffect(effect.id, { wobble: parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    {/* Particle shape */}
-                    <div className="toolbar-settings-block">
-                      <Dropdown
-                        label="Particle Shape"
-                        value={effect.particleShape || ''}
-                        onChange={(e) =>
-                          updateWeatherEffect(effect.id, {
-                            particleShape: (e.target.value || undefined) as 'circle' | 'star' | 'heart' | 'snowflake' | 'drop' | 'spark' | 'flare' | undefined,
-                          })
-                        }
-                        className="toolbar-full-width-select"
+              {/* Vertical list of weather effects */}
+              <div className="weather-effects-list">
+                {(['rain', 'snow', 'fog', 'clouds', 'fireflies', 'embers', 'sparkles', 'hearts'] as WeatherType[]).map((type) => {
+                  const existing = activeWeatherEffects.find(e => e.type === type);
+                  const isExpanded = expandedWeatherEffectId === existing?.id;
+                  
+                  return (
+                    <div key={type} className="weather-effect-item">
+                      <div 
+                        className="weather-effect-header"
+                        onClick={() => {
+                          if (existing) {
+                            setExpandedWeatherEffectId(isExpanded ? null : existing.id);
+                          } else {
+                            const newId = crypto.randomUUID();
+                            const preset = getPresetForType(type);
+                            addWeatherEffect({
+                              id: newId,
+                              type,
+                              enabled: true,
+                              intensity: preset?.intensity ?? 50,
+                              speed: preset?.speed ?? 50,
+                              size: preset?.size ?? 5,
+                              color: preset?.color ?? '#ffffff',
+                              direction: preset?.direction ?? 270,
+                              wobble: preset?.wobble ?? 50,
+                              wobbleAmplitude: preset?.wobbleAmplitude ?? 50,
+                              particleShape: preset?.particleShape,
+                              belowTokens: true,
+                              lifetime: 5000,
+                              opacity: 100,
+                            });
+                            setExpandedWeatherEffectId(newId);
+                          }
+                        }}
                       >
-                        <option value="">Auto (Type Default)</option>
-                        <option value="circle">Circle</option>
-                        <option value="snowflake">Snowflake</option>
-                        <option value="drop">Drop</option>
-                        <option value="spark">Spark</option>
-                        <option value="flare">Flare</option>
-                        <option value="star">Star</option>
-                        <option value="heart">Heart</option>
-                      </Dropdown>
-                    </div>
-
-                    {/* Custom Texture URL */}
-                    <div className="toolbar-settings-block">
-                      <label className="toolbar-settings-caption toolbar-settings-block-label">Custom Texture</label>
-                      <div className="toolbar-settings-inline toolbar-settings-upload-row">
-                        <input
-                          type="text"
-                          placeholder="Enter image URL..."
-                          value={effect.customTextureUrl || ''}
-                          onChange={(e) => {
-                            updateWeatherEffect(effect.id, { customTextureUrl: e.target.value });
-                          }}
-                          className="toolbar-text-input-compact"
-                        />
-                        <label className="toolbar-upload-button">
-                          Upload
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="toolbar-hidden-input"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  const result = event.target?.result as string;
-                                  updateWeatherEffect(effect.id, { customTextureUrl: result });
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                        {effect.customTextureUrl && (
-                          <Button
-                            onClick={() => updateWeatherEffect(effect.id, { customTextureUrl: '' })}
-                            variant="ghost"
-                            size="sm"
-                          >
-                            Clear
-                          </Button>
-                        )}
+                        <span className="weather-effect-name">{WEATHER_LABELS[type] ?? type}</span>
+                        <div className="weather-effect-toggle">
+                          {existing ? (
+                            <>
+                              <label className="toggle-switch">
+                                <input
+                                  type="checkbox"
+                                  checked={existing.enabled}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    updateWeatherEffect(existing.id, { enabled: e.target.checked });
+                                  }}
+                                />
+                                <span className="toggle-slider"></span>
+                              </label>
+                              <button 
+                                className="weather-effect-remove"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeWeatherEffect(existing.id);
+                                  setExpandedWeatherEffectId(null);
+                                }}
+                                title="Remove effect"
+                              >
+                                ✕
+                              </button>
+                            </>
+                          ) : (
+                            <span className="weather-effect-add">+</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="toolbar-settings-chip-grid toolbar-settings-chip-grid-tight">
-                        {FREE_TEXTURE_PRESETS.map((preset) => (
+                      
+                      {existing && isExpanded && (
+                        <div className="weather-effect-settings">
+                          <div className="weather-effect-settings-grid">
+                            <div className="weather-setting-row">
+                              <label>Below Tokens</label>
+                              <label className="toggle-switch small">
+                                <input
+                                  type="checkbox"
+                                  checked={existing.belowTokens ?? true}
+                                  onChange={(e) => updateWeatherEffect(existing.id, { belowTokens: e.target.checked })}
+                                />
+                                <span className="toggle-slider"></span>
+                              </label>
+                            </div>
+                            
+                            <div className="weather-setting-row">
+                              <label>Color</label>
+                              <input
+                                type="color"
+                                value={existing.color || '#ffffff'}
+                                onChange={(e) => updateWeatherEffect(existing.id, { color: e.target.value })}
+                                className="weather-color-input"
+                              />
+                            </div>
+                            
+                            <div className="weather-setting-row">
+                              <label>Scale: {existing.size}%</label>
+                              <input
+                                type="range"
+                                min="1"
+                                max="200"
+                                value={existing.size ?? 50}
+                                onChange={(e) => updateWeatherEffect(existing.id, { size: parseInt(e.target.value) })}
+                                className="weather-slider"
+                              />
+                            </div>
+                            
+                            <div className="weather-setting-row">
+                              <label>Lifetime: {(existing.lifetime ?? 5000) / 1000}s</label>
+                              <input
+                                type="range"
+                                min="1000"
+                                max="30000"
+                                step="500"
+                                value={existing.lifetime ?? 5000}
+                                onChange={(e) => updateWeatherEffect(existing.id, { lifetime: parseInt(e.target.value) })}
+                                className="weather-slider"
+                              />
+                            </div>
+                            
+                            <div className="weather-setting-row">
+                              <label>Amount: {existing.intensity}%</label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={existing.intensity ?? 50}
+                                onChange={(e) => updateWeatherEffect(existing.id, { intensity: parseInt(e.target.value) })}
+                                className="weather-slider"
+                              />
+                            </div>
+                            
+                            <div className="weather-setting-row">
+                              <label>Opacity: {existing.opacity ?? 100}%</label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={existing.opacity ?? 100}
+                                onChange={(e) => updateWeatherEffect(existing.id, { opacity: parseInt(e.target.value) })}
+                                className="weather-slider"
+                              />
+                            </div>
+                          </div>
+                          
                           <Button
-                            key={preset.label}
-                            onClick={() => updateWeatherEffect(effect.id, { customTextureUrl: preset.url })}
+                            onClick={async () => {
+                              const weatherPresetId = WEATHER_TYPE_TO_PRESET[existing.type] || '';
+                              if (weatherPresetId) {
+                                // Apply toolbar settings to the preset before opening editor
+                                const { getParticlePresetById, updateParticlePreset } = await import('../particles/editor/particlePresetStore');
+                                const preset = getParticlePresetById(weatherPresetId);
+                                if (preset) {
+                                  // Apply simplified settings to preset
+                                  const updatedPreset = { ...preset };
+                                  
+                                  // Color override
+                                  if (existing.color) {
+                                    updatedPreset.startColor = existing.color;
+                                    updatedPreset.endColor = existing.color;
+                                  }
+                                  
+                                  // Scale override (maps to size)
+                                  if (existing.size !== undefined) {
+                                    const particleScale = 0.25 + (existing.size / 100) * 2.25;
+                                    updatedPreset.startSize = Math.round(4 * particleScale);
+                                    updatedPreset.endSize = Math.round(9 * particleScale);
+                                  }
+                                  
+                                  // Lifetime override
+                                  if (existing.lifetime !== undefined) {
+                                    updatedPreset.lifetimeMinMs = existing.lifetime;
+                                    updatedPreset.lifetimeMaxMs = existing.lifetime;
+                                  }
+                                  
+                                  // Amount override (maps to emit rate and max particles)
+                                  if (existing.intensity !== undefined) {
+                                    updatedPreset.emitRate = Math.round(8 + existing.intensity * 2.4);
+                                    updatedPreset.maxParticles = Math.round(30 + existing.intensity * 3.8);
+                                  }
+                                  
+                                  // Opacity override
+                                  if (existing.opacity !== undefined) {
+                                    updatedPreset.startAlpha = existing.opacity / 100;
+                                    updatedPreset.endAlpha = existing.opacity / 100;
+                                  }
+                                  
+                                  updateParticlePreset(updatedPreset);
+                                }
+                                setParticlePreset(weatherPresetId);
+                              }
+                              setTool('particle');
+                            }}
                             variant="secondary"
                             size="sm"
-                            title={preset.url}
+                            className="toolbar-full-width-button"
                           >
-                            {preset.label}
+                            Edit in Particle Editor
                           </Button>
-                        ))}
-                      </div>
+                        </div>
+                      )}
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* Remove effect button */}
-                    <Button
-                      onClick={() => {
-                        removeWeatherEffect(effect.id);
-                        setSelectedWeatherEffectId(null);
-                      }}
-                      variant="danger"
-                      className="toolbar-full-width-button"
-                    >
-                      Remove Effect
-                    </Button>
-                  </>
-                );
-              })()}
-            </div>
-          )}
-
+              </div>
+            )}
           </div>
 
           <div className="toolbar-fullscreen-panel">

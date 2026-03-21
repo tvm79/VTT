@@ -21,6 +21,7 @@ import {
   ZoomBlurFilter,
 } from 'pixi-filters';
 import { getParticleSystem, initParticleSystem } from '../particles/runtime/ParticleSystem';
+import { getParticlePresetById } from '../particles/editor/particlePresetStore';
 import type { ParticlePreset } from '../particles/editor/particleSchema';
 import type { WeatherEffectConfig, WeatherFilterConfig, WeatherFilterType } from '../store/gameStore';
 import { useGameStore } from '../store/gameStore';
@@ -123,58 +124,55 @@ function toShapeTexture(shape?: WeatherConfig['particleShape']): string | undefi
   }
 }
 
+// Build minimal overrides for weather effects - only spawn area and layer ordering
+// All other settings (color, size, speed, direction, lifetime, opacity) come from the Particle Emitter preset
 function buildWeatherOverrides(effect: WeatherEffectConfig, boardWidth: number, boardHeight: number): Partial<ParticlePreset> {
-  const intensity = clamp(effect.intensity ?? 50, 0, 100);
-  const size = clamp(effect.size ?? 100, 1, 200);
-  const speed = clamp(effect.speed ?? 50, 0, 100);
-  const wobbleSpeed = clamp(effect.wobble ?? 50, 0, 100);
-  const wobbleAmount = clamp(effect.wobbleAmplitude ?? 50, 0, 100);
-
-  const particleScale = 0.25 + (size / 100) * 2.25;
-
-  const directionBase = Number.isFinite(effect.direction) ? effect.direction : 270;
-  const directionOffset = ((wobbleAmount / 100) * 80) - 40;
-  const spreadFromWobble = 6 + (wobbleAmount / 100) * 120;
-  const speedMul = 0.2 + (speed / 100) * 2.3;
-  const drag = clamp(0.01 + (wobbleSpeed / 100) * 0.2, 0.005, 0.4);
-
+  // Only override spawn area - weather needs to cover the entire board
+  // Layer ordering: belowTokens controls whether particles appear below or above tokens
+  // ALL other settings come from the Particle Emitter preset - no overrides!
   const overrides: Partial<ParticlePreset> = {
-    emitRate: clamp(Math.round(8 + intensity * 2.4), 4, 260),
-    maxParticles: clamp(Math.round(30 + intensity * 3.8), 24, 420),
     spawnShape: 'box',
     spawnWidth: boardWidth * 1.15,
     spawnHeight: boardHeight * 1.15,
     spawnRadius: Math.max(boardWidth, boardHeight) * 0.6,
-    durationMs: 0,
-    startColor: effect.color || undefined,
-    endColor: effect.color || undefined,
-    directionDeg: directionBase + directionOffset,
-    spreadDeg: spreadFromWobble,
-    drag,
-    speedMin: clamp(Math.round((6 + intensity * 0.5) * speedMul), 1, 320),
-    speedMax: clamp(Math.round((22 + intensity * 1.2) * speedMul), 2, 520),
-    startSize: clamp(Math.round(4 * particleScale), 2, 420),
-    endSize: clamp(Math.round(9 * particleScale), 3, 640),
+    durationMs: 0, // Continuous emission for weather
+    sortGroup: effect.belowTokens !== false ? 'below-token' : 'above-token',
   };
 
-  const shapeTexture = toShapeTexture(effect.particleShape);
-  if (effect.type === 'hearts' && !effect.particleShape) {
-    overrides.texture = 'spark';
-  } else if (shapeTexture) {
-    overrides.texture = shapeTexture;
-  }
-
-  if (effect.customTextureUrl) {
-    overrides.texture = effect.customTextureUrl;
-  }
+  // NO overrides for color, size, lifetime, amount, opacity, speed, direction, etc.
+  // All these come directly from the Particle Emitter preset!
 
   return overrides;
 }
 
 function createEffectSignature(effect: WeatherEffectConfig, boardWidth: number, boardHeight: number): string {
+  const presetId = WEATHER_TYPE_TO_PRESET[effect.type as WeatherType] || '';
+  
+  // Get the current preset data so changes in Particle Editor trigger updates
+  const preset = presetId ? getParticlePresetById(presetId) : undefined;
+  
   const overrides = buildWeatherOverrides(effect, boardWidth, boardHeight);
   return JSON.stringify({
-    preset: WEATHER_TYPE_TO_PRESET[effect.type as WeatherType] || '',
+    preset: presetId,
+    // Include key preset properties to detect changes in Particle Editor
+    presetSnapshot: preset ? {
+      emitRate: preset.emitRate,
+      maxParticles: preset.maxParticles,
+      startColor: preset.startColor,
+      endColor: preset.endColor,
+      startSize: preset.startSize,
+      endSize: preset.endSize,
+      speedMin: preset.speedMin,
+      speedMax: preset.speedMax,
+      directionDeg: preset.directionDeg,
+      spreadDeg: preset.spreadDeg,
+      lifetimeMinMs: preset.lifetimeMinMs,
+      lifetimeMaxMs: preset.lifetimeMaxMs,
+      startAlpha: preset.startAlpha,
+      endAlpha: preset.endAlpha,
+      texture: preset.texture,
+      sortGroup: preset.sortGroup,
+    } : null,
     boardWidth,
     boardHeight,
     enabled: effect.enabled,
@@ -687,6 +685,9 @@ export function WeatherPanel({ isOpen, onClose }: WeatherPanelProps) {
                     direction: 180,
                     wobble: 50,
                     wobbleAmplitude: 50,
+                    belowTokens: true,
+                    lifetime: 5000,
+                    opacity: 100,
                   });
                 }
               }}

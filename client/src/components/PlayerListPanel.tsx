@@ -188,6 +188,7 @@ export function PlayerListPanel() {
       >
         <Icon name="user-group" />
         <span>Players ({players.length + (session.gmId ? 1 : 0)})</span>
+        <span className="room-code">{session.roomCode}</span>
       </div>
       <div className="player-list">
         {/* Show GM if user is the GM or GM exists in players array */}

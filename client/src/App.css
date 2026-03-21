@@ -528,7 +528,7 @@ button.tool-btn i {
 /* Light Editor Panel - themable with CSS */
 .light-editor-panel {
   position: absolute;
-  background-color: var(--light-editor-surface, var(--surface, var(--bg-secondary)));
+  background-color: var(--surface,var(--light-editor-surface, var(--bg-secondary)));
   border: 1px solid var(--light-editor-accent, var(--accent));
   border-radius: var(--radius-md);
   padding: var(--space-4);
@@ -912,13 +912,54 @@ button.tool-btn i {
   pointer-events: auto;
 }
 
+/* Container for hover detection - wraps trigger and toolbar */
+.toolbar-hover-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 150px;
+  z-index: 99997;
+  pointer-events: none;
+}
+
+/* Header hover trigger - invisible area at top of screen */
+.header-hover-trigger {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 /* Toolbar wrapper for positioning outside header */
 .toolbar-wrapper {
-  position: fixed;
+  position: absolute;
   top: 6px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(-100%);
+  opacity: 0;
   z-index: 99999;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  pointer-events: none;
+}
+
+/* Show toolbar when hovering over container */
+.toolbar-hover-container:hover .toolbar-wrapper {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Keep toolbar visible when toolbar buttons are active/pressed */
+.toolbar-hover-container:has(.toolbar button:active) .toolbar-wrapper,
+.toolbar-hover-container:has(.toolbar button[aria-pressed="true"]) .toolbar-wrapper,
+.toolbar-hover-container:has(.game-toolbar-header:active) .toolbar-wrapper {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .no-board {
@@ -2339,6 +2380,194 @@ canvas {
   width: 100%;
 }
 
+.weather-effects-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.weather-effect-item {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-state-hover);
+}
+
+.weather-effect-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s;
+}
+
+.weather-effect-header:hover {
+  background: var(--color-state-active);
+}
+
+.weather-effect-name {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.weather-effect-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.weather-effect-add {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  background: var(--color-state-hover);
+  border-radius: var(--radius-sm);
+}
+
+.weather-effect-remove {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.weather-effect-remove:hover {
+  background: var(--color-state-active);
+  color: var(--color-text-danger);
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.toggle-switch.small {
+  width: 28px;
+  height: 16px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-bg-tertiary);
+  transition: 0.2s;
+  border-radius: 20px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+.toggle-switch.small .toggle-slider {
+  border-radius: 16px;
+}
+
+.toggle-switch.small .toggle-slider:before {
+  height: 10px;
+  width: 10px;
+  left: 3px;
+  bottom: 3px;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--color-primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(16px);
+}
+
+.toggle-switch.small input:checked + .toggle-slider:before {
+  transform: translateX(12px);
+}
+
+.weather-effect-settings {
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-primary);
+}
+
+.weather-effect-settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.weather-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.weather-setting-row label:first-child {
+  flex-shrink: 0;
+}
+
+.weather-color-input {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: transparent;
+}
+
+.weather-slider {
+  flex: 1;
+  max-width: 120px;
+  height: 4px;
+  appearance: none;
+  background: var(--color-bg-tertiary);
+  border-radius: 2px;
+  outline: none;
+}
+
+.weather-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
 .gameboard-inline-control-row {
   display: flex;
   align-items: center;
@@ -2394,10 +2623,12 @@ canvas {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 10px;
 }
 
 .gameboard-inline-control-label-wide {
   min-width: 60px;
+  padding: 0px 10px;
 }
 
 .gameboard-inline-control-value-wide {
@@ -2683,7 +2914,7 @@ canvas {
 
 .gameboard-audio-editor-panel {
   position: absolute;
-  background-color: var(--gameboard-audio-editor-surface, var(--surface, var(--bg-secondary)));
+  background-color:  var(--surface,var(--light-editor-surface, var(--bg-secondary)));
   border: 1px solid var(--gameboard-audio-editor-accent, var(--accent));
   border-radius: var(--radius-md);
   padding: var(--space-4);
