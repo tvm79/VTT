@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, memo, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
-import type { WeatherFilterConfig, WeatherFilterType } from '../store/gameStore';
+import type { WeatherEffectConfig, WeatherFilterConfig, WeatherFilterType } from '../store/gameStore';
 import { socketService } from '../services/socket';
 import { DEFAULT_COLOR_SCHEMES } from '../../../shared/src/index';
 import type { ColorScheme } from '../../../shared/src/index';
@@ -16,6 +16,12 @@ import {
   type WeatherFilterSettingDefinition,
   type WeatherType,
 } from './WeatherEffects';
+import type { ParticlePreset } from '../particles/editor/particleSchema';
+import {
+  getParticlePresetById,
+  subscribeParticlePresets,
+  updateParticlePreset,
+} from '../particles/editor/particlePresetStore';
 import { getActivatedTextColor, TOKEN_DISPOSITIONS, type TokenDisposition } from '../utils/colorUtils';
 import { VISUAL_OPTIONS, setAtmosphericFog, setFogEnabled, setFogIntensity, setFogSpeed, setFogShift, setFogDirection, setFogColor1, setFogColor2 } from '../utils/gameTime';
 
@@ -70,6 +76,55 @@ const WEATHER_SECTION_STYLE = {
   padding: 'var(--space-3)',
   background: 'var(--color-state-hover)',
 } as const;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function weatherEffectFromPreset(preset: ParticlePreset | undefined, fallback: WeatherEffectConfig): WeatherEffectConfig {
+  if (!preset) return fallback;
+
+  const avgSize = ((preset.startSize ?? fallback.size) + (preset.endSize ?? fallback.size)) / 2;
+  const size = clamp(Math.round((((avgSize / 6.5) - 0.25) / 2.25) * 100), 1, 200);
+  const lifetime = clamp(Math.round(((preset.lifetimeMinMs ?? fallback.lifetime) + (preset.lifetimeMaxMs ?? fallback.lifetime)) / 2), 1000, 30000);
+  const intensity = clamp(Math.round((preset.emitRate - 8) / 2.4), 0, 100);
+  const opacity = clamp(Math.round((preset.startAlpha ?? 1) * 100), 0, 100);
+  const direction = typeof preset.directionDeg === 'number' ? ((preset.directionDeg % 360) + 360) % 360 : fallback.direction;
+
+  return {
+    ...fallback,
+    color: preset.startColor ?? fallback.color,
+    size,
+    lifetime,
+    intensity,
+    opacity,
+    direction,
+  };
+}
+
+function applyWeatherSettingsToPreset(basePreset: ParticlePreset, weather: WeatherEffectConfig): ParticlePreset {
+  const next = { ...basePreset };
+
+  next.startColor = weather.color;
+  next.endColor = weather.color;
+
+  const particleScale = 0.25 + (weather.size / 100) * 2.25;
+  next.startSize = Math.round(4 * particleScale);
+  next.endSize = Math.round(9 * particleScale);
+
+  next.lifetimeMinMs = weather.lifetime;
+  next.lifetimeMaxMs = weather.lifetime;
+
+  next.emitRate = Math.round(8 + weather.intensity * 2.4);
+  next.maxParticles = Math.round(30 + weather.intensity * 3.8);
+
+  next.startAlpha = weather.opacity / 100;
+  next.endAlpha = weather.opacity / 100;
+
+  next.directionDeg = weather.direction;
+
+  return next;
+}
 
 export const Toolbar = memo(function Toolbar() {
   const { 
@@ -303,6 +358,7 @@ export const Toolbar = memo(function Toolbar() {
   const [fullScreenEffectsExpanded, setFullScreenEffectsExpanded] = useState(true);
   const [weatherParticlesExpanded, setWeatherParticlesExpanded] = useState(true);
   const [fogShaderExpanded, setFogShaderExpanded] = useState(false);
+  const [, setParticlePresetRevision] = useState(0);
   
   // Fog shader settings - initialized from VISUAL_OPTIONS
   const [fogEnabled, setFogEnabledState] = useState(VISUAL_OPTIONS.fogEnabled);
@@ -326,6 +382,28 @@ export const Toolbar = memo(function Toolbar() {
       setWeatherFilterEffects(getDefaultWeatherFilterEffects());
     }
   }, [weatherFilterEffects.length, setWeatherFilterEffects]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeParticlePresets(() => {
+      setParticlePresetRevision((value) => value + 1);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const syncWeatherEffectToPreset = (effect: WeatherEffectConfig, updates: Partial<WeatherEffectConfig>) => {
+    const weatherPresetId = WEATHER_TYPE_TO_PRESET[effect.type] || '';
+    if (!weatherPresetId) return;
+    const preset = getParticlePresetById(weatherPresetId);
+    if (!preset) return;
+
+    const mergedEffect = { ...effect, ...updates };
+    updateParticlePreset(applyWeatherSettingsToPreset(preset, mergedEffect));
+  };
+
+  const updateWeatherEffectWithPresetSync = (effect: WeatherEffectConfig, updates: Partial<WeatherEffectConfig>) => {
+    updateWeatherEffect(effect.id, updates);
+    syncWeatherEffectToPreset(effect, updates);
+  };
 
   const upsertWeatherFilter = (type: WeatherFilterType, updater: (effect: WeatherFilterConfig) => WeatherFilterConfig) => {
     const existing = weatherFilterEffects.find((effect) => effect.type === type);
@@ -1864,6 +1942,7 @@ export const Toolbar = memo(function Toolbar() {
         <div 
           className="settings-panel"
           style={{
+            width: 'var(--toolbar-settings-width, 320px)',
             background: colorScheme && (colorScheme.id.includes('-custom-') || colorScheme.id === 'custom') ? colorScheme.surface : undefined,
           }}
         >
@@ -1888,6 +1967,11 @@ export const Toolbar = memo(function Toolbar() {
                 {(['rain', 'snow', 'fog', 'clouds', 'fireflies', 'embers', 'sparkles', 'hearts'] as WeatherType[]).map((type) => {
                   const existing = activeWeatherEffects.find(e => e.type === type);
                   const isExpanded = expandedWeatherEffectId === existing?.id;
+                  const weatherPresetId = existing ? (WEATHER_TYPE_TO_PRESET[existing.type] || '') : '';
+                  const weatherPreset = weatherPresetId ? getParticlePresetById(weatherPresetId) : undefined;
+                  const effectiveSettings = existing
+                    ? weatherEffectFromPreset(weatherPreset, existing)
+                    : null;
                   
                   return (
                     <div key={type} className="weather-effect-item">
@@ -1929,7 +2013,7 @@ export const Toolbar = memo(function Toolbar() {
                                   checked={existing.enabled}
                                   onChange={(e) => {
                                     e.stopPropagation();
-                                    updateWeatherEffect(existing.id, { enabled: e.target.checked });
+                                    updateWeatherEffectWithPresetSync(existing, { enabled: e.target.checked });
                                   }}
                                 />
                                 <span className="toggle-slider"></span>
@@ -1960,8 +2044,8 @@ export const Toolbar = memo(function Toolbar() {
                               <label className="toggle-switch small">
                                 <input
                                   type="checkbox"
-                                  checked={existing.belowTokens ?? true}
-                                  onChange={(e) => updateWeatherEffect(existing.id, { belowTokens: e.target.checked })}
+                                  checked={effectiveSettings?.belowTokens ?? true}
+                                  onChange={(e) => updateWeatherEffectWithPresetSync(existing, { belowTokens: e.target.checked })}
                                 />
                                 <span className="toggle-slider"></span>
                               </label>
@@ -1971,57 +2055,69 @@ export const Toolbar = memo(function Toolbar() {
                               <label>Color</label>
                               <input
                                 type="color"
-                                value={existing.color || '#ffffff'}
-                                onChange={(e) => updateWeatherEffect(existing.id, { color: e.target.value })}
+                                value={effectiveSettings?.color || '#ffffff'}
+                                onChange={(e) => updateWeatherEffectWithPresetSync(existing, { color: e.target.value })}
                                 className="weather-color-input"
                               />
                             </div>
-                            
                             <div className="weather-setting-row">
-                              <label>Scale: {existing.size}%</label>
+                              <label>Direction: {effectiveSettings?.direction ?? existing.direction}°</label>
                               <input
                                 type="range"
-                                min="1"
-                                max="200"
-                                value={existing.size ?? 50}
-                                onChange={(e) => updateWeatherEffect(existing.id, { size: parseInt(e.target.value) })}
+                                min="0"
+                                max="360"
+                                step="1"
+                                value={effectiveSettings?.direction ?? existing.direction ?? 270}
+                                onChange={(e) => updateWeatherEffectWithPresetSync(existing, { direction: parseInt(e.target.value, 10) })}
                                 className="weather-slider"
                               />
                             </div>
                             
                             <div className="weather-setting-row">
-                              <label>Lifetime: {(existing.lifetime ?? 5000) / 1000}s</label>
+                              <label>Scale: {effectiveSettings?.size ?? existing.size}%</label>
+                              <input
+                                type="range"
+                                min="1"
+                                max="200"
+                                value={effectiveSettings?.size ?? existing.size ?? 50}
+                                onChange={(e) => updateWeatherEffectWithPresetSync(existing, { size: parseInt(e.target.value, 10) })}
+                                className="weather-slider"
+                              />
+                            </div>
+                            
+                            <div className="weather-setting-row">
+                              <label>Lifetime: {((effectiveSettings?.lifetime ?? existing.lifetime ?? 5000) / 1000).toFixed(1)}s</label>
                               <input
                                 type="range"
                                 min="1000"
                                 max="30000"
                                 step="500"
-                                value={existing.lifetime ?? 5000}
-                                onChange={(e) => updateWeatherEffect(existing.id, { lifetime: parseInt(e.target.value) })}
+                                value={effectiveSettings?.lifetime ?? existing.lifetime ?? 5000}
+                                onChange={(e) => updateWeatherEffectWithPresetSync(existing, { lifetime: parseInt(e.target.value, 10) })}
                                 className="weather-slider"
                               />
                             </div>
                             
                             <div className="weather-setting-row">
-                              <label>Amount: {existing.intensity}%</label>
+                              <label>Amount: {effectiveSettings?.intensity ?? existing.intensity}%</label>
                               <input
                                 type="range"
                                 min="0"
                                 max="100"
-                                value={existing.intensity ?? 50}
-                                onChange={(e) => updateWeatherEffect(existing.id, { intensity: parseInt(e.target.value) })}
+                                value={effectiveSettings?.intensity ?? existing.intensity ?? 50}
+                                onChange={(e) => updateWeatherEffectWithPresetSync(existing, { intensity: parseInt(e.target.value, 10) })}
                                 className="weather-slider"
                               />
                             </div>
                             
                             <div className="weather-setting-row">
-                              <label>Opacity: {existing.opacity ?? 100}%</label>
+                              <label>Opacity: {effectiveSettings?.opacity ?? existing.opacity ?? 100}%</label>
                               <input
                                 type="range"
                                 min="0"
                                 max="100"
-                                value={existing.opacity ?? 100}
-                                onChange={(e) => updateWeatherEffect(existing.id, { opacity: parseInt(e.target.value) })}
+                                value={effectiveSettings?.opacity ?? existing.opacity ?? 100}
+                                onChange={(e) => updateWeatherEffectWithPresetSync(existing, { opacity: parseInt(e.target.value, 10) })}
                                 className="weather-slider"
                               />
                             </div>
@@ -2029,47 +2125,10 @@ export const Toolbar = memo(function Toolbar() {
                           
                           <Button
                             onClick={async () => {
-                              const weatherPresetId = WEATHER_TYPE_TO_PRESET[existing.type] || '';
                               if (weatherPresetId) {
-                                // Apply toolbar settings to the preset before opening editor
-                                const { getParticlePresetById, updateParticlePreset } = await import('../particles/editor/particlePresetStore');
                                 const preset = getParticlePresetById(weatherPresetId);
-                                if (preset) {
-                                  // Apply simplified settings to preset
-                                  const updatedPreset = { ...preset };
-                                  
-                                  // Color override
-                                  if (existing.color) {
-                                    updatedPreset.startColor = existing.color;
-                                    updatedPreset.endColor = existing.color;
-                                  }
-                                  
-                                  // Scale override (maps to size)
-                                  if (existing.size !== undefined) {
-                                    const particleScale = 0.25 + (existing.size / 100) * 2.25;
-                                    updatedPreset.startSize = Math.round(4 * particleScale);
-                                    updatedPreset.endSize = Math.round(9 * particleScale);
-                                  }
-                                  
-                                  // Lifetime override
-                                  if (existing.lifetime !== undefined) {
-                                    updatedPreset.lifetimeMinMs = existing.lifetime;
-                                    updatedPreset.lifetimeMaxMs = existing.lifetime;
-                                  }
-                                  
-                                  // Amount override (maps to emit rate and max particles)
-                                  if (existing.intensity !== undefined) {
-                                    updatedPreset.emitRate = Math.round(8 + existing.intensity * 2.4);
-                                    updatedPreset.maxParticles = Math.round(30 + existing.intensity * 3.8);
-                                  }
-                                  
-                                  // Opacity override
-                                  if (existing.opacity !== undefined) {
-                                    updatedPreset.startAlpha = existing.opacity / 100;
-                                    updatedPreset.endAlpha = existing.opacity / 100;
-                                  }
-                                  
-                                  updateParticlePreset(updatedPreset);
+                                if (preset && effectiveSettings) {
+                                  updateParticlePreset(applyWeatherSettingsToPreset(preset, effectiveSettings));
                                 }
                                 setParticlePreset(weatherPresetId);
                               }

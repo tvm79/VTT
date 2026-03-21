@@ -258,7 +258,7 @@ function App() {
         title={chatVisible ? "Hide Chat" : "Show Chat"}
         className={`app-edge-toggle chat-panel-toggle ${chatVisible ? 'is-open' : ''}`}
         style={{
-          left: chatVisible ? 'calc(100vw - 299px)' : 'calc(100vw - 38px)',
+          left: chatVisible ? 'calc(100vw - 300px)' : 'calc(100vw - 38px)',
         }}
       >
         <Icon name={chatVisible ? "chevron-right" : "chevron-left"} />

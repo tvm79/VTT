@@ -715,15 +715,15 @@ export function ParticleEditorPanel({
           </Section>
 
           <Section title="Lifetime & Appearance">
-            <label style={styles.label}>Lifetime (Min/Max)</label>
+            <label style={styles.label}>Lifetime (Min/Max) in seconds</label>
             <RangePair
-              minValue={activePreset.lifetimeMinMs}
-              maxValue={activePreset.lifetimeMaxMs}
-              min={100}
-              max={10000}
-              step={50}
-              onChangeMin={(value) => updatePreset({ ...activePreset, lifetimeMinMs: value })}
-              onChangeMax={(value) => updatePreset({ ...activePreset, lifetimeMaxMs: value })}
+              minValue={activePreset.lifetimeMinMs / 1000}
+              maxValue={activePreset.lifetimeMaxMs / 1000}
+              min={0.1}
+              max={30}
+              step={0.1}
+              onChangeMin={(value) => updatePreset({ ...activePreset, lifetimeMinMs: value * 1000 })}
+              onChangeMax={(value) => updatePreset({ ...activePreset, lifetimeMaxMs: value * 1000 })}
             />
             <GradientAlphaField
               startColor={activePreset.startColor}
@@ -738,7 +738,7 @@ export function ParticleEditorPanel({
               minValue={activePreset.startSize}
               maxValue={activePreset.endSize}
               min={0.1}
-              max={256}
+              max={50}
               step={0.1}
               onChangeMin={(value) => updatePreset({ ...activePreset, startSize: value })}
               onChangeMax={(value) => updatePreset({ ...activePreset, endSize: value })}
@@ -1401,6 +1401,8 @@ function CurveField({
   onChange: (curve: ParticleCurve) => void;
 }) {
   const normalized = normalizeCurve(curve);
+  const isEnabled = normalized.enabled;
+  
   return (
     <div style={styles.curveWrap}>
       <div style={styles.curveHeader}>
@@ -1415,86 +1417,90 @@ function CurveField({
         </label>
       </div>
 
-      <div style={styles.curvePresetRow}>
-        {CURVE_PRESETS.map((preset) => (
-          <button
-            key={preset.label}
-            className="tool-btn"
-            type="button"
-            style={styles.curvePresetBtn}
-            onClick={() => onChange({ enabled: true, points: clonePoints(preset.points) })}
-            title={`Apply ${preset.label}`}
-          >
-            <Icon name={preset.icon} />
-          </button>
-        ))}
-        <button
-          className="tool-btn"
-          type="button"
-          style={styles.curvePresetBtn}
-          onClick={() => onChange(defaultCurve())}
-          title="Reset curve"
-        >
-          Reset
-        </button>
-      </div>
-
-      <div style={styles.curvePointsList}>
-        {normalized.points.map((point, index) => (
-          <div key={`${index}-${point.t}-${point.v}`} style={styles.curvePointRow}>
-            <span style={styles.curvePointIndex}>{index + 1}</span>
-            <input
-              type="number"
-              min={0}
-              max={1}
-              step={0.01}
-              value={point.t}
-              style={styles.rangeNumber}
-              onChange={(e) => {
-                const points = normalized.points.map((p, i) => i === index ? { ...p, t: clamp01(Number(e.target.value)) } : p);
-                onChange({ ...normalized, points: sortAndFixEndpoints(points) });
-              }}
-            />
-            <input
-              type="number"
-              min={yMin}
-              max={yMax}
-              step={yStep}
-              value={point.v}
-              style={styles.rangeNumber}
-              onChange={(e) => {
-                const nextValue = clamp(Number(e.target.value), yMin, yMax);
-                const points = normalized.points.map((p, i) => i === index ? { ...p, v: nextValue } : p);
-                onChange({ ...normalized, points: sortAndFixEndpoints(points) });
-              }}
-            />
+      {isEnabled && (
+        <>
+          <div style={styles.curvePresetRow}>
+            {CURVE_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                className="tool-btn"
+                type="button"
+                style={styles.curvePresetBtn}
+                onClick={() => onChange({ enabled: true, points: clonePoints(preset.points) })}
+                title={`Apply ${preset.label}`}
+              >
+                <Icon name={preset.icon} />
+              </button>
+            ))}
             <button
               className="tool-btn"
               type="button"
-              disabled={normalized.points.length <= 2}
-              onClick={() => {
-                const points = normalized.points.filter((_, i) => i !== index);
-                onChange({ ...normalized, points: sortAndFixEndpoints(points) });
-              }}
-              title="Remove point"
+              style={styles.curvePresetBtn}
+              onClick={() => onChange(defaultCurve())}
+              title="Reset curve"
             >
-              <Icon name="times" />
+              Reset
             </button>
           </div>
-        ))}
-      </div>
-      <button
-        className="tool-btn"
-        type="button"
-        style={styles.curveAddBtn}
-        onClick={() => {
-          const points = [...normalized.points, { t: 0.5, v: 1 }];
-          onChange({ ...normalized, points: sortAndFixEndpoints(points) });
-        }}
-        title="Add curve point"
-      >
-        <Icon name="plus" />
-      </button>
+
+          <div style={styles.curvePointsList}>
+            {normalized.points.map((point, index) => (
+              <div key={`${index}-${point.t}-${point.v}`} style={styles.curvePointRow}>
+                <span style={styles.curvePointIndex}>{index + 1}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={point.t}
+                  style={styles.rangeNumber}
+                  onChange={(e) => {
+                    const points = normalized.points.map((p, i) => i === index ? { ...p, t: clamp01(Number(e.target.value)) } : p);
+                    onChange({ ...normalized, points: sortAndFixEndpoints(points) });
+                  }}
+                />
+                <input
+                  type="number"
+                  min={yMin}
+                  max={yMax}
+                  step={yStep}
+                  value={point.v}
+                  style={styles.rangeNumber}
+                  onChange={(e) => {
+                    const nextValue = clamp(Number(e.target.value), yMin, yMax);
+                    const points = normalized.points.map((p, i) => i === index ? { ...p, v: nextValue } : p);
+                    onChange({ ...normalized, points: sortAndFixEndpoints(points) });
+                  }}
+                />
+                <button
+                  className="tool-btn"
+                  type="button"
+                  disabled={normalized.points.length <= 2}
+                  onClick={() => {
+                    const points = normalized.points.filter((_, i) => i !== index);
+                    onChange({ ...normalized, points: sortAndFixEndpoints(points) });
+                  }}
+                  title="Remove point"
+                >
+                  <Icon name="times" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            className="tool-btn"
+            type="button"
+            style={styles.curveAddBtn}
+            onClick={() => {
+              const points = [...normalized.points, { t: 0.5, v: 1 }];
+              onChange({ ...normalized, points: sortAndFixEndpoints(points) });
+            }}
+            title="Add curve point"
+          >
+            <Icon name="plus" />
+          </button>
+        </>
+      )}
     </div>
   );
 }

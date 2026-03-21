@@ -4321,8 +4321,9 @@ export function GameBoard() {
           const height = effectiveGridSize * footprint;
           // Get border color based on token disposition
           const borderColor = getTokenBorderColor(token.properties);
-          // Draw selection rectangle at token's world position
-          tokenSelection.rect(token.x - 2, token.y - 2, width + 4, height + 4);
+          // Draw selection rectangle at token's world position (with rounded corners)
+          const selectionRadius = 6;
+          tokenSelection.roundRect(token.x - 2, token.y - 2, width + 4, height + 4, selectionRadius);
           tokenSelection.stroke({ width: 3, color: borderColor, alpha: 1 }); // Disposition-based color outline
         }
       }

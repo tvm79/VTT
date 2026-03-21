@@ -2,7 +2,7 @@
  * Weather Effects - particle weather + PixiJS filter helpers.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Application, Filter } from 'pixi.js';
 import { Point } from 'pixi.js';
 import {
@@ -21,7 +21,7 @@ import {
   ZoomBlurFilter,
 } from 'pixi-filters';
 import { getParticleSystem, initParticleSystem } from '../particles/runtime/ParticleSystem';
-import { getParticlePresetById } from '../particles/editor/particlePresetStore';
+import { getParticlePresetById, subscribeParticlePresets } from '../particles/editor/particlePresetStore';
 import type { ParticlePreset } from '../particles/editor/particleSchema';
 import type { WeatherEffectConfig, WeatherFilterConfig, WeatherFilterType } from '../store/gameStore';
 import { useGameStore } from '../store/gameStore';
@@ -182,6 +182,14 @@ function createEffectSignature(effect: WeatherEffectConfig, boardWidth: number, 
 
 export function MultiWeatherEffectRenderer({ app, effects, boardWidth, boardHeight }: MultiWeatherEffectsProps) {
   const trackedRef = useRef<Map<string, string>>(new Map());
+  const [presetRevision, setPresetRevision] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeParticlePresets(() => {
+      setPresetRevision((value) => value + 1);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -230,7 +238,7 @@ export function MultiWeatherEffectRenderer({ app, effects, boardWidth, boardHeig
     return () => {
       cancelled = true;
     };
-  }, [app, effects, boardWidth, boardHeight]);
+  }, [app, effects, boardWidth, boardHeight, presetRevision]);
 
   useEffect(
     () => () => {
