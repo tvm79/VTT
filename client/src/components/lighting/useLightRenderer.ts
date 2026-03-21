@@ -203,11 +203,10 @@ export function useLightRenderer(options: UseLightRendererOptions): UseLightRend
         const selectionGraphics = new PIXI.Graphics();
         (selectionGraphics as any).isSelectionIndicator = true;
         const selectionSize = (r || 200) + 30;
-        // Draw filled circle with border for visibility
-        selectionGraphics.lineStyle(3, 0x00ff00, 0.1); // Green selection border
-        selectionGraphics.beginFill(0x00ff00, 0.0); // Semi-transparent fill
-        selectionGraphics.drawCircle(light.x, light.y, selectionSize);
-        selectionGraphics.endFill();
+        // Draw filled circle with border for visibility (PixiJS v8 API)
+        selectionGraphics.circle(light.x, light.y, selectionSize);
+        selectionGraphics.stroke({ width: 3, color: 0x00ff00, alpha: 0.1 });
+        selectionGraphics.fill({ color: 0x00ff00, alpha: 0.0 });
         // Make selection graphics ignore pointer events so clicks pass through to light icon
         selectionGraphics.eventMode = 'none';
         lightLayer.addChild(selectionGraphics);
@@ -230,7 +229,7 @@ export function useLightRenderer(options: UseLightRendererOptions): UseLightRend
         // For radiance type, use a different approach - flatter gradient for ambient lighting
         const lightTexture = type === 'radiance' 
           ? getRadianceTexture(outerRadius, safeColor, intensity)
-          : getLightTexture(outerRadius, safeColor);
+          : getLightTexture(outerRadius, safeColor, innerRadius);
         const lightSprite = new PIXI.Sprite(lightTexture);
         lightSprite.anchor.set(0.5);
         lightSprite.width = outerRadius * 2;

@@ -51,7 +51,8 @@ import { useSpatialAudio } from './audio/useSpatialAudio';
 import { VISUAL_OPTIONS, setFogEnabled, setFogIntensity, setFogSpeed, setFogShift, setFogDirection, setFogColor1, setFogColor2 } from '../utils/gameTime';
 import { getPixiRendererKind, initPixiApplicationWebGL2First, isPixiWebGLRenderer } from '../utils/pixiRenderer';
 import { GridOverlay } from '../utils/GridOverlay';
-import defaultTurnTokenImage from '../../assets/icons/turn_token.webp';
+// Default turn token - now in public/assets/art for proper PixiJS loading
+const DEFAULT_TURN_TOKEN_URL = '/assets/art/turn_token.webp';
 import { colors } from '../ui/tokens';
 import { 
   snapToGridIntersection, 
@@ -270,6 +271,14 @@ function toBoardSafeImageUrl(url: string | null | undefined): string {
   if (raw.startsWith('/api/assets/proxy-image?')) {
     const ext = inferImageExtensionFromUrl(raw);
     return raw.replace('/api/assets/proxy-image?', `/api/assets/proxy-image.${ext}?`);
+  }
+
+  // Handle Vite asset imports - they come as URLs with hashes like /assets/turn_token.webp?hash
+  // Convert to a clean path that PixiJS can load
+  if (raw.includes('/assets/') && raw.includes('?')) {
+    // Strip query params for cleaner loading
+    const cleanPath = raw.split('?')[0];
+    return cleanPath;
   }
 
   if (!isRemoteHttpImageUrl(raw)) return raw;
@@ -3243,7 +3252,26 @@ export function GameBoard() {
       isInCombat && currentTurnIndex >= 0 && currentTurnIndex < combatants.length
         ? combatants[currentTurnIndex]?.tokenId ?? null
         : null;
-    const turnMarkerTextureUrl = toBoardSafeImageUrl(turnTokenImageUrl || defaultTurnTokenImage);
+    
+    console.log('[TurnMarkerDebug] Token render effect - isInCombat:', isInCombat, 'currentTurnIndex:', currentTurnIndex, 'combatants.length:', combatants.length, 'activeTurnTokenId:', activeTurnTokenId);
+    
+    // Determine the turn marker URL - use custom URL if set, otherwise use default
+    // The default is now in public/assets/art for proper PixiJS loading
+    let turnMarkerUrl = turnTokenImageUrl;
+    if (!turnMarkerUrl) {
+      turnMarkerUrl = DEFAULT_TURN_TOKEN_URL;
+    }
+    
+    // Normalize legacy/invalid paths
+    if (turnMarkerUrl && typeof turnMarkerUrl === 'string') {
+      // Fix common path issues - legacy paths and query params
+      turnMarkerUrl = turnMarkerUrl
+        .replace(/^\/assets\/icons\//, '/assets/art/') // Legacy path correction
+        .replace(/^\/assets\/turn_token.webp$/, '/assets/art/turn_token.webp') // Old default path
+        .replace(/\?.*$/, ''); // Remove query params for cleaner cache keys
+    }
+    
+    const turnMarkerTextureUrl = toBoardSafeImageUrl(turnMarkerUrl);
 
     // Filter tokens based on visibility rules
     // - GM can always see all tokens
@@ -3518,60 +3546,98 @@ export function GameBoard() {
         const size = width;
         applyCenteredAspectFitToTokenSprites(sprite, shadowSprite, width, height);
         const markerSpriteMeta = turnMarkerSprite as any;
-        if (markerSpriteMeta.__sourceUrl !== turnMarkerTextureUrl) {
-          markerSpriteMeta.__sourceUrl = turnMarkerTextureUrl;
-          markerSpriteMeta.__textureReady = false;
-          markerSpriteMeta.__textureLoading = true;
-          turnMarkerSprite.visible = false;
+        let markerTextureReady = false;
+        let shouldShowTurnMarker = false;
+        if (isInCombat) {
+          if (markerSpriteMeta.__sourceUrl !== turnMarkerTextureUrl) {
+            markerSpriteMeta.__sourceUrl = turnMarkerTextureUrl;
+            markerSpriteMeta.__textureReady = false;
+            markerSpriteMeta.__textureLoading = true;
+            turnMarkerSprite.visible = false;
 
-          PIXI.Assets.load<PIXI.Texture>(turnMarkerTextureUrl)
-            .then((markerTexture) => {
-              if (markerSpriteMeta.__sourceUrl !== turnMarkerTextureUrl) return;
-              const isValidTexture = Boolean((markerTexture as any)?.source);
-              markerSpriteMeta.__textureReady = isValidTexture;
-              markerSpriteMeta.__textureLoading = false;
-
-              if (isValidTexture) {
-                turnMarkerSprite.texture = markerTexture;
-                turnMarkerSprite.visible = true;
-              } else {
-                turnMarkerSprite.visible = false;
-              }
-            })
-            .catch((error) => {
-              if (markerSpriteMeta.__sourceUrl !== turnMarkerTextureUrl) return;
+            // Skip loading if URL is empty or invalid
+            if (!turnMarkerTextureUrl || turnMarkerTextureUrl === '') {
+              turnMarkerSprite.visible = false;
               markerSpriteMeta.__textureReady = false;
               markerSpriteMeta.__textureLoading = false;
-              turnMarkerSprite.visible = false;
-              console.error('[TurnMarkerDebug] marker texture load failed', {
-                turnMarkerTextureUrl,
-                error,
+              return;
+            }
+
+            // Use direct fetch approach for PixiJS v8 compatibility
+            // This avoids the "Asset not found in cache" warning
+            fetch(turnMarkerTextureUrl)
+              .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.blob();
+              })
+              .then(blob => {
+                return createImageBitmap(blob);
+              })
+              .then(imageBitmap => {
+                if (markerSpriteMeta.__sourceUrl !== turnMarkerTextureUrl) return;
+                const texture = PIXI.Texture.from(imageBitmap);
+                turnMarkerSprite.texture = texture;
+                turnMarkerSprite.visible = true;
+                markerSpriteMeta.__textureReady = true;
+                markerSpriteMeta.__textureLoading = false;
+              })
+              .catch((error) => {
+                if (markerSpriteMeta.__sourceUrl !== turnMarkerTextureUrl) return;
+                markerSpriteMeta.__textureReady = false;
+                markerSpriteMeta.__textureLoading = false;
+                turnMarkerSprite.visible = false;
+                console.warn('[TurnMarkerDebug] marker texture load failed (using fallback)', {
+                  turnMarkerTextureUrl,
+                  error: error?.message || 'Unknown error',
+                });
               });
-            });
+          }
+          applyCenteredAspectFitToTurnMarker(turnMarkerSprite, size);
+          turnMarkerSprite.alpha = 1;
+
+          const markerWidth = turnMarkerSprite.width;
+          const markerHeight = turnMarkerSprite.height;
+          const markerX = size / 2;
+          const markerY = size / 2;
+
+          turnMarkerFallback.clear();
+          turnMarkerFallback.roundRect(
+            markerX - markerWidth / 2,
+            markerY - markerHeight / 2,
+            markerWidth,
+            markerHeight,
+            Math.min(markerHeight / 2, 36),
+          );
+          turnMarkerFallback.fill({ color: DEFAULT_TURN_MARKER_FILL, alpha: 0.45 });
+          turnMarkerFallback.stroke({ width: 4, color: DEFAULT_TURN_MARKER_STROKE, alpha: 0.98 });
+
+          markerTextureReady = Boolean(markerSpriteMeta.__textureReady && (turnMarkerSprite.texture as any)?.source);
+          turnMarkerSprite.visible = markerTextureReady;
+          turnMarkerFallback.visible = !markerTextureReady;
+          const isDraggingOrDropping = dragMode !== 'none' || Boolean(pendingDropType);
+          shouldShowTurnMarker = token.id === activeTurnTokenId && !isDraggingOrDropping;
+        } else {
+          markerSpriteMeta.__textureReady = false;
+          markerSpriteMeta.__textureLoading = false;
+          turnMarkerSprite.visible = false;
+          turnMarkerFallback.visible = false;
         }
-        applyCenteredAspectFitToTurnMarker(turnMarkerSprite, size);
-        turnMarkerSprite.alpha = 1;
-
-        const markerWidth = turnMarkerSprite.width;
-        const markerHeight = turnMarkerSprite.height;
-        const markerX = size / 2;
-        const markerY = size / 2;
-
-        turnMarkerFallback.clear();
-        turnMarkerFallback.roundRect(
-          markerX - markerWidth / 2,
-          markerY - markerHeight / 2,
-          markerWidth,
-          markerHeight,
-          Math.min(markerHeight / 2, 36),
-        );
-        turnMarkerFallback.fill({ color: DEFAULT_TURN_MARKER_FILL, alpha: 0.45 });
-        turnMarkerFallback.stroke({ width: 4, color: DEFAULT_TURN_MARKER_STROKE, alpha: 0.98 });
-
-        const markerTextureReady = Boolean(markerSpriteMeta.__textureReady && (turnMarkerSprite.texture as any)?.source);
-        turnMarkerSprite.visible = markerTextureReady;
-        turnMarkerFallback.visible = !markerTextureReady;
-        turnMarkerContainer.visible = token.id === activeTurnTokenId;
+        // FIX: Only show TurnMarker when actually in combat AND token is the active turn
+        shouldShowTurnMarker = shouldShowTurnMarker && isInCombat;
+        if (shouldShowTurnMarker) {
+          console.log('[TurnMarkerDebug] Showing TurnMarker for token:', token.id, token.name, 'activeTurnTokenId:', activeTurnTokenId, 'isInCombat:', isInCombat, 'currentTurnIndex:', currentTurnIndex, 'combatants:', combatants.map(c => ({ tokenId: c.tokenId, name: c.name })));
+        }
+        console.info('[TurnMarkerDebug] Drag/marker visibility state', {
+          tokenId: token.id,
+          tokenName: token.name,
+          isInCombat,
+          currentTurnIndex,
+          activeTurnTokenId,
+          shouldShowTurnMarker,
+          dragMode,
+          pendingDropType,
+        });
+        turnMarkerContainer.visible = shouldShowTurnMarker;
         const markerTexture = turnMarkerSprite.texture as any;
         console.debug('[TurnMarkerDebug] token marker render state', {
           tokenId: token.id,
@@ -5333,7 +5399,7 @@ export function GameBoard() {
             Math.pow(measurement.endX - measurement.startX, 2) + 
             Math.pow(measurement.endY - measurement.startY, 2)
           );
-          graphics.drawCircle(measurement.startX, measurement.startY, radius);
+          graphics.circle(measurement.startX, measurement.startY, radius);
           graphics.fill({ color: color, alpha: 0.3 });
           graphics.stroke({ width: 3, color: color });
         } else if (measurement.shape === 'rectangle') {
@@ -6358,7 +6424,7 @@ export function GameBoard() {
         } else if (currentMeasurementShape === 'circle') {
           // Circle - draw from start to end as radius
           const radius = calculateDistance(start, end);
-          measureLine.drawCircle(startX, startY, radius);
+          measureLine.circle(startX, startY, radius);
           measureLine.fill({ color: measureColorNumber, alpha: 0.3 });
           measureLine.stroke({ width: 3, color: measureColorNumber });
           
@@ -7514,6 +7580,14 @@ export function GameBoard() {
           // Sync the final radius to server when drag ends
           socketService.updateLight(light.id, { radius: newRadius, dimRadius: newRadius * 0.25 });
         }}
+        onLightInnerRadiusDrag={(light, newDimRadius) => {
+          // Update light dimRadius in real-time while dragging
+          updateLight(light.id, { dimRadius: newDimRadius });
+        }}
+        onLightInnerRadiusDragEnd={(light, newDimRadius) => {
+          // Sync the final dimRadius to server when drag ends
+          socketService.updateLight(light.id, { dimRadius: newDimRadius });
+        }}
       />
 
       <ParticleEmitterIconsOverlay
@@ -7640,6 +7714,12 @@ export function GameBoard() {
         }}
         onAudioSourceRadiusDragEnd={(audioSource, newRadius) => {
           socketService.updateAudioSource(audioSource.id, { radius: newRadius });
+        }}
+        onAudioSourceInnerRadiusDrag={(audioSource, newInnerRadius) => {
+          updateAudioSource(audioSource.id, { innerRadius: newInnerRadius });
+        }}
+        onAudioSourceInnerRadiusDragEnd={(audioSource, newInnerRadius) => {
+          socketService.updateAudioSource(audioSource.id, { innerRadius: newInnerRadius });
         }}
       />
       

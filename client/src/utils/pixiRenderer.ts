@@ -54,7 +54,7 @@ async function initCanvasApplication(
   options: PixiInitWithoutPreference
 ): Promise<{ app: Application; rendererKind: PixiRendererKind }> {
   const app = new Application();
-  await app.init({ ...options, preference: 'canvas' } as PixiInitOptions);
+  await app.init({ ...options, preference: 'canvas',antialias: true } as PixiInitOptions);
 
   const rendererKind = getPixiRendererKind(app);
   return {

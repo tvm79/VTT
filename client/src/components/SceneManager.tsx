@@ -211,6 +211,8 @@ export function SceneManager() {
 
   const getTokenCount = (scene: Scene) => scene.tokens?.length || 0;
   const getLightCount = (scene: Scene) => scene.lights?.length || 0;
+  const getAudioSourceCount = (scene: Scene) => scene.audioSources?.length || 0;
+  const getParticleEmitterCount = (scene: Scene) => scene.manualParticleEmitters?.length || 0;
 
   if (!sceneManagerVisible) return null;
 
@@ -679,6 +681,7 @@ export function SceneManager() {
                   fontSize: '12px',
                   color: colorScheme?.id === 'custom' ? colorScheme.text : '#a0aec0',
                   opacity: 0.7,
+                  flexWrap: 'wrap',
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Icon name="user" />
@@ -687,6 +690,14 @@ export function SceneManager() {
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Icon name="sun" />
                     {getLightCount(scene)} lights
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="volume-up" />
+                    {getAudioSourceCount(scene)} audio
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Icon name="wind" />
+                    {getParticleEmitterCount(scene)} particles
                   </span>
                   {scene.weatherType !== 'none' && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

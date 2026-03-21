@@ -79,13 +79,13 @@ class AudioPlayer {
     }
   }
 
-  // Available D20 roll sound files
+  // Available D20 roll sound files - use MP3 for Safari compatibility
   private d20RollSounds = [
-    '/assets/audio/sfx/d20-rolls/d20-rolls-001.ogg',
-    '/assets/audio/sfx/d20-rolls/d20-rolls-002.ogg',
-    '/assets/audio/sfx/d20-rolls/d20-rolls-003.ogg',
-    '/assets/audio/sfx/d20-rolls/d20-rolls-004.ogg',
-    '/assets/audio/sfx/d20-rolls/d20-rolls.ogg',
+    '/assets/audio/sfx/d20-rolls/d20-rolls-001.mp3',
+    '/assets/audio/sfx/d20-rolls/d20-rolls-002.mp3',
+    '/assets/audio/sfx/d20-rolls/d20-rolls-003.mp3',
+    '/assets/audio/sfx/d20-rolls/d20-rolls-004.mp3',
+    '/assets/audio/sfx/d20-rolls/d20-rolls.mp3',
   ];
 
   // Play a dice roll sound - plays a random audio file from d20-rolls directory
@@ -102,8 +102,22 @@ class AudioPlayer {
     audio.volume = this.volume;
     
     audio.src = soundPath;
+    
+    // Add debugging: log when audio starts loading and any errors
+    audio.addEventListener('loadstart', () => {
+      console.log('D20 roll sound: Loading started for', soundPath);
+    });
+    
+    audio.addEventListener('error', (e) => {
+      console.warn('D20 roll sound: Load error -', e); 
+      console.warn('D20 roll sound: Audio error code:', audio.error?.code);
+      console.warn('D20 roll sound: Audio error message:', audio.error?.message);
+    });
+    
     audio.play().catch(err => {
       console.warn('Error playing d20 roll sound:', err);
+      console.warn('Error name:', err.name);
+      console.warn('Error message:', err.message);
     });
   }
 

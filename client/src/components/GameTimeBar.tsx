@@ -212,35 +212,7 @@ export function GameTimeBar() {
         </button>
       </div>
 
-      {/* Atmospheric Fog checkbox */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid var(--border, #4a5568)' }}>
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            cursor: 'pointer',
-            fontSize: '9px',
-            color: 'var(--text-secondary, #718096)',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={atmosphericFogEnabled}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              setAtmosphericFogEnabled(checked);
-              setAtmosphericFog(checked);
-              // Sync with server if GM
-              if (isGM) {
-                socketService.updateTimeSettings({ atmosphericFog: checked });
-              }
-            }}
-            style={{ cursor: 'pointer', margin: 0 }}
-          />
-          Fog
-        </label>
-      </div>
+ 
 
 
       {/* Resize Handle */}

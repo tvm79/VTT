@@ -13,13 +13,15 @@ const lightTextureCache = new Map<string, PIXI.Texture>();
 /**
  * Generates a radial gradient light texture with the given radius and color.
  * Uses a multi-stop gradient for realistic light falloff.
+ * Supports an inner radius (dimRadius) where light is at full brightness.
  * 
  * @param radius - The outer radius of the light in pixels
  * @param color - The hex color of the light (e.g., 0xFFAA00)
+ * @param dimRadius - The inner radius where light starts fading (optional, defaults to 0)
  * @returns PIXI.Texture - The generated light texture
  */
-export function getLightTexture(radius: number, color: number): PIXI.Texture {
-  const key = `light_${radius}_${color}`;
+export function getLightTexture(radius: number, color: number, dimRadius: number = 0): PIXI.Texture {
+  const key = `light_${radius}_${color}_${dimRadius}`;
 
   if (lightTextureCache.has(key)) {
     return lightTextureCache.get(key)!;
@@ -37,20 +39,45 @@ export function getLightTexture(radius: number, color: number): PIXI.Texture {
   const g = (color >> 8) & 255;
   const b = color & 255;
 
-  const gradient = ctx.createRadialGradient(
-    radius,
-    radius,
-    0,
-    radius,
-    radius,
-    radius
-  );
+  let gradient: CanvasGradient;
 
-  gradient.addColorStop(0.0, `rgba(${r},${g},${b},1)`);
-  gradient.addColorStop(0.2, `rgba(${r},${g},${b},0.7)`);
-  gradient.addColorStop(0.45, `rgba(${r},${g},${b},0.35)`);
-  gradient.addColorStop(0.75, `rgba(${r},${g},${b},0.12)`);
-  gradient.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
+  if (dimRadius > 0) {
+    // When dimRadius is set, create a solid inner circle and gradient from dimRadius to outer radius
+    // First draw solid inner circle
+    const innerRadiusPixels = dimRadius;
+    
+    gradient = ctx.createRadialGradient(
+      radius,
+      radius,
+      innerRadiusPixels,
+      radius,
+      radius,
+      radius
+    );
+    
+    // From inner radius to outer radius: full brightness at inner, fading to 0 at outer
+    gradient.addColorStop(0.0, `rgba(${r},${g},${b},1)`);
+    gradient.addColorStop(0.25, `rgba(${r},${g},${b},0.7)`);
+    gradient.addColorStop(0.5, `rgba(${r},${g},${b},0.35)`);
+    gradient.addColorStop(0.75, `rgba(${r},${g},${b},0.12)`);
+    gradient.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
+  } else {
+    // Original gradient without inner radius
+    gradient = ctx.createRadialGradient(
+      radius,
+      radius,
+      0,
+      radius,
+      radius,
+      radius
+    );
+
+    gradient.addColorStop(0.0, `rgba(${r},${g},${b},1)`);
+    gradient.addColorStop(0.2, `rgba(${r},${g},${b},0.7)`);
+    gradient.addColorStop(0.45, `rgba(${r},${g},${b},0.35)`);
+    gradient.addColorStop(0.75, `rgba(${r},${g},${b},0.12)`);
+    gradient.addColorStop(1.0, `rgba(${r},${g},${b},0)`);
+  }
 
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);

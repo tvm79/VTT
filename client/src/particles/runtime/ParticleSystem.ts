@@ -299,7 +299,7 @@ export class ParticleSystem implements ParticleSystemApi {
   private createRootContainer(): Container {
     const root = new PixiContainer();
     root.sortableChildren = true;
-    root.name = 'particleRoot';
+    root.label = 'particleRoot';
     root.zIndex = 10;
     const below = this.createLayerGroup('below-token');
     const at = this.createLayerGroup('at-token');
@@ -327,9 +327,9 @@ export class ParticleSystem implements ParticleSystemApi {
     const normal = new PixiContainer();
     const add = new PixiContainer();
     const screen = new PixiContainer();
-    normal.name = `${name}-normal`;
-    add.name = `${name}-add`;
-    screen.name = `${name}-screen`;
+    normal.label = `${name}-normal`;
+    add.label = `${name}-add`;
+    screen.label = `${name}-screen`;
     normal.sortableChildren = true;
     add.sortableChildren = true;
     screen.sortableChildren = true;

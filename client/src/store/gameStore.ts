@@ -918,6 +918,13 @@ export interface Scene {
   activeWeatherEffects: WeatherEffectConfig[];
   weatherFilterEffects?: WeatherFilterConfig[];
   manualParticleEmitters?: SceneParticleEmitterConfig[];
+  
+  // Battle/Combat state
+  isInCombat?: boolean;
+  combatants?: Combatant[];
+  combatRound?: number;
+  currentTurnIndex?: number;
+  
   createdAt: Date;
 }
 
@@ -1796,7 +1803,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Audio Panel
   audioPanelVisible: false,
-  audioPanelPosition: { x: window.innerWidth - 340, y: 70 },
+  audioPanelPosition: { x: window.innerWidth - 840, y: 70 },
   audioPanelSize: { width: 300, height: 400 },
   playerListPanelPosition: loadSavedPlayerListPanelPosition(),
   playerListPanelSize: loadSavedPlayerListPanelSize(),
@@ -2879,13 +2886,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     if (!state.currentBoard) return;
     
+    // Deduplicate lights and audio sources by ID to prevent double-counting bug
+    const uniqueLights = state.lights.filter((light, index, self) => 
+      index === self.findIndex((l) => l.id === light.id)
+    );
+    const uniqueAudioSources = state.audioSources.filter((audio, index, self) => 
+      index === self.findIndex((a) => a.id === audio.id)
+    );
+    
     const newScene: Scene = {
       id: crypto.randomUUID(),
       name,
       boardId: state.currentBoard.id,
       tokens: state.tokens,
-      lights: state.lights,
-      audioSources: state.audioSources,
+      lights: uniqueLights,
+      audioSources: uniqueAudioSources,
       fogReveals: state.fogReveals,
       fogAdds: state.fogAdds,
       backgroundUrl: state.currentBoard.backgroundUrl,
@@ -2932,6 +2947,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       godRayLacunarity: VISUAL_OPTIONS.godRayLacunarity,
       godRayGain: VISUAL_OPTIONS.godRayGain,
       godRayIntensity: VISUAL_OPTIONS.godRayIntensity,
+      // Battle/Combat state
+      isInCombat: state.isInCombat,
+      combatants: state.combatants,
+      combatRound: state.combatRound,
+      currentTurnIndex: state.currentTurnIndex,
       createdAt: new Date(),
     };
     
@@ -2951,13 +2971,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     const existingScene = state.scenes.find(s => s.id === sceneId);
     if (!existingScene) return;
     
+    // Deduplicate lights and audio sources by ID to prevent double-counting bug
+    const uniqueLights = state.lights.filter((light, index, self) => 
+      index === self.findIndex((l) => l.id === light.id)
+    );
+    const uniqueAudioSources = state.audioSources.filter((audio, index, self) => 
+      index === self.findIndex((a) => a.id === audio.id)
+    );
+    
     // Create updated scene with same ID and name, but new content
     const updatedScene: Scene = {
       ...existingScene,
       boardId: state.currentBoard.id,
       tokens: state.tokens,
-      lights: state.lights,
-      audioSources: state.audioSources,
+      lights: uniqueLights,
+      audioSources: uniqueAudioSources,
       fogReveals: state.fogReveals,
       fogAdds: state.fogAdds,
       backgroundUrl: state.currentBoard.backgroundUrl,
@@ -3003,6 +3031,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       godRayLacunarity: VISUAL_OPTIONS.godRayLacunarity,
       godRayGain: VISUAL_OPTIONS.godRayGain,
       godRayIntensity: VISUAL_OPTIONS.godRayIntensity,
+      // Battle/Combat state
+      isInCombat: state.isInCombat,
+      combatants: state.combatants,
+      combatRound: state.combatRound,
+      currentTurnIndex: state.currentTurnIndex,
       createdAt: new Date(),
     };
     
@@ -3021,6 +3054,91 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     const scene = state.scenes.find(s => s.id === sceneId);
     if (!scene) return;
+    
+    // Auto-save current scene before loading new one (if there's an active scene and current board)
+    if (state.activeSceneId && state.currentBoard && state.isGM) {
+      const currentActiveScene = state.scenes.find(s => s.id === state.activeSceneId);
+      if (currentActiveScene) {
+        // Deduplicate lights and audio sources by ID to prevent double-counting bug
+        const uniqueLights = state.lights.filter((light, index, self) => 
+          index === self.findIndex((l) => l.id === light.id)
+        );
+        const uniqueAudioSources = state.audioSources.filter((audio, index, self) => 
+          index === self.findIndex((a) => a.id === audio.id)
+        );
+        
+        // Overwrite the current active scene with current state
+        const updatedScene: Scene = {
+          ...currentActiveScene,
+          boardId: state.currentBoard.id,
+          tokens: state.tokens,
+          lights: uniqueLights,
+          audioSources: uniqueAudioSources,
+          fogReveals: state.fogReveals,
+          fogAdds: state.fogAdds,
+          backgroundUrl: state.currentBoard.backgroundUrl,
+          mapBleedEnabled: state.mapBleedEnabled,
+          mapBleedFeather: state.mapBleedFeather,
+          mapBleedBlur: state.mapBleedBlur,
+          mapBleedVignette: state.mapBleedVignette,
+          mapBleedScale: state.mapBleedScale,
+          backgroundColor: state.backgroundColor,
+          gridColor: state.gridColor,
+          gridSize: state.gridSize,
+          gridOffsetX: state.gridOffsetX,
+          gridOffsetY: state.gridOffsetY,
+          gridUnit: state.gridUnit,
+          gridStyle: state.gridStyle,
+          gridOpacity: state.gridOpacity,
+          panFriction: state.panFriction,
+          panEnabled: state.panEnabled,
+          weatherType: state.weatherType,
+          weatherIntensity: state.weatherIntensity,
+          weatherSpeed: state.weatherSpeed,
+          weatherSize: state.weatherSize,
+          weatherColor: state.weatherColor,
+          weatherDirection: state.weatherDirection,
+          weatherWobble: state.weatherWobble,
+          weatherWobbleAmplitude: state.weatherWobbleAmplitude,
+          weatherParticleShape: state.weatherParticleShape,
+          activeWeatherEffects: state.activeWeatherEffects,
+          weatherFilterEffects: state.weatherFilterEffects,
+          manualParticleEmitters: state.sceneParticleEmitters,
+          // Atmospheric fog settings
+          atmosphericFog: VISUAL_OPTIONS.atmosphericFog,
+          fogEnabled: VISUAL_OPTIONS.fogEnabled,
+          fogIntensity: VISUAL_OPTIONS.fogIntensity,
+          fogSpeed: VISUAL_OPTIONS.fogSpeed,
+          fogShift: VISUAL_OPTIONS.fogShift,
+          fogDirection: VISUAL_OPTIONS.fogDirection,
+          fogColor1: VISUAL_OPTIONS.fogColor1,
+          fogColor2: VISUAL_OPTIONS.fogColor2,
+          // God ray settings
+          godRayEnabled: VISUAL_OPTIONS.godRayEnabled,
+          godRayAngle: VISUAL_OPTIONS.godRayAngle,
+          godRayLacunarity: VISUAL_OPTIONS.godRayLacunarity,
+          godRayGain: VISUAL_OPTIONS.godRayGain,
+          godRayIntensity: VISUAL_OPTIONS.godRayIntensity,
+          // Battle/Combat state
+          isInCombat: state.isInCombat,
+          combatants: state.combatants,
+          combatRound: state.combatRound,
+          currentTurnIndex: state.currentTurnIndex,
+          createdAt: new Date(),
+        };
+        
+        // Update in localStorage
+        const key = 'vtt_scenes';
+        const existingScenes = JSON.parse(localStorage.getItem(key) || '[]');
+        const updatedScenes = existingScenes.map((s: Scene) => 
+          s.id === state.activeSceneId ? updatedScene : s
+        );
+        localStorage.setItem(key, JSON.stringify(updatedScenes));
+        
+        // Update state
+        set({ scenes: updatedScenes });
+      }
+    }
     
     // Save the last loaded scene ID to localStorage
     localStorage.setItem('vtt_lastSceneId', sceneId);
@@ -3106,6 +3224,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         activeWeatherEffects: scene.activeWeatherEffects || [],
         weatherFilterEffects: scene.weatherFilterEffects || [],
         sceneParticleEmitters: scene.manualParticleEmitters || [],
+        // Restore battle/combat state
+        isInCombat: scene.isInCombat ?? false,
+        combatants: scene.combatants || [],
+        combatRound: scene.combatRound ?? 1,
+        currentTurnIndex: scene.currentTurnIndex ?? 0,
         sceneManagerVisible: false,
       });
     }
@@ -3231,6 +3354,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         activeWeatherEffects: lastScene.activeWeatherEffects || [],
         weatherFilterEffects: lastScene.weatherFilterEffects || [],
         sceneParticleEmitters: lastScene.manualParticleEmitters || [],
+        // Restore battle/combat state
+        isInCombat: lastScene.isInCombat ?? false,
+        combatants: lastScene.combatants || [],
+        combatRound: lastScene.combatRound ?? 1,
+        currentTurnIndex: lastScene.currentTurnIndex ?? 0,
         sceneManagerVisible: false,
       });
     }
@@ -3280,6 +3408,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       activeWeatherEffects: [],
       weatherFilterEffects: [],
       manualParticleEmitters: [],
+      // Battle/Combat state - new scene starts fresh
+      isInCombat: false,
+      combatants: [],
+      combatRound: 1,
+      currentTurnIndex: 0,
       createdAt: new Date(),
     };
     

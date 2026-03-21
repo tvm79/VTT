@@ -22,7 +22,7 @@ export class MeasurementRenderer {
     
     // Create graphics object for measurements
     this.graphics = new PIXI.Graphics();
-    this.graphics.name = 'measurementGraphics';
+    this.graphics.label = 'measurementGraphics';
     this.container.addChild(this.graphics);
     
     // Create labels container
@@ -71,7 +71,7 @@ export class MeasurementRenderer {
   private getPreviewGraphics(): PIXI.Graphics {
     if (!this.previewGraphics) {
       this.previewGraphics = new PIXI.Graphics();
-      this.previewGraphics.name = 'measurementPreview';
+      this.previewGraphics.label = 'measurementPreview';
       this.container.addChild(this.previewGraphics);
     }
     return this.previewGraphics;
@@ -113,7 +113,7 @@ export class MeasurementRenderer {
    */
   drawCircle(start: MeasurementPoint, end: MeasurementPoint, color: number, thickness: number): void {
     const radius = calculateCircleRadius(start, end);
-    this.graphics.drawCircle(start.x, start.y, radius);
+    this.graphics.circle(start.x, start.y, radius);
     this.graphics.stroke({ width: thickness, color: color, alpha: 0.8 });
   }
   
@@ -186,7 +186,7 @@ export class MeasurementRenderer {
    */
   private drawPreviewCircle(graphics: PIXI.Graphics, start: MeasurementPoint, end: MeasurementPoint, color: number, thickness: number): void {
     const radius = calculateCircleRadius(start, end);
-    graphics.drawCircle(start.x, start.y, radius);
+    graphics.circle(start.x, start.y, radius);
     graphics.stroke({ width: thickness, color: color, alpha: 0.6 });
   }
   
