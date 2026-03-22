@@ -22,8 +22,8 @@ const SQRT3 = Math.sqrt(3);
 
 function pixelToAxial(point: { x: number; y: number }): { q: number; r: number } {
   return {
-    q: (point.x * SQRT3) / 3 - point.y / 3,
-    r: (point.y * 2) / 3,
+    q: (point.x * 2) / 3,
+    r: (-point.x + SQRT3 * point.y) / 3,
   };
 }
 
@@ -64,8 +64,8 @@ function cubeToAxial(cube: { x: number; y: number; z: number }): { q: number; r:
 
 function axialToPixel(axial: { q: number; r: number }): { x: number; y: number } {
   return {
-    x: SQRT3 * (axial.q + axial.r / 2),
-    y: 1.5 * axial.r,
+    x: 1.5 * axial.q,
+    y: (SQRT3 / 2) * axial.q + SQRT3 * axial.r,
   };
 }
 

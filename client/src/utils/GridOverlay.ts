@@ -88,6 +88,28 @@ float lineStyleMask(float axisCoord)
     return 1.0 - smoothstep(dotRadius, dotRadius + 0.12, dotPhase);
 }
 
+float hexLineStyleMask(float edgeCoord, float edgeIndex)
+{
+    float styleAmount = clamp(uGridStyleAmount, 0.0, 1.0);
+
+    if (uGridStyle < 0.5) {
+        return 1.0;
+    }
+
+    float phase = fract(edgeCoord + edgeIndex * 0.137);
+
+    if (uGridStyle < 1.5) {
+        // Dashed: keep a long visible segment so the edge reads as a line.
+        float onWidth = mix(0.96, 0.74, styleAmount);
+        return step(phase, onWidth);
+    }
+
+    // Dotted: render compact dots centered along each edge.
+    float dot = abs(phase - 0.5);
+    float radius = mix(0.13, 0.05, styleAmount);
+    return 1.0 - smoothstep(radius, radius + 0.04, dot);
+}
+
 vec3 cubeRound(vec3 cube)
 {
     vec3 rounded = floor(cube + 0.5);
@@ -107,8 +129,8 @@ vec3 cubeRound(vec3 cube)
 vec2 pixelToAxial(vec2 point)
 {
     return vec2(
-        0.57735026919 * point.x - 0.33333333333 * point.y,
-        0.66666666667 * point.y
+        0.66666666667 * point.x,
+        -0.33333333333 * point.x + 0.57735026919 * point.y
     );
 }
 
@@ -120,15 +142,55 @@ vec3 axialToCube(vec2 axial)
 vec2 axialToPixel(vec2 axial)
 {
     return vec2(
-        1.73205080757 * (axial.x + 0.5 * axial.y),
-        1.5 * axial.y
+        1.5 * axial.x,
+        0.86602540378 * (2.0 * axial.y + axial.x)
     );
 }
 
-float sdHex(vec2 point)
+float sdSegment(vec2 p, vec2 a, vec2 b, out float t)
 {
-    vec2 p = abs(point);
-    return max(p.x * 0.86602540378 + p.y * 0.5, p.y) - 1.0;
+    vec2 pa = p - a;
+    vec2 ba = b - a;
+    float denom = max(dot(ba, ba), 0.000001);
+    t = clamp(dot(pa, ba) / denom, 0.0, 1.0);
+    return length(pa - ba * t);
+}
+
+float hexBoundaryDistance(vec2 p, out float edgeCoord, out float edgeIndex)
+{
+    const float H = 0.43301270189;
+    const float S = 0.21650635095;
+
+    vec2 v0 = vec2(0.0, -H);
+    vec2 v1 = vec2(0.5, -S);
+    vec2 v2 = vec2(0.5, S);
+    vec2 v3 = vec2(0.0, H);
+    vec2 v4 = vec2(-0.5, S);
+    vec2 v5 = vec2(-0.5, -S);
+
+    float best = 1e9;
+    float t = 0.0;
+    float d;
+
+    d = sdSegment(p, v0, v1, t);
+    if (d < best) { best = d; edgeCoord = t; edgeIndex = 0.0; }
+
+    d = sdSegment(p, v1, v2, t);
+    if (d < best) { best = d; edgeCoord = t; edgeIndex = 1.0; }
+
+    d = sdSegment(p, v2, v3, t);
+    if (d < best) { best = d; edgeCoord = t; edgeIndex = 2.0; }
+
+    d = sdSegment(p, v3, v4, t);
+    if (d < best) { best = d; edgeCoord = t; edgeIndex = 3.0; }
+
+    d = sdSegment(p, v4, v5, t);
+    if (d < best) { best = d; edgeCoord = t; edgeIndex = 4.0; }
+
+    d = sdSegment(p, v5, v0, t);
+    if (d < best) { best = d; edgeCoord = t; edgeIndex = 5.0; }
+
+    return best;
 }
 
 float squareGridAlpha(vec2 world)
@@ -164,15 +226,28 @@ float squareGridAlpha(vec2 world)
 float hexGridAlpha(vec2 world)
 {
     vec2 normalized = world / max(uGridSize, 0.0001);
-    vec2 axial = pixelToAxial(normalized);
-    vec3 roundedCube = cubeRound(axialToCube(axial));
-    vec2 center = axialToPixel(vec2(roundedCube.x, roundedCube.z));
-    vec2 local = normalized - center;
 
-    float edgeDistance = abs(sdHex(local));
-    float aa = max(0.002, 1.75 / max(uZoom * uGridSize, 1.0));
-    float border = 1.0 - smoothstep(0.0, aa, edgeDistance);
-    return border;
+    vec2 axial = pixelToAxial(normalized);
+    vec3 cube = cubeRound(axialToCube(axial));
+    vec2 center = axialToPixel(vec2(cube.x, cube.z));
+
+    vec2 local = normalized - center;
+    float edgeCoord = 0.0;
+    float edgeIndex = 0.0;
+    float d = hexBoundaryDistance(local, edgeCoord, edgeIndex);
+    float pixelScale = max(uZoom * uGridSize, 1.0);
+    float styleAmount = clamp(uGridStyleAmount, 0.0, 1.0);
+    float thickness = mix(0.9, 1.8, styleAmount) / pixelScale;
+    float aa = 1.0 / pixelScale;
+
+    // Render the SDF boundary as a thin line band.
+    float line = 1.0 - smoothstep(thickness, thickness + aa, abs(d));
+
+    if (uGridStyle > 0.5) {
+        line *= hexLineStyleMask(edgeCoord, edgeIndex);
+    }
+
+    return line;
 }
 
 void main(void)
