@@ -1387,6 +1387,7 @@ export function GameBoard() {
     pencilSmoothness,
     pencilDrawRate,
     pencilFogColor,
+    fogSnapToGrid,
     particlePreset,
     setParticlePreset,
     particleEmitterSize,
@@ -4831,7 +4832,7 @@ export function GameBoard() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
-  }, [appReady, currentBoard, fogReveals, fogAdds, isCurrentUserGM, clampToBoard, gmFogOpacity, tool, fogDrawMode, effectiveGridSize, tokens]);
+  }, [appReady, currentBoard, fogReveals, fogAdds, isCurrentUserGM, clampToBoard, gmFogOpacity, tool, fogDrawMode, effectiveGridSize, fogSnapToGrid, tokens]);
 
   // Token drag - with ghost preview
   useEffect(() => {
@@ -5864,8 +5865,19 @@ export function GameBoard() {
         if (!fogAction) return;
 
         const localPos = stage.toLocal(pos);
-        const startX = clampToBoard(localPos.x, currentBoard.width);
-        const startY = clampToBoard(localPos.y, currentBoard.height);
+        let startX = clampToBoard(localPos.x, currentBoard.width);
+        let startY = clampToBoard(localPos.y, currentBoard.height);
+        
+        // Apply grid snapping if enabled (not needed for 'grid' mode which already snaps)
+        if (fogSnapToGrid && fogDrawMode !== 'grid') {
+          const gridSize = effectiveGridSize || 50;
+          const offsetX = gridOffsetX || 0;
+          const offsetY = gridOffsetY || 0;
+          const snapped = snapToGridIntersection(startX, startY, gridSize, offsetX, offsetY);
+          startX = snapped.x;
+          startY = snapped.y;
+        }
+        
         fogActionRef.current = fogAction;
 
         if (fogDrawMode === 'polygon') {
@@ -6243,9 +6255,20 @@ export function GameBoard() {
 
       if (currentTool === 'fog' && fogDrawMode === 'polygon' && fogPolygonRef.current.active && currentBoard) {
         const localPos = stage.toLocal(pos);
+        let cursorX = clampToBoard(localPos.x, currentBoard.width);
+        let cursorY = clampToBoard(localPos.y, currentBoard.height);
+        // Apply grid snapping if enabled
+        if (fogSnapToGrid) {
+          const gridSize = effectiveGridSize || 50;
+          const offsetX = gridOffsetX || 0;
+          const offsetY = gridOffsetY || 0;
+          const snapped = snapToGridIntersection(cursorX, cursorY, gridSize, offsetX, offsetY);
+          cursorX = snapped.x;
+          cursorY = snapped.y;
+        }
         fogPolygonRef.current.cursor = {
-          x: clampToBoard(localPos.x, currentBoard.width),
-          y: clampToBoard(localPos.y, currentBoard.height),
+          x: cursorX,
+          y: cursorY,
         };
         drawFogPolygonPreview();
         return;
@@ -6253,9 +6276,20 @@ export function GameBoard() {
 
       if (currentTool === 'fog' && fogDrawMode === 'free' && fogFreeDrawRef.current.active && currentBoard) {
         const localPos = stage.toLocal(pos);
+        let pointX = clampToBoard(localPos.x, currentBoard.width);
+        let pointY = clampToBoard(localPos.y, currentBoard.height);
+        // Apply grid snapping if enabled
+        if (fogSnapToGrid) {
+          const gridSize = effectiveGridSize || 50;
+          const offsetX = gridOffsetX || 0;
+          const offsetY = gridOffsetY || 0;
+          const snapped = snapToGridIntersection(pointX, pointY, gridSize, offsetX, offsetY);
+          pointX = snapped.x;
+          pointY = snapped.y;
+        }
         const point = {
-          x: clampToBoard(localPos.x, currentBoard.width),
-          y: clampToBoard(localPos.y, currentBoard.height),
+          x: pointX,
+          y: pointY,
         };
         const points = fogFreeDrawRef.current.points;
         const lastPoint = points[points.length - 1];
@@ -6276,8 +6310,17 @@ export function GameBoard() {
       // Only draw if the brush is on top of fog (not already revealed)
       if (currentTool === 'fog' && fogDrawMode === 'pencil' && fogPencilRef.current.active && currentBoard) {
         const localPos = stage.toLocal(pos);
-        const x = clampToBoard(localPos.x, currentBoard.width);
-        const y = clampToBoard(localPos.y, currentBoard.height);
+        let x = clampToBoard(localPos.x, currentBoard.width);
+        let y = clampToBoard(localPos.y, currentBoard.height);
+        // Apply grid snapping if enabled
+        if (fogSnapToGrid) {
+          const gridSize = effectiveGridSize || 50;
+          const offsetX = gridOffsetX || 0;
+          const offsetY = gridOffsetY || 0;
+          const snapped = snapToGridIntersection(x, y, gridSize, offsetX, offsetY);
+          x = snapped.x;
+          y = snapped.y;
+        }
         const settings = getPencilSettings();
         const lastKey = fogPencilRef.current.lastCircleKey;
         const key = `${x.toFixed(1)},${y.toFixed(1)}`;
@@ -6349,8 +6392,17 @@ export function GameBoard() {
 
       if (currentTool === 'fog' && fogDrawMode === 'box' && fogDragRef.current.active && fogDragRef.current.start && currentBoard) {
         const localPos = stage.toLocal(pos);
-        const endX = clampToBoard(localPos.x, currentBoard.width);
-        const endY = clampToBoard(localPos.y, currentBoard.height);
+        let endX = clampToBoard(localPos.x, currentBoard.width);
+        let endY = clampToBoard(localPos.y, currentBoard.height);
+        // Apply grid snapping to end position if enabled
+        if (fogSnapToGrid) {
+          const gridSize = effectiveGridSize || 50;
+          const offsetX = gridOffsetX || 0;
+          const offsetY = gridOffsetY || 0;
+          const snapped = snapToGridIntersection(endX, endY, gridSize, offsetX, offsetY);
+          endX = snapped.x;
+          endY = snapped.y;
+        }
         fogDragRef.current.current = { x: endX, y: endY };
 
         const preview = fogDragRef.current.preview;
@@ -7044,7 +7096,7 @@ export function GameBoard() {
       fogGridRef.current.cells.clear();
       fogGridRef.current.lastCellKey = null;
     };
-  }, [currentBoard, tool, isGM, squareValue, gridUnit, measureColorNumber, players, lights, effectiveGridSize, gridOffsetX, gridOffsetY, buildRectPolygon, clampToBoard, fogDrawMode, getMeasurementAnchor, particlePreset, particleEmitterSize]);
+  }, [currentBoard, tool, isGM, squareValue, gridUnit, measureColorNumber, players, lights, effectiveGridSize, gridOffsetX, gridOffsetY, buildRectPolygon, clampToBoard, fogDrawMode, fogSnapToGrid, getMeasurementAnchor, particlePreset, particleEmitterSize]);
 
 
   const tools: { id: 'select' | 'measure' | 'light' | 'audio' | 'fog' | 'particle'; icon: string; label: string }[] = [

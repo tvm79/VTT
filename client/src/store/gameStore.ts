@@ -626,6 +626,7 @@ interface FogToolsSettings {
   fogDrawMode: 'box' | 'polygon' | 'free' | 'grid' | 'pencil';
   gmFogOpacity: number;
   pencilSize: number;
+  fogSnapToGrid: boolean;
 }
 
 // Default fog tools settings
@@ -633,6 +634,7 @@ const DEFAULT_FOG_TOOLS_SETTINGS: FogToolsSettings = {
   fogDrawMode: 'polygon',
   gmFogOpacity: 0.45,
   pencilSize: 30,
+  fogSnapToGrid: true,
 };
 
 // Helper to load fog tools settings from localStorage
@@ -1283,6 +1285,7 @@ interface GameState {
   fogDrawMode: 'box' | 'polygon' | 'free' | 'grid' | 'pencil';
   gmFogOpacity: number;
   pencilSize: number;
+  fogSnapToGrid: boolean;
 
   // Pencil settings (persisted to localStorage)
   pencilSmoothness: number;
@@ -1301,6 +1304,7 @@ interface GameState {
   setFogDrawMode: (mode: 'box' | 'polygon' | 'free' | 'grid' | 'pencil') => void;
   setGmFogOpacity: (opacity: number) => void;
   setPencilSize: (size: number) => void;
+  setFogSnapToGrid: (snapToGrid: boolean) => void;
 
   // Setter functions for pencil settings
   setPencilSmoothness: (smoothness: number) => void;
@@ -1712,6 +1716,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   fogDrawMode: loadSavedFogToolsSettings().fogDrawMode,
   gmFogOpacity: loadSavedFogToolsSettings().gmFogOpacity,
   pencilSize: loadSavedFogToolsSettings().pencilSize,
+  fogSnapToGrid: loadSavedFogToolsSettings().fogSnapToGrid,
   pencilSmoothness: loadSavedPencilSettings().smoothness,
   pencilDrawRate: loadSavedPencilSettings().drawRate,
   pencilFogColor: loadSavedPencilSettings().fogColor,
@@ -2535,6 +2540,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       fogDrawMode: mode,
       gmFogOpacity: current.gmFogOpacity,
       pencilSize: current.pencilSize,
+      fogSnapToGrid: current.fogSnapToGrid,
     });
     set({ fogDrawMode: mode });
   },
@@ -2544,6 +2550,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       fogDrawMode: current.fogDrawMode,
       gmFogOpacity: opacity,
       pencilSize: current.pencilSize,
+      fogSnapToGrid: current.fogSnapToGrid,
     });
     set({ gmFogOpacity: opacity });
   },
@@ -2553,8 +2560,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       fogDrawMode: current.fogDrawMode,
       gmFogOpacity: current.gmFogOpacity,
       pencilSize: size,
+      fogSnapToGrid: current.fogSnapToGrid,
     });
     set({ pencilSize: size });
+  },
+  setFogSnapToGrid: (snapToGrid: boolean) => {
+    const current = useGameStore.getState();
+    saveFogToolsSettingsToStorage({
+      fogDrawMode: current.fogDrawMode,
+      gmFogOpacity: current.gmFogOpacity,
+      pencilSize: current.pencilSize,
+      fogSnapToGrid: snapToGrid,
+    });
+    set({ fogSnapToGrid: snapToGrid });
   },
   setPencilSmoothness: (smoothness: number) => {
     const current = useGameStore.getState();

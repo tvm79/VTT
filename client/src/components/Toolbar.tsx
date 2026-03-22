@@ -243,6 +243,8 @@ export const Toolbar = memo(function Toolbar() {
     setPencilDrawRate,
     pencilFogColor,
     setPencilFogColor,
+    fogSnapToGrid,
+    setFogSnapToGrid,
     dice3dEnabled,
     setDice3dEnabled,
     dice3dColor,
@@ -1149,6 +1151,20 @@ export const Toolbar = memo(function Toolbar() {
                     setPencilDrawRate(parseInt(e.target.value, 10));
                   }}
                 />
+              </div>
+
+              {/* Snap to Grid Toggle */}
+              <div className="background-panel-row">
+                <label className="toolbar-fog-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={fogSnapToGrid}
+                    onChange={(e) => {
+                      setFogSnapToGrid(e.target.checked);
+                    }}
+                  />
+                  Snap to Grid
+                </label>
               </div>
                 </>
               )}
