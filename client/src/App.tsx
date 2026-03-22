@@ -123,7 +123,7 @@ function App() {
   // Memoize theme class and style to avoid recalculation on every render
   const themeClass = useMemo(() => `theme-${getBaseThemeId(colorScheme.id)}`, [colorScheme.id]);
   
-  const themeStyle = useMemo((): React.CSSProperties => {
+  const themeStyle = useMemo((): React.CSSProperties & Record<string, string> => {
     const isCustomized = colorScheme.id.includes('-custom-') || colorScheme.id === 'custom';
     const panelBlurValue = colorScheme.panelBlur || 0;
     const surfaceAlpha = colorScheme.surfaceAlpha ?? 1;

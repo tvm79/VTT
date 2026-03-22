@@ -98,25 +98,34 @@ function renameFolderPath(value: string | null | undefined, fromPath: string, to
 }
 
 function buildFolderTree(tables: RollTable[], createdFolders: string[]): RollTableFolderNode[] {
-  const root = new Map<string, RollTableFolderNode>();
+  const rootNodes: RollTableFolderNode[] = [];
+  const nodesByPath = new Map<string, RollTableFolderNode>();
 
   const ensureNode = (folderPath: string): RollTableFolderNode => {
     const parts = folderPath.split('/').map((part) => part.trim()).filter(Boolean);
-    let currentMap = root;
     let currentPath = '';
+    let parentPath = '';
     let currentNode: RollTableFolderNode | null = null;
 
     for (const part of parts) {
       currentPath = currentPath ? `${currentPath}/${part}` : part;
-      let nextNode = currentMap.get(part);
+      let nextNode = nodesByPath.get(currentPath);
       if (!nextNode) {
         nextNode = { name: part, path: currentPath, tables: [], children: [] };
-        currentMap.set(part, nextNode);
+        nodesByPath.set(currentPath, nextNode);
+
+        if (!parentPath) {
+          rootNodes.push(nextNode);
+        } else {
+          const parentNode = nodesByPath.get(parentPath);
+          if (parentNode && !parentNode.children.some((child) => child.path === nextNode!.path)) {
+            parentNode.children.push(nextNode);
+          }
+        }
       }
+
       currentNode = nextNode;
-      const childMap = new Map(nextNode.children.map((child) => [child.name, child]));
-      nextNode.children = Array.from(childMap.values());
-      currentMap = childMap;
+      parentPath = currentPath;
     }
 
     if (!currentNode) {
@@ -130,12 +139,9 @@ function buildFolderTree(tables: RollTable[], createdFolders: string[]): RollTab
     ensureNode(folderPath);
   }
 
-  const unfiledNode: RollTableFolderNode = { name: 'Unfiled', path: '', tables: [], children: [] };
-
   for (const table of tables) {
     const folderPath = typeof table.folder === 'string' ? table.folder.trim() : '';
     if (!folderPath) {
-      unfiledNode.tables.push(table);
       continue;
     }
     ensureNode(folderPath).tables.push(table);
@@ -149,8 +155,7 @@ function buildFolderTree(tables: RollTable[], createdFolders: string[]): RollTab
       .sort((a, b) => a.name.localeCompare(b.name)),
   });
 
-  const nodes = Array.from(root.values()).map(sortNode).sort((a, b) => a.name.localeCompare(b.name));
-  return [sortNode(unfiledNode), ...nodes];
+  return [...rootNodes].map(sortNode).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function tableNodeToRollTable(input: unknown, index: number): RollTable | null {
@@ -326,17 +331,28 @@ export function RollTablePanel() {
   const [availableDmgTables, setAvailableDmgTables] = useState<RollTable[]>([]);
   const [selectedDmgTableNames, setSelectedDmgTableNames] = useState<string[]>([]);
   const [createdFolders, setCreatedFolders] = useState<string[]>([]);
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({ unfiled: true });
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
   const [editingFolderPath, setEditingFolderPath] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
+  const [expandedRowDetails, setExpandedRowDetails] = useState<Set<string>>(new Set());
 
   const selectedTable = useMemo(
     () => rollTables.find((t) => t.id === selectedTableId) || rollTables[0] || null,
     [rollTables, selectedTableId],
   );
 
-  const folderTree = useMemo(() => buildFolderTree(rollTables, createdFolders), [createdFolders, rollTables]);
+  const folderTree = useMemo(() => {
+    const tree = buildFolderTree(rollTables, createdFolders);
+    return tree;
+  }, [createdFolders, rollTables]);
+
+  const rootTables = useMemo(
+    () => rollTables
+      .filter((table) => !table.folder || !table.folder.trim())
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [rollTables],
+  );
 
   const hasPendingDmgSelection = availableDmgTables.length > 0;
 
@@ -726,8 +742,35 @@ export function RollTablePanel() {
     const trimmed = folderName?.trim();
     if (!trimmed) return;
     const folderPath = parentPath ? `${parentPath}/${trimmed}` : trimmed;
-    setCreatedFolders((current) => (current.includes(folderPath) ? current : [...current, folderPath]));
-    setExpandedFolders((current) => ({ ...current, [parentPath || 'unfiled']: true, [folderPath]: true }));
+    
+    // Ensure parent path exists in createdFolders if creating a subfolder
+    let parentsToAdd: string[] = [];
+    if (parentPath) {
+      const parts = parentPath.split('/');
+      let currentPath = '';
+      for (const part of parts) {
+        currentPath = currentPath ? `${currentPath}/${part}` : part;
+        if (!createdFolders.includes(currentPath)) {
+          parentsToAdd.push(currentPath);
+        }
+      }
+    }
+    
+    setCreatedFolders((current) => {
+      let next = [...current];
+      // Add any missing parent folders
+      for (const p of parentsToAdd) {
+        if (!next.includes(p)) {
+          next.push(p);
+        }
+      }
+      // Add the new folder
+      if (!next.includes(folderPath)) {
+        next.push(folderPath);
+      }
+      return next;
+    });
+    setExpandedFolders((current) => ({ ...current, ...(parentPath ? { [parentPath]: true } : {}), [folderPath]: true }));
   };
 
   const beginFolderRename = (folderPath: string) => {
@@ -754,11 +797,47 @@ export function RollTablePanel() {
       folder: renameFolderPath(table.folder, editingFolderPath, nextPath),
     })));
     setExpandedFolders((current) => {
-      const nextEntries = Object.entries(current).map(([key, value]) => [renameFolderPath(key === 'unfiled' ? null : key, editingFolderPath, nextPath) || 'unfiled', value] as const);
+      const nextEntries = Object.entries(current).map(([key, value]) => [renameFolderPath(key, editingFolderPath, nextPath) || key, value] as const);
       return { ...Object.fromEntries(nextEntries), [nextPath]: true };
     });
     setEditingFolderPath(null);
     setEditingFolderName('');
+  };
+
+  const deleteFolder = (folderPath: string) => {
+    if (!folderPath) return;
+    const folderName = folderPath.split('/').pop() || folderPath;
+    if (!window.confirm(`Delete folder "${folderName}"? Tables in this folder will be moved to Unfiled.`)) return;
+    // Move all tables from this folder to unfiled
+    useGameStore.getState().setRollTables(useGameStore.getState().rollTables.map((table) => ({
+      ...table,
+      folder: table.folder === folderPath ? null : (table.folder?.startsWith(`${folderPath}/`) ? table.folder : table.folder),
+    })));
+    // Remove the folder and its subfolders from createdFolders
+    setCreatedFolders(createdFolders.filter((f) => f !== folderPath && !f.startsWith(`${folderPath}/`)));
+    // Remove from expandedFolders
+    setExpandedFolders((current) => {
+      const next = { ...current };
+      delete next[folderPath];
+      Object.keys(next).forEach((key) => {
+        if (key.startsWith(`${folderPath}/`)) {
+          delete next[key];
+        }
+      });
+      return next;
+    });
+  };
+
+  const toggleRowDetail = (rowId: string) => {
+    setExpandedRowDetails((current) => {
+      const next = new Set(current);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
   };
 
   const toggleFolder = (folderKey: string) => {
@@ -786,18 +865,71 @@ export function RollTablePanel() {
       folder: renameFolderPath(table.folder, sourcePath, nextPath),
     })));
     setExpandedFolders((current) => {
-      const nextEntries = Object.entries(current).map(([key, value]) => [renameFolderPath(key === 'unfiled' ? null : key, sourcePath, nextPath) || 'unfiled', value] as const);
+      const nextEntries = Object.entries(current).map(([key, value]) => [renameFolderPath(key, sourcePath, nextPath) || key, value] as const);
       return Object.fromEntries(nextEntries);
     });
     setDragOverFolder(null);
   };
 
+  const renderTableListItem = (t: RollTable, depth = 0): JSX.Element => (
+    <div
+      key={t.id}
+      draggable
+      onDragStart={(e) => {
+        e.stopPropagation();
+        e.dataTransfer.setData('text/rolltable-id', t.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      className="rolltables-table-list-item"
+      style={{
+        '--rolltables-table-row-bg': selectedTable?.id === t.id
+          ? 'color-mix(in srgb, var(--color-bg-surface-elevated) 100%, transparent)'
+          : 'transparent',
+        '--rolltables-indent': depth > 0 ? '10px' : '0px',
+      } as React.CSSProperties}
+    >
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setSelectedTableId(t.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setSelectedTableId(t.id);
+          }
+        }}
+        className="rolltables-table-select"
+      >
+        <div className="rolltables-table-heading">
+          <span className="rolltables-table-title">{t.name}</span>
+          <span className="rolltables-table-formula">{t.formula || 'weighted'}</span>
+        </div>
+      </div>
+      <div className="rolltables-table-actions">
+        <button
+          className="rolltables-action-btn rolltables-action-btn-compact"
+          onClick={() => { void rollTableFromList(t); }}
+          title={`Roll on ${t.name}`}
+        >
+          <Icon name="dice-d20" />
+        </button>
+        <button
+          className="rolltables-action-btn rolltables-action-btn-compact"
+          onClick={() => deleteTableFromList(t.id)}
+          title={`Delete ${t.name}`}
+        >
+          <Icon name="trash" />
+        </button>
+      </div>
+    </div>
+  );
+
   const renderFolderNode = (node: RollTableFolderNode, depth = 0): JSX.Element => {
-    const folderKey = node.path || 'unfiled';
+    const folderKey = node.path;
     const isExpanded = expandedFolders[folderKey] !== false;
     const hasChildren = node.children.length > 0;
     const hasTables = node.tables.length > 0;
-    const folderDropValue = node.path || null;
+    const folderDropValue = node.path;
 
     return (
       <div
@@ -813,9 +945,9 @@ export function RollTablePanel() {
           setDragOverFolder(folderKey);
         }}
         onDragLeave={() => setDragOverFolder((current) => (current === folderKey ? null : current))}
-        draggable={Boolean(node.path)}
+        draggable
         onDragStart={(e) => {
-          if (!node.path) return;
+          if (e.target !== e.currentTarget) return;
           e.dataTransfer.setData('text/rolltable-folder-path', node.path);
           e.dataTransfer.effectAllowed = 'move';
         }}
@@ -830,8 +962,11 @@ export function RollTablePanel() {
           if (tableId) moveTableToFolder(tableId, folderDropValue);
         }}
       >
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => toggleFolder(folderKey)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleFolder(folderKey); }}
           className="rolltables-folder-toggle"
           style={{
             '--rolltables-folder-toggle-bg': depth === 0
@@ -865,85 +1000,74 @@ export function RollTablePanel() {
             )}
           </span>
           <span className="rolltables-folder-actions">
-            {node.path && (
-              <button
-                className="rolltables-action-btn rolltables-action-btn-compact"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  createFolder(node.path);
-                }}
-                title={`Create subfolder in ${node.name}`}
-              >
-                <Icon name="plus" />
-              </button>
-            )}
-            {!node.path && (
-              <button
-                className="rolltables-action-btn rolltables-action-btn-compact"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  createFolder(null);
-                }}
-                title="Create folder"
-              >
-                <Icon name="folder-plus" />
-              </button>
-            )}
-            <span className="rolltables-folder-count">{node.tables.length + node.children.length}</span>
+            <>
+              <span
+                  className="rolltables-folder-btn"
+                  role="button"
+                  tabIndex={0}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    beginFolderRename(node.path);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      beginFolderRename(node.path);
+                    }
+                  }}
+                  title={`Rename ${node.name}`}
+                >
+                  <Icon name="edit" />
+              </span>
+              <span
+                  className="rolltables-folder-btn"
+                  role="button"
+                  tabIndex={0}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    createFolder(node.path);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      createFolder(node.path);
+                    }
+                  }}
+                  title={`Create subfolder in ${node.name}`}
+                >
+                  <Icon name="plus" />
+              </span>
+              <span
+                  className="rolltables-folder-btn rolltables-folder-btn-delete"
+                  role="button"
+                  tabIndex={0}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    deleteFolder(node.path);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      deleteFolder(node.path);
+                    }
+                  }}
+                  title={`Delete ${node.name}`}
+                >
+                  <Icon name="trash" />
+              </span>
+            </>
           </span>
-        </button>
+        </div>
         {isExpanded && (
           <>
             {node.children.map((child) => renderFolderNode(child, depth + 1))}
-            {hasTables && node.tables.map((t) => (
-              <div
-                key={t.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/rolltable-id', t.id);
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                className="rolltables-table-list-item"
-                style={{
-                  '--rolltables-table-row-bg': selectedTable?.id === t.id
-                    ? 'color-mix(in srgb, var(--color-bg-surface-elevated) 100%, transparent)'
-                    : 'transparent',
-                  '--rolltables-indent': depth > 0 ? '10px' : '0px',
-                } as React.CSSProperties}
-              >
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedTableId(t.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setSelectedTableId(t.id);
-                    }
-                  }}
-                  className="rolltables-table-select"
-                >
-                  <div className="rolltables-table-title">{t.name}</div>
-                  <div className="rolltables-table-formula">{t.formula || 'weighted'}</div>
-                </div>
-                <div className="rolltables-table-actions">
-                  <button
-                    className="rolltables-action-btn rolltables-action-btn-compact"
-                    onClick={() => { void rollTableFromList(t); }}
-                    title={`Roll on ${t.name}`}
-                  >
-                    <Icon name="dice-d20" />
-                  </button>
-                  <button
-                    className="rolltables-action-btn rolltables-action-btn-compact"
-                    onClick={() => deleteTableFromList(t.id)}
-                    title={`Delete ${t.name}`}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
-              </div>
-            ))}
+            {hasTables && node.tables.map((t) => renderTableListItem(t, depth))}
             {!hasChildren && !hasTables && (
               <div className="rolltables-folder-empty" style={{ '--rolltables-indent': depth > 0 ? '10px' : '0px' } as React.CSSProperties}>
                 Empty folder
@@ -996,6 +1120,9 @@ export function RollTablePanel() {
             <button className="rolltables-action-btn" onClick={exportTables} title="Export tables">
               <Icon name="download" />
             </button>
+            <button className="rolltables-action-btn" onClick={() => createFolder(null)} title="Create folder">
+              <Icon name="folder-plus" />
+            </button>
             <button className="rolltables-action-btn" onClick={importTables} title="Import JSON tables">
               <Icon name="upload" />
             </button>
@@ -1042,7 +1169,30 @@ export function RollTablePanel() {
               </div>
             </div>
           )}
-          <div className="rolltables-folder-tree">
+          <div
+            className="rolltables-folder-tree"
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOverFolder('__root__');
+            }}
+            onDragLeave={() => setDragOverFolder((current) => (current === '__root__' ? null : current))}
+            onDrop={(e) => {
+              e.preventDefault();
+              const folderPath = e.dataTransfer.getData('text/rolltable-folder-path');
+              const tableId = e.dataTransfer.getData('text/rolltable-id');
+              if (folderPath) {
+                moveFolderToFolder(folderPath, null);
+                return;
+              }
+              if (tableId) moveTableToFolder(tableId, null);
+            }}
+            style={{
+              background: dragOverFolder === '__root__'
+                ? 'color-mix(in srgb, var(--color-accent-primary) 8%, transparent)'
+                : 'transparent',
+            }}
+          >
+            {rootTables.map((table) => renderTableListItem(table, 0))}
             {folderTree.map((node) => renderFolderNode(node))}
           </div>
         </div>
@@ -1129,6 +1279,16 @@ export function RollTablePanel() {
                       })}
                       placeholder="Label"
                     />
+                    <button
+                      className="tool-btn rolltables-row-expand-btn"
+                      title={expandedRowDetails.has(row.id || '') ? 'Hide detail' : 'Add detail'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleRowDetail(row.id || '');
+                      }}
+                    >
+                      <Icon name={expandedRowDetails.has(row.id || '') ? 'times' : 'edit'} />
+                    </button>
                     <div className="rolltables-row-metrics">
                       <div className="rolltables-field-stack">
                         <input
@@ -1174,22 +1334,24 @@ export function RollTablePanel() {
                     </button>
                   </div>
 
-                  <div className="rolltables-row-line rolltables-row-line-bottom">
-                    <textarea
-                      className="rolltables-row-detail rolltables-row-result-textarea"
-                      value={row.detail || ''}
-                      onChange={(e) => {
-                        updateRollTable(selectedTable.id, {
-                          rows: selectedTable.rows.map((r) => (r.id === row.id ? { ...r, detail: e.target.value } : r)),
-                        });
-                        requestAnimationFrame(() => autoResizeTextarea(e.currentTarget));
-                      }}
-                      onInput={(e) => autoResizeTextarea(e.currentTarget)}
-                      onFocus={(e) => autoResizeTextarea(e.currentTarget)}
-                      placeholder="Detail"
-                      rows={1}
-                    />
-                  </div>
+                  {expandedRowDetails.has(row.id || '') && (
+                    <div className="rolltables-row-line rolltables-row-line-bottom">
+                      <textarea
+                        className="rolltables-row-detail rolltables-row-result-textarea"
+                        value={row.detail || ''}
+                        onChange={(e) => {
+                          updateRollTable(selectedTable.id, {
+                            rows: selectedTable.rows.map((r) => (r.id === row.id ? { ...r, detail: e.target.value } : r)),
+                          });
+                          requestAnimationFrame(() => autoResizeTextarea(e.currentTarget));
+                        }}
+                        onInput={(e) => autoResizeTextarea(e.currentTarget)}
+                        onFocus={(e) => autoResizeTextarea(e.currentTarget)}
+                        placeholder="Add detail text..."
+                        rows={1}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
 

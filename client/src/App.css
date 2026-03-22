@@ -5307,12 +5307,17 @@ canvas {
   margin-left: var(--rolltables-indent, 0px);
   border-bottom: var(--rolltables-folder-divider, none);
   background: var(--rolltables-folder-bg, transparent);
+  margin-bottom: 2px;
+}
+
+.rolltables-folder-node:hover {
+  background: color-mix(in srgb, var(--color-bg-surface-elevated) 50%, transparent);
 }
 
 .rolltables-folder-toggle {
   width: 100%;
   text-align: left;
-  padding: var(--space-2) var(--space-3);
+  padding: 10px 12px;
   background: var(--rolltables-folder-toggle-bg, color-mix(in srgb, var(--color-bg-overlay) 88%, transparent));
   color: var(--color-text-primary);
   border: none;
@@ -5321,6 +5326,19 @@ canvas {
   justify-content: space-between;
   align-items: center;
   font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background-color 0.15s;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.rolltables-folder-toggle:hover {
+  background: color-mix(in srgb, var(--color-bg-surface-elevated) 30%, var(--rolltables-folder-toggle-bg, transparent));
+}
+
+.rolltables-folder-toggle:focus {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: -2px;
 }
 
 .rolltables-folder-main,
@@ -5330,36 +5348,109 @@ canvas {
 }
 
 .rolltables-folder-main {
-  gap: var(--space-2);
+  gap: 8px;
+}
+
+.rolltables-folder-main .fa-icon,
+.rolltables-folder-main svg {
+  color: var(--color-accent-primary, #f59e0b);
 }
 
 .rolltables-folder-actions {
-  gap: var(--space-2);
+  gap: 4px;
 }
 
 .rolltables-folder-name-input {
-  background: color-mix(in srgb, var(--color-bg-surface-elevated) 65%, transparent);
+  background: var(--color-bg-surface-elevated, #2a2a2a);
   color: var(--color-text-primary);
-  border: 1px solid color-mix(in srgb, var(--color-border-strong) 64%, transparent);
+  border: 2px solid var(--color-accent-primary, #f59e0b);
   border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
+  padding: 4px 8px;
+  font-size: var(--font-size-sm);
+  width: 100%;
+  max-width: 150px;
+}
+
+.rolltables-folder-name-input:focus {
+  outline: none;
+  border-color: var(--color-accent-primary, #f59e0b);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-primary, #f59e0b) 30%, transparent);
 }
 
 .rolltables-folder-count {
-  opacity: 0.7;
+  opacity: 0.6;
   font-size: var(--font-size-xs);
+  background: color-mix(in srgb, var(--color-bg-surface-elevated) 50%, transparent);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.rolltables-folder-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s, color 0.15s;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.rolltables-folder-btn:hover {
+  background: color-mix(in srgb, var(--color-accent-primary) 20%, transparent);
+  color: var(--color-text-primary);
+}
+
+.rolltables-folder-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rolltables-folder-btn-delete:hover {
+  background: color-mix(in srgb, var(--color-danger, #dc3545) 20%, transparent);
+  color: var(--color-danger, #dc3545);
 }
 
 .rolltables-table-list-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
-  padding: var(--space-2);
+  padding: 10px 12px 10px 20px;
   background: var(--rolltables-table-row-bg, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border-strong) 55%, transparent);
   align-items: center;
   cursor: grab;
   margin-left: var(--rolltables-indent, 0px);
+  transition: background-color 0.15s;
+}
+
+.rolltables-table-list-item:nth-child(odd) {
+  background: color-mix(in srgb, var(--color-bg-surface-elevated) 30%, transparent) !important;
+}
+
+.rolltables-table-list-item:hover {
+  background: color-mix(in srgb, var(--color-bg-surface-elevated) 50%, transparent) !important;
+}
+
+.rolltables-row-expand-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.rolltables-row-expand-btn:hover {
+  background: color-mix(in srgb, var(--color-accent-primary) 20%, transparent);
+  color: var(--color-text-primary);
 }
 
 .rolltables-table-select {
@@ -5376,9 +5467,17 @@ canvas {
   font-weight: var(--font-weight-semibold);
 }
 
+.rolltables-table-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
 .rolltables-table-formula {
   opacity: 0.7;
   font-size: var(--font-size-xs);
+  white-space: nowrap;
 }
 
 .rolltables-table-actions {
@@ -5397,6 +5496,7 @@ canvas {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   margin-left: var(--rolltables-indent, 0px);
+  font-style: italic;
 }
 
 .rolltables-status-text {
@@ -5489,7 +5589,6 @@ canvas {
 
 .rolltables-folder-tree {
   overflow-y: auto;
-  border: 1px solid color-mix(in srgb, var(--color-border-strong) 72%, transparent);
   border-radius: var(--radius-sm);
   flex: 1;
 }
@@ -5554,12 +5653,11 @@ canvas {
 .rolltables-row-line button,
 .rolltables-row-line .rolltables-row-image-preview {
   border: none !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 0 !important;
 }
 
 .rolltables-row-line-top {
-  grid-template-columns: 110px minmax(180px, 1fr) minmax(220px, 320px) 48px;
+  grid-template-columns: 110px minmax(180px, 1fr) auto minmax(220px, 320px) 48px;
 }
 
 .rolltables-row-line-bottom {

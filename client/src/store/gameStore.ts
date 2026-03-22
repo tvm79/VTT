@@ -1820,8 +1820,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   macrosPanelSize: { width: 320, height: 400 },
   rollTables: loadSavedRollTables(),
   rollTablePanelVisible: false,
-  rollTablePanelPosition: { x: window.innerWidth - 700, y: 70 },
-  rollTablePanelSize: { width: 340, height: 500 },
+  rollTablePanelPosition: { x: window.innerWidth - 1200, y: 70 },
+  rollTablePanelSize: { width: 900, height: 700 },
 
   // Audio Panel
   audioPanelVisible: false,

@@ -21,6 +21,7 @@ interface CompendiumProps {
   sessionModules: any[];
   isGM: boolean;
   handleToggleModule: (moduleId: string) => void;
+  handleRefreshModule: (moduleId: string, datasetHint?: string) => void;
   handleDeleteModule: (moduleId: string) => void;
   setActiveTab: (tab: 'compendium' | 'modules' | 'import' | 'journals' | 'characters') => void;
   fetchAvailableFiles: () => void;
@@ -88,6 +89,12 @@ interface CompendiumProps {
 // Threshold below which list view is shown instead of cards
 const LIST_VIEW_THRESHOLD = 0.5;
 
+function getFiveEToolsDatasetHint(module: any): string | undefined {
+  const description = String(module?.description || '');
+  const match = description.match(/Imported from 5eTools \(([^)]+)\)/i);
+  return match?.[1]?.trim() || undefined;
+}
+
 export function Compendium({
   activeTab,
   activeBrowseTab,
@@ -102,6 +109,7 @@ export function Compendium({
   sessionModules,
   isGM,
   handleToggleModule,
+  handleRefreshModule,
   handleDeleteModule,
   setActiveTab,
   fetchAvailableFiles,
@@ -164,8 +172,8 @@ export function Compendium({
   setFilters,
   activeFilterCount,
 }: CompendiumProps) {
-  // Show filter button only for spell and monster tabs
-  const showFilterButton = activeBrowseTab === 'spell' || activeBrowseTab === 'monster';
+  // Show filter button whenever the current tab has filters available.
+  const showFilterButton = ['spell', 'monster', 'item', 'class', 'feat', 'background', 'race', 'species'].includes(activeBrowseTab);
   const filterCount = activeFilterCount || 0;
   
   return (
@@ -178,7 +186,10 @@ export function Compendium({
                 <button
                   key={type}
                   className={`type-tab ${activeBrowseTab === type ? 'active' : ''}`}
-                  onClick={() => setActiveBrowseTab(type)}
+                  onClick={() => {
+                    setActiveBrowseTab(type);
+                    // Refresh after tab change - fetchItemsByType handles the race->species mapping
+                  }}
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}s
                 </button>
@@ -233,11 +244,11 @@ export function Compendium({
           </div>
 
           {/* Wrapper for filter sidebar and items grid */}
-          <div className={(activeBrowseTab === 'spell' || activeBrowseTab === 'monster') ? "compendium-with-sidebar" : ""}>
-            {(activeBrowseTab === 'spell' || activeBrowseTab === 'monster') && (
+          <div className={(activeBrowseTab === 'spell' || activeBrowseTab === 'monster' || activeBrowseTab === 'item' || activeBrowseTab === 'class' || activeBrowseTab === 'feat' || activeBrowseTab === 'background' || activeBrowseTab === 'race' || activeBrowseTab === 'species') ? "compendium-with-sidebar" : ""}>
+            {(activeBrowseTab === 'spell' || activeBrowseTab === 'monster' || activeBrowseTab === 'item' || activeBrowseTab === 'class' || activeBrowseTab === 'feat' || activeBrowseTab === 'background' || activeBrowseTab === 'race' || activeBrowseTab === 'species') && (
               <div className="filter-sidebar">
                 <FilterPanel
-                  type={activeBrowseTab as 'spell' | 'monster'}
+                  type={activeBrowseTab as 'spell' | 'monster' | 'item' | 'class' | 'feat' | 'background' | 'race' | 'species'}
                   filters={filters || {}}
                   onFiltersChange={(newFilters) => {
                     setShowFilters?.(true);
@@ -274,6 +285,8 @@ export function Compendium({
                     {modules.map((module) => {
                       const sessionModule = sessionModules.find((sm) => sm.moduleId === module.id);
                       const isEnabled = sessionModule?.enabled || false;
+                      const canRefresh = String(module.description || '').includes('5eTools') || String(module.version || '').toLowerCase() === '5etools';
+                      const datasetHint = getFiveEToolsDatasetHint(module);
 
                       return (
                         <div key={module.id} className={`module-card ${isEnabled ? 'enabled' : ''}`}>
@@ -291,8 +304,16 @@ export function Compendium({
                                 className={`toggle-btn ${isEnabled ? 'active' : ''}`}
                                 onClick={() => handleToggleModule(module.id)}
                                 title={isEnabled ? 'Disable for session' : 'Enable for session'}
-                              >
+                                >
                                 <Icon name={isEnabled ? 'toggle-on' : 'toggle-off'} />
+                              </button>
+                              <button
+                                className="btn-icon"
+                                onClick={() => handleRefreshModule(module.id, datasetHint)}
+                                title={canRefresh ? 'Refresh module from its 5eTools source' : 'Refresh only available for 5eTools imports'}
+                                disabled={!canRefresh}
+                              >
+                                <Icon name="rotate" />
                               </button>
                               <button
                                 className="btn-icon btn-danger"

@@ -21,6 +21,23 @@ export interface FilterState {
   speedSwim?: boolean;
   speedBurrow?: boolean;
   speedClimb?: boolean;
+  
+  // Item filters
+  itemType?: string;
+  rarity?: string;
+  magical?: boolean;
+  attunement?: string;
+  priceMin?: string;
+  priceMax?: string;
+  tattooType?: string;
+  
+  // Class filters
+  hasSpellcasting?: boolean;
+  classSource?: string;
+  
+  // Race filters
+  hasDarkvision?: boolean;
+  raceSource?: string;
 }
 
 export interface FilterOptions {
@@ -31,10 +48,14 @@ export interface FilterOptions {
   creatureTypes?: { value: string; label: string }[];
   sizes?: { value: string; label: string }[];
   challengeRatings?: { value: string; label: string }[];
+  itemTypes?: { value: string; label: string }[];
+  rarities?: { value: string; label: string }[];
+  attunementTypes?: { value: string; label: string }[];
+  tattooTypes?: { value: string; label: string }[];
 }
 
 interface FilterPanelProps {
-  type: 'spell' | 'monster';
+  type: 'spell' | 'monster' | 'item' | 'class' | 'feat' | 'background' | 'race' | 'species';
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   onClose: () => void;
@@ -294,6 +315,182 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
     </div>
   );
   
+  const renderItemFilters = () => (
+    <div className="filter-section">
+      {/* Item Type Filter */}
+      <div className="filter-group">
+        <label>Item Type</label>
+        <select
+          value={filters.itemType || ''}
+          onChange={(e) => updateFilter('itemType', e.target.value)}
+        >
+          <option value="">All Types</option>
+          {options.itemTypes?.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Rarity Filter */}
+      <div className="filter-group">
+        <label>Rarity</label>
+        <select
+          value={filters.rarity || ''}
+          onChange={(e) => updateFilter('rarity', e.target.value)}
+        >
+          <option value="">All Rarities</option>
+          <option value="mundane">Mundane</option>
+          {options.rarities?.map((r) => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Attunement Filter */}
+      <div className="filter-group">
+        <label>Attunement</label>
+        <select
+          value={filters.attunement || ''}
+          onChange={(e) => updateFilter('attunement', e.target.value)}
+        >
+          <option value="">Any</option>
+          <option value="required">Required</option>
+          <option value="not required">Not Required</option>
+        </select>
+      </div>
+      
+      {/* Tattoo Type Filter */}
+      {filters.itemType === 'tattoo' && (
+        <div className="filter-group">
+          <label>Tattoo Type</label>
+          <select
+            value={filters.tattooType || ''}
+            onChange={(e) => updateFilter('tattooType', e.target.value)}
+          >
+            <option value="">All</option>
+            <option value="permanent">Permanent</option>
+            <option value="spellwrought">Spellwrought</option>
+          </select>
+        </div>
+      )}
+      
+      {/* Price Range */}
+      <div className="filter-group">
+        <label>Price (gp)</label>
+        <div className="filter-range">
+          <input
+            type="number"
+            placeholder="Min"
+            value={filters.priceMin || ''}
+            onChange={(e) => updateFilter('priceMin', e.target.value)}
+          />
+          <span>to</span>
+          <input
+            type="number"
+            placeholder="Max"
+            value={filters.priceMax || ''}
+            onChange={(e) => updateFilter('priceMax', e.target.value)}
+          />
+        </div>
+      </div>
+      
+      {/* Magical Filter */}
+      <div className="filter-group">
+        <label>Properties</label>
+        <div className="filter-checkboxes">
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.magical || false}
+              onChange={(e) => updateFilter('magical', e.target.checked ? 'true' : undefined)}
+            />
+            Magical
+          </label>
+        </div>
+      </div>
+      
+      {/* Source Filter */}
+      <div className="filter-group">
+        <label>Source</label>
+        <select
+          value={filters.source || ''}
+          onChange={(e) => updateFilter('source', e.target.value)}
+        >
+          <option value="">All Sources</option>
+          {options.sources?.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+  
+  const renderSourceOnlyGroup = (title: string) => (
+    <div className="filter-group">
+      <label>{title}</label>
+      <select
+        value={filters.source || ''}
+        onChange={(e) => updateFilter('source', e.target.value)}
+      >
+        <option value="">All Sources</option>
+        {options.sources?.map((s) => (
+          <option key={s.value} value={s.value}>{s.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const renderClassFilters = () => (
+    <div className="filter-section">
+      <div className="filter-group">
+        <label>Features</label>
+        <div className="filter-checkboxes">
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.hasSpellcasting || false}
+              onChange={(e) => updateFilter('hasSpellcasting', e.target.checked ? 'true' : undefined)}
+            />
+            Has Spellcasting
+          </label>
+        </div>
+      </div>
+      {renderSourceOnlyGroup('Source')}
+    </div>
+  );
+
+  const renderFeatFilters = () => (
+    <div className="filter-section">
+      {renderSourceOnlyGroup('Source')}
+    </div>
+  );
+
+  const renderBackgroundFilters = () => (
+    <div className="filter-section">
+      {renderSourceOnlyGroup('Source')}
+    </div>
+  );
+
+  const renderRaceFilters = () => (
+    <div className="filter-section">
+      {/* Has Darkvision Filter */}
+      <div className="filter-group">
+        <label>Traits</label>
+        <div className="filter-checkboxes">
+          <label className="filter-checkbox">
+            <input
+              type="checkbox"
+              checked={filters.hasDarkvision || false}
+              onChange={(e) => updateFilter('hasDarkvision', e.target.checked ? 'true' : undefined)}
+            />
+            Has Darkvision
+          </label>
+        </div>
+      </div>
+      {renderSourceOnlyGroup('Source')}
+    </div>
+  );
+  
   return (
     <div className="filter-panel">
       <div className="filter-header">
@@ -305,7 +502,14 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
         <div className="filter-loading">Loading options...</div>
       ) : (
         <>
-          {type === 'spell' ? renderSpellFilters() : renderMonsterFilters()}
+          {type === 'spell' && renderSpellFilters()}
+          {type === 'monster' && renderMonsterFilters()}
+          {type === 'item' && renderItemFilters()}
+          {type === 'class' && renderClassFilters()}
+          {type === 'feat' && renderFeatFilters()}
+          {type === 'background' && renderBackgroundFilters()}
+          {type === 'race' && renderRaceFilters()}
+          {type === 'species' && renderRaceFilters()}
         </>
       )}
       
@@ -341,6 +545,10 @@ export function ActiveFilters({
         return `Class: ${value}`;
       case 'source':
         return `Source: ${value}`;
+      case 'classSource':
+        return `Source: ${value}`;
+      case 'raceSource':
+        return `Source: ${value}`;
       case 'concentration':
         return 'Concentration';
       case 'ritual':
@@ -367,6 +575,24 @@ export function ActiveFilters({
         return 'Burrowing';
       case 'speedClimb':
         return 'Climbing';
+      case 'itemType':
+        return `Type: ${value}`;
+      case 'rarity':
+        return `Rarity: ${value}`;
+      case 'attunement':
+        return `Attunement: ${value}`;
+      case 'tattooType':
+        return `Tattoo: ${value}`;
+      case 'priceMin':
+        return `Price: ${value}+ gp`;
+      case 'priceMax':
+        return `Price: ≤${value} gp`;
+      case 'magical':
+        return 'Magical';
+      case 'hasSpellcasting':
+        return 'Has Spellcasting';
+      case 'hasDarkvision':
+        return 'Has Darkvision';
       default:
         return `${key}: ${value}`;
     }

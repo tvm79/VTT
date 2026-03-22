@@ -4,6 +4,7 @@ import { JournalPanel } from './JournalPanel';
 import { CharacterSheetPanel } from './CharacterSheetPanel';
 import { Compendium } from './Compendium';
 import { Characters } from './Characters';
+import { CharacterCreatorWizard } from './CharacterCreatorWizard';
 import { Journals } from './Journals';
 import { FloatingPanelsLayer } from './FloatingPanelsLayer';
 import { RollableText } from './RollableText';
@@ -1246,6 +1247,7 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
   // Character Sheet state
   const [characters, setCharacters] = useState<any[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
+  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
   
   // Fetch characters
 
@@ -1627,27 +1629,8 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
     }
   };
 
-  const createCharacter = async () => {
-    if (!session) return;
-    try {
-      const res = await fetch(`/api/data/sessions/${session.id}/characters`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'New Character' }),
-      });
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Failed to create character:', res.status, errorText);
-        alert('Failed to create character. Please ensure the server is running and try again.');
-        return;
-      }
-      const newCharacter = await res.json();
-      setCharacters([...characters, newCharacter]);
-      openCharacterPanel(newCharacter);
-    } catch (error) {
-      console.error('Failed to create character:', error);
-      alert('Failed to create character. Please ensure the server is running and try again.');
-    }
+  const createCharacter = () => {
+    setShowCharacterWizard(true);
   };
 
   const updateCharacter = async (id: string, updates: any) => {
@@ -2030,6 +2013,8 @@ interface OpenPanel {
       if (activeFilters.somatic) params.append('somatic', String(activeFilters.somatic));
       if (activeFilters.material) params.append('material', String(activeFilters.material));
       if (activeFilters.source) params.append('source', activeFilters.source);
+      if (activeFilters.classSource) params.append('classSource', activeFilters.classSource);
+      if (activeFilters.raceSource) params.append('raceSource', activeFilters.raceSource);
       if (activeFilters.crMin) params.append('crMin', activeFilters.crMin);
       if (activeFilters.crMax) params.append('crMax', activeFilters.crMax);
       if (activeFilters.creatureType) params.append('creatureType', activeFilters.creatureType);
@@ -2039,10 +2024,35 @@ interface OpenPanel {
       if (activeFilters.speedBurrow) params.append('speedBurrow', String(activeFilters.speedBurrow));
       if (activeFilters.speedClimb) params.append('speedClimb', String(activeFilters.speedClimb));
       
-      // Use new compendium API for normalized structure
-      const res = await fetch(`/api/data/compendium/${type}?${params}`);
-      const data = await res.json();
-      setTypeItems((data.data || []).map((entry: any) => normalizeViewerItem(entry)));
+      // Item filters
+      if (activeFilters.itemType) params.append('itemType', activeFilters.itemType);
+      if (activeFilters.rarity) params.append('rarity', activeFilters.rarity);
+      if (activeFilters.attunement) params.append('attunement', activeFilters.attunement);
+      if (activeFilters.tattooType) params.append('tattooType', activeFilters.tattooType);
+      if (activeFilters.priceMin) params.append('priceMin', activeFilters.priceMin);
+      if (activeFilters.priceMax) params.append('priceMax', activeFilters.priceMax);
+      if (activeFilters.magical) params.append('magical', String(activeFilters.magical));
+      
+      // Class filters
+      if (activeFilters.hasSpellcasting) params.append('hasSpellcasting', String(activeFilters.hasSpellcasting));
+      
+      // Race filters
+      if (activeFilters.hasDarkvision) params.append('hasDarkvision', String(activeFilters.hasDarkvision));
+      
+      // Map 'race' to 'species' for API query since races are normalized to 'species' in the database
+      // Also try both types to handle both normalized and non-normalized imports
+      const apiTypes = type === 'race' ? ['species', 'race'] : [type];
+      
+      let allItems: any[] = [];
+      for (const apiType of apiTypes) {
+        const res = await fetch(`/api/data/compendium/${apiType}?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          const items = (data.data || []).map((entry: any) => normalizeViewerItem(entry));
+          allItems = [...allItems, ...items];
+        }
+      }
+      setTypeItems(allItems);
     } catch (error) {
       console.error('Failed to fetch items:', error);
     } finally {
@@ -2070,6 +2080,35 @@ interface OpenPanel {
       });
     } catch (error) {
       console.error('Failed to toggle module:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefreshModule = async (moduleId: string, datasetHint?: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/data/modules/${moduleId}/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datasetHint ? { dataset: datasetHint } : {}),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data?.message || data?.error || 'Module refresh failed');
+      }
+
+      alert(`Refreshed ${data.imported} of ${data.fetched} entries from ${data.dataset}.`);
+      await fetchModules();
+      if (session) {
+        await fetchSessionModules();
+      }
+      if (activeTab === 'compendium') {
+        await fetchItemsByType(activeBrowseTab, filters);
+      }
+    } catch (error) {
+      console.error('Failed to refresh module:', error);
+      alert('Failed to refresh module');
     } finally {
       setLoading(false);
     }
@@ -4916,6 +4955,7 @@ interface OpenPanel {
           showFilters={showFilters}
           setShowFilters={setShowFilters}
           activeFilterCount={Object.keys(filters).length}
+          handleRefreshModule={handleRefreshModule}
         />
 
         {activeTab === 'journals' && (
@@ -4951,6 +4991,16 @@ interface OpenPanel {
         ref={resizeRef}
         className="data-manager-resize"
         onMouseDown={handleResizeStart}
+      />
+
+      <CharacterCreatorWizard
+        isOpen={showCharacterWizard}
+        onClose={() => setShowCharacterWizard(false)}
+        onCharacterCreated={(newCharacter) => {
+          setCharacters([...characters, newCharacter]);
+          openCharacterPanel(newCharacter);
+          setShowCharacterWizard(false);
+        }}
       />
     </div>
   );

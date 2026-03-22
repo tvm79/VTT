@@ -15,6 +15,41 @@ const FIVE_ETOOLS_IMG_BASE_URL = 'https://5e.tools/img';
 const IMAGE_FETCHER_CONFIG = getImageFetcherConfig();
 const IMAGE_PROVIDERS = createImageProviderRegistry(IMAGE_FETCHER_CONFIG.flags.providers, IMAGE_FETCHER_CONFIG);
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['.webp', '.png', '.jpg', '.jpeg', '.gif', '.avif']);
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  A: 'Ammunition',
+  AF: 'Ammunition (Futuristic)',
+  AT: 'Artisan Tool',
+  EM: 'Eldritch Machine',
+  EXP: 'Explosive',
+  G: 'Adventuring Gear',
+  GS: 'Gaming Set',
+  HA: 'Heavy Armor',
+  INS: 'Instrument',
+  LA: 'Light Armor',
+  M: 'Melee Weapon',
+  MA: 'Medium Armor',
+  MNT: 'Mount',
+  GV: 'Generic Variant',
+  P: 'Potion',
+  R: 'Ranged Weapon',
+  RD: 'Rod',
+  RG: 'Ring',
+  ST: 'Staff',
+  S: 'Shield',
+  SC: 'Scroll',
+  SCF: 'Spellcasting Focus',
+  OTH: 'Other',
+  T: 'Tool',
+  TAH: 'Tack and Harness',
+  TG: 'Trade Good',
+  W: 'Wondrous Item',
+  $: 'Treasure',
+  VEH: 'Vehicle (Land)',
+  SHP: 'Vehicle (Water)',
+  AIR: 'Vehicle (Air)',
+  WD: 'Wand',
+};
+const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE_LABELS));
 
 const IMAGE_FETCH_METRICS = {
   resolveCalls: 0,
@@ -31,6 +66,104 @@ const IMAGE_FETCH_METRICS = {
 function incrementMetricBucket(bucket: Record<string, number>, key: string): void {
   const metricKey = String(key || 'unknown').trim() || 'unknown';
   bucket[metricKey] = (bucket[metricKey] || 0) + 1;
+}
+
+function getEntrySourceValue(raw: any, fallbackSource?: string | null): string | null {
+  const candidates = [
+    fallbackSource,
+    raw?.source,
+    raw?.book,
+    raw?.system?.source?.custom,
+    raw?.system?.source?.rules,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+function getSourceFilterCandidates(source: string): Array<Record<string, any>> {
+  const value = String(source || '').trim();
+  if (!value) return [];
+
+  return [
+    { source: value },
+    { raw: { path: ['source'], equals: value } },
+    { raw: { path: ['book'], equals: value } },
+    { raw: { path: ['system', 'source', 'custom'], equals: value } },
+    { raw: { path: ['system', 'source', 'rules'], equals: value } },
+  ];
+}
+
+function getItemTypeCode(raw: any): string {
+  const candidates = [
+    raw?.type,
+    raw?.itemType,
+    raw?.system?.type,
+    raw?.system?.itemType,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const normalized = candidate.trim().toUpperCase();
+    if (normalized && ITEM_TYPE_CODES.has(normalized)) return normalized;
+  }
+
+  if (raw?.weapon || raw?.system?.weapon) {
+    return raw?.weapon?.ranged || raw?.system?.weapon?.ranged ? 'R' : 'M';
+  }
+  if (raw?.armor || raw?.system?.armor) {
+    const armor = raw?.armor || raw?.system?.armor || {};
+    if (armor.stealthDisadvantage || armor.type === 'heavy') return 'HA';
+    if (armor.type === 'medium') return 'MA';
+    return 'LA';
+  }
+  if (raw?.shield || raw?.system?.shield) return 'S';
+  if (raw?.potion || raw?.system?.potion) return 'P';
+  if (raw?.tool || raw?.system?.tool) return 'T';
+  if (raw?.scroll || raw?.system?.scroll) return 'SC';
+  if (raw?.ring || raw?.system?.ring) return 'RG';
+  if (raw?.wand || raw?.system?.wand) return 'WD';
+  if (raw?.staff || raw?.system?.staff) return 'ST';
+  if (raw?.rod || raw?.system?.rod) return 'RD';
+  if (raw?.wondrous || raw?.system?.wondrous) return 'W';
+  return 'G';
+}
+
+function getItemTypeLabel(code: string): string {
+  const normalized = String(code || '').trim().toUpperCase();
+  return ITEM_TYPE_LABELS[normalized] || normalized || 'Item';
+}
+
+function getItemRarityLabel(value: string): string {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  return normalized
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function getItemTypeFilterCandidates(itemType: string): Array<Record<string, any>> {
+  const rawValue = String(itemType || '').trim();
+  if (!rawValue || rawValue.toLowerCase() === 'magic-item') return [];
+  const value = rawValue.toUpperCase();
+  const lowerValue = value.toLowerCase();
+
+  return [
+    { raw: { path: ['type'], equals: value } },
+    { raw: { path: ['type'], equals: lowerValue } },
+    { raw: { path: ['itemType'], equals: value } },
+    { raw: { path: ['itemType'], equals: lowerValue } },
+    { raw: { path: ['system', 'type'], equals: value } },
+    { raw: { path: ['system', 'type'], equals: lowerValue } },
+    { raw: { path: ['system', 'itemType'], equals: value } },
+    { raw: { path: ['system', 'itemType'], equals: lowerValue } },
+  ];
 }
 
 const LOCAL_FALLBACK_IMAGE_BY_TYPE: Record<string, string> = {
@@ -311,6 +444,44 @@ async function fetchCombinedClassData(classKeys: string[]): Promise<any> {
   return combined;
 }
 
+async function fetchJsonFrom5eTools(url: string): Promise<any> {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'VTT-Importer/1.0',
+    },
+  });
+
+  if (!response.ok) {
+    const error = new Error(`Failed to fetch ${url}: ${response.status}`) as Error & { statusCode?: number; url?: string };
+    error.statusCode = response.status;
+    error.url = url;
+    throw error;
+  }
+
+  return response.json();
+}
+
+async function fetchCombinedItemData(): Promise<any> {
+  const combined: any = { item: [] };
+  const itemUrls = [`${BASE_URL}/items-base.json`, `${BASE_URL}/items.json`];
+
+  for (const url of itemUrls) {
+    try {
+      const data = await fetchJsonFrom5eTools(url);
+
+      for (const key of ['item', 'baseitem', 'magicvariant']) {
+        if (Array.isArray(data?.[key])) {
+          combined.item.push(...data[key]);
+        }
+      }
+    } catch (err) {
+      console.error(`Error fetching items from ${url}:`, err);
+    }
+  }
+
+  return combined;
+}
+
 // PHB classes (core classes)
 const PHB_CLASSES = ['barbarian', 'bard', 'cleric', 'druid', 'fighter', 'monk', 'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard'];
 
@@ -509,6 +680,140 @@ function extractDatasetItems(payload: any, rootKeys: string[]): any[] {
 
   const firstArray = Object.values(payload).find((value) => Array.isArray(value));
   return Array.isArray(firstArray) ? firstArray : [payload];
+}
+
+function parseFiveEToolsDatasetFromDescription(description?: string | null): string | null {
+  const match = String(description || '').match(/Imported from 5eTools \(([^)]+)\)/i);
+  return match?.[1]?.trim() || null;
+}
+
+async function inferFiveEToolsDatasetForModule(moduleId: string, moduleName: string): Promise<string | null> {
+  const entries = await prisma.compendiumEntry.findMany({
+    where: { moduleId },
+    select: { type: true },
+    take: 20,
+  });
+
+  if (entries.length === 0) return null;
+
+  const types = new Set(entries.map((entry) => String(entry.type || '').toLowerCase()).filter(Boolean));
+  const moduleLabel = String(moduleName || '').toLowerCase();
+
+  if (types.size === 1 && types.has('item')) {
+    if (moduleLabel.includes('item') || moduleLabel.includes('5etools') || moduleLabel.includes('phb')) {
+      return 'items-all';
+    }
+  }
+
+  return null;
+}
+
+async function importFiveEToolsDataset(params: {
+  dataset: string;
+  name: string;
+  system: string;
+  version?: string | null;
+  description?: string | null;
+  moduleId?: string | null;
+  replaceExisting?: boolean;
+}) {
+  const { dataset, name, system, version, description, moduleId, replaceExisting = false } = params;
+  const preset = fiveEToolsDatasets[String(dataset)];
+
+  if (!preset) {
+    const error = new Error(`Unknown 5eTools dataset "${dataset}"`) as Error & { statusCode?: number };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let payload: any;
+  let fetchUrl = preset.url;
+
+  if (preset.url === 'DYNAMIC_CLASS_URL') {
+    const classKeys = dataset === 'classes-xphb' ? XPHB_CLASSES : PHB_CLASSES;
+    payload = await fetchCombinedClassData(classKeys);
+    fetchUrl = `${BASE_URL}/class (combined from ${classKeys.length} files)`;
+  } else if (dataset === 'items-all') {
+    payload = await fetchCombinedItemData();
+    fetchUrl = `${BASE_URL}/items-base.json + ${BASE_URL}/items.json`;
+  } else {
+    payload = await fetchJsonFrom5eTools(preset.url);
+  }
+
+  const items = extractDatasetItems(payload, preset.rootKeys);
+  if (items.length === 0) {
+    const error = new Error('Dataset returned no importable items') as Error & { statusCode?: number; url?: string };
+    error.statusCode = 422;
+    error.url = fetchUrl;
+    throw error;
+  }
+
+  let module: any = null;
+  if (moduleId) {
+    module = await prisma.dataModule.findUnique({ where: { id: moduleId } });
+    if (!module) {
+      const error = new Error(`Module "${moduleId}" not found`) as Error & { statusCode?: number };
+      error.statusCode = 404;
+      throw error;
+    }
+  } else {
+    module = await prisma.dataModule.findFirst({
+      where: { name, system },
+    });
+  }
+
+  if (!module) {
+    module = await prisma.dataModule.create({
+      data: {
+        name,
+        system,
+        version: version || '5etools',
+        description: description || `Imported from 5eTools (${dataset})`,
+        itemCount: 0,
+      },
+    });
+  } else if (replaceExisting) {
+    await prisma.compendiumEntry.deleteMany({ where: { moduleId: module.id } });
+    await prisma.dataModule.update({
+      where: { id: module.id },
+      data: {
+        itemCount: 0,
+        ...(version ? { version } : {}),
+        ...(description ? { description } : {}),
+      },
+    });
+  }
+
+  let createdCount = 0;
+  const batchSize = 50;
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (item: any) => {
+        try {
+          await createCompendiumEntry(module.id, system, preset.type, item);
+          createdCount++;
+        } catch (err) {
+          console.error('Error creating 5eTools entry:', err);
+        }
+      }),
+    );
+  }
+
+  const count = await prisma.compendiumEntry.count({ where: { moduleId: module.id } });
+  const updatedModule = await prisma.dataModule.update({
+    where: { id: module.id },
+    data: { itemCount: count },
+  });
+
+  return {
+    success: true,
+    imported: createdCount,
+    fetched: items.length,
+    dataset,
+    sourceUrl: fetchUrl,
+    module: { ...updatedModule, itemCount: count },
+  };
 }
 
 router.get('/import/5etools/datasets', async (_req, res) => {
@@ -1205,88 +1510,65 @@ router.post('/import/5etools', async (req, res) => {
     return res.status(400).json({ error: 'Missing required fields: dataset, name, system' });
   }
 
-  const preset = fiveEToolsDatasets[String(dataset)];
-  if (!preset) {
-    return res.status(400).json({ error: `Unknown 5eTools dataset "${dataset}"` });
+  try {
+    const result = await importFiveEToolsDataset({ dataset, name, system, version: version || null, description: description || null });
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error importing 5eTools dataset:', error);
+    res.status(error?.statusCode || 500).json({
+      error: 'Failed to import 5eTools dataset',
+      message: error.message,
+      status: error?.statusCode,
+      url: error?.url,
+    });
   }
+});
+
+router.post('/modules/:moduleId/refresh', async (req, res) => {
+  const { moduleId } = req.params;
 
   try {
-    let payload: any;
-    let fetchUrl = preset.url;
-
-    // Handle dynamic class URL - fetch and combine multiple class files
-    if (preset.url === 'DYNAMIC_CLASS_URL') {
-      const classKeys = dataset === 'classes-xphb' ? XPHB_CLASSES : PHB_CLASSES;
-      payload = await fetchCombinedClassData(classKeys);
-      fetchUrl = `${BASE_URL}/class (combined from ${classKeys.length} files)`;
-    } else {
-      const response = await fetch(preset.url, {
-        headers: {
-          'User-Agent': 'VTT-Importer/1.0',
-        },
-      });
-
-      if (!response.ok) {
-        return res.status(502).json({ error: 'Failed to fetch dataset from 5eTools', status: response.status, url: preset.url });
-      }
-
-      payload = await response.json();
-    }
-
-    const items = extractDatasetItems(payload, preset.rootKeys);
-    if (items.length === 0) {
-      return res.status(422).json({ error: 'Dataset returned no importable items', url: fetchUrl });
-    }
-
-    let module = await prisma.dataModule.findFirst({
-      where: { name, system },
-    });
-
+    const module = await prisma.dataModule.findUnique({ where: { id: moduleId } });
     if (!module) {
-      module = await prisma.dataModule.create({
-        data: {
-          name,
-          system,
-          version: version || '5etools',
-          description: description || `Imported from 5eTools (${dataset})`,
-          itemCount: 0,
-        },
+      return res.status(404).json({ error: 'Module not found' });
+    }
+
+    const dataset = String(
+      req.body?.dataset ||
+      parseFiveEToolsDatasetFromDescription(module.description) ||
+      (String(module.version || '').toLowerCase() === '5etools' ? 'items-all' : '') ||
+      (await inferFiveEToolsDatasetForModule(module.id, module.name)) ||
+      '',
+    ).trim();
+    if (!dataset) {
+      return res.status(400).json({
+        error: 'Unable to infer 5eTools dataset for this module',
+        message: 'Only modules imported from 5eTools can be refreshed automatically.',
       });
     }
 
-    let createdCount = 0;
-    const batchSize = 50;
-    for (let i = 0; i < items.length; i += batchSize) {
-      const batch = items.slice(i, i + batchSize);
-      await Promise.all(
-        batch.map(async (item: any) => {
-          try {
-            await createCompendiumEntry(module!.id, system, preset.type, item);
-            createdCount++;
-          } catch (err) {
-            console.error('Error creating 5eTools entry:', err);
-          }
-        }),
-      );
-    }
-
-    const count = await prisma.compendiumEntry.count({ where: { moduleId: module.id } });
-    await prisma.dataModule.update({
-      where: { id: module.id },
-      data: { itemCount: count },
+    const result = await importFiveEToolsDataset({
+      dataset,
+      name: module.name,
+      system: module.system,
+      version: module.version || null,
+      description: module.description || null,
+      moduleId: module.id,
+      replaceExisting: true,
     });
 
     res.json({
-      success: true,
-      imported: createdCount,
-      fetched: items.length,
-      dataset,
-      sourceUrl: preset.url,
-      module: { ...module, itemCount: count },
+      ...result,
+      refreshed: true,
     });
   } catch (error: any) {
-    console.error('Error importing 5eTools dataset:', error);
-    res.status(500).json({ error: 'Failed to import 5eTools dataset', message: error.message });
+    console.error('Error refreshing module:', error);
+    res.status(error?.statusCode || 500).json({
+      error: 'Failed to refresh module',
+      message: error.message,
+      status: error?.statusCode,
+      url: error?.url,
+    });
   }
 });
 
@@ -1437,40 +1719,50 @@ function getSchoolValue(value: string): string {
 
 // Get available filter options for a given type
 router.get('/compendium/filters/:type', async (req, res) => {
-  const { type } = req.params;
-  
+  const requestedType = String(req.params.type || '').toLowerCase();
+  const effectiveType = requestedType === 'race' ? 'species' : requestedType;
+  const where =
+    requestedType === 'race' || requestedType === 'species'
+      ? { type: { in: ['species', 'race'] } }
+      : { type: effectiveType };
+
   try {
     const options: Record<string, { value: string; label: string }[]> = {};
-    
-    if (type === 'spell') {
-      const entries = await prisma.compendiumEntry.findMany({
-        where: { type: 'spell' },
-        select: { raw: true, source: true },
-        take: 5000,
-      });
-      
+    const entries = await prisma.compendiumEntry.findMany({
+      where,
+      select: { raw: true, source: true },
+      take: 5000,
+    });
+
+    const sourceSet = new Set<string>();
+    entries.forEach((entry: any) => {
+      const raw = entry.raw || {};
+      const sourceValue = getEntrySourceValue(raw, entry.source);
+      if (sourceValue) sourceSet.add(sourceValue);
+    });
+
+    options.sources = Array.from(sourceSet).sort().map((source) => ({ value: source, label: source }));
+
+    if (effectiveType === 'spell') {
       const schoolSet = new Set<string>();
       const classSet = new Set<string>();
-      const sourceSet = new Set<string>();
-      
+
       entries.forEach((entry: any) => {
         const raw = entry.raw || {};
         const system = raw.system || raw.data || {};
-        
-        // Get school - could be direct or nested
+
         const school = system.school || system.school?.name;
         if (school) schoolSet.add(school);
-        
-        // Get classes - try multiple possible paths in both raw and system
+
         const classPaths = [
-          system.classes, 
-          system.sourceClass, 
+          system.classes,
+          system.sourceClass,
           system.class,
           raw.classes,
           raw.sourceClass,
-          raw.class
+          raw.class,
         ];
-        
+
         for (const classes of classPaths) {
           if (!classes) continue;
           if (Array.isArray(classes)) {
@@ -1484,41 +1776,27 @@ router.get('/compendium/filters/:type', async (req, res) => {
             classSet.add(classes);
           }
         }
-        
-        if (entry.source) sourceSet.add(entry.source);
       });
-      
-      options.schools = Array.from(schoolSet).sort().map(s => ({ value: getSchoolLabel(s), label: getSchoolLabel(s) }));
-      options.classes = Array.from(classSet).sort().map(s => ({ value: s, label: s }));
-      options.sources = Array.from(sourceSet).sort().map(s => ({ value: s, label: s }));
-      
+
+      options.schools = Array.from(schoolSet).sort().map((s) => ({ value: getSchoolLabel(s), label: getSchoolLabel(s) }));
+      options.classes = Array.from(classSet).sort().map((s) => ({ value: s, label: s }));
       options.levels = Array.from({ length: 10 }, (_, i) => ({
         value: String(i),
         label: i === 0 ? 'Cantrip' : `Level ${i}`,
       }));
-      
-    } else if (type === 'monster') {
-      const entries = await prisma.compendiumEntry.findMany({
-        where: { type: 'monster' },
-        select: { raw: true, source: true },
-        take: 5000,
-      });
-      
+    } else if (effectiveType === 'monster') {
       const typeSet = new Set<string>();
       const sizeSet = new Set<string>();
-      const sourceSet = new Set<string>();
-      
+
       entries.forEach((entry: any) => {
         const raw = entry.raw || {};
         const system = raw.system || raw.data || {};
-        
-        // Get monster type - the type is stored at raw.type directly
+
         const mtype = raw.type;
-        if (mtype) {
-          typeSet.add(mtype);
+        if (typeof mtype === 'string' && mtype.trim()) {
+          typeSet.add(mtype.trim());
         }
-        
-        // Get size - it's stored in raw.system.size as an array like ["H"] for Huge
+
         const size = system.size;
         if (size) {
           if (Array.isArray(size)) {
@@ -1527,20 +1805,47 @@ router.get('/compendium/filters/:type', async (req, res) => {
             sizeSet.add(size);
           }
         }
-        
-        if (entry.source) sourceSet.add(entry.source);
       });
-      
-      options.creatureTypes = Array.from(typeSet).sort().map(s => ({ value: getMonsterTypeValue(s), label: getMonsterTypeLabel(s) }));
-      options.sizes = Array.from(sizeSet).sort().map(s => ({ value: getSizeValue(s), label: getSizeLabel(s) }));
-      options.sources = Array.from(sourceSet).sort().map(s => ({ value: s, label: s }));
-      
+
+      options.creatureTypes = Array.from(typeSet).sort().map((s) => ({ value: getMonsterTypeValue(s), label: getMonsterTypeLabel(s) }));
+      options.sizes = Array.from(sizeSet).sort().map((s) => ({ value: getSizeValue(s), label: getSizeLabel(s) }));
       options.challengeRatings = Array.from({ length: 34 }, (_, i) => ({
         value: String(i / 2),
         label: i / 2 === 0 ? '0' : i / 2 === 0.125 ? '1/8' : i / 2 === 0.25 ? '1/4' : i / 2 === 0.5 ? '1/2' : String(i / 2),
       }));
+    } else if (effectiveType === 'item') {
+      const typeSet = new Set<string>();
+      const rarityMap = new Map<string, string>();
+
+      entries.forEach((entry: any) => {
+        const raw = entry.raw || {};
+        const system = raw.system || raw.data || {};
+
+        const rarity = system.rarity || raw.rarity;
+        if (typeof rarity === 'string' && rarity.trim()) {
+          const normalizedRarity = rarity.trim().toLowerCase();
+          if (!rarityMap.has(normalizedRarity)) {
+            rarityMap.set(normalizedRarity, getItemRarityLabel(rarity));
+          }
+        }
+
+        const itemType = getItemTypeCode(raw);
+        if (itemType) typeSet.add(itemType);
+      });
+
+      options.itemTypes = Array.from(typeSet).sort().map((value) => ({
+        value,
+        label: getItemTypeLabel(value),
+      }));
+
+      options.rarities = Array.from(rarityMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([value, label]) => ({
+        value,
+        label,
+      }));
     }
-    
+
     res.json(options);
   } catch (error: any) {
     console.error('Error getting filter options:', error);
@@ -1562,6 +1867,7 @@ router.get('/compendium/:type', async (req, res) => {
   const verbal = req.query.verbal as string | undefined;
   const somatic = req.query.somatic as string | undefined;
   const material = req.query.material as string | undefined;
+  const source = req.query.source as string | undefined;
   
   // Monster filters
   const crMin = req.query.crMin as string | undefined;
@@ -1572,6 +1878,12 @@ router.get('/compendium/:type', async (req, res) => {
   const speedSwim = req.query.speedSwim as string | undefined;
   const speedBurrow = req.query.speedBurrow as string | undefined;
   const speedClimb = req.query.speedClimb as string | undefined;
+  
+  // Item filters
+  const itemType = req.query.itemType as string | undefined;
+  const rarity = req.query.rarity as string | undefined;
+  const magical = req.query.magical as string | undefined;
+  const attunement = req.query.attunement as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 100, 500);
   const offsetNum = parseInt(offset as string) || 0;
@@ -1584,10 +1896,11 @@ router.get('/compendium/:type', async (req, res) => {
     if (system) {
       where.system = String(system);
     }
+    const sharedFilters: any[] = source ? [{ OR: getSourceFilterCandidates(source) }] : [];
     
     // Build filter conditions based on type
     if (type === 'spell') {
-      const spellFilters: any[] = [];
+      const spellFilters: any[] = [...sharedFilters];
       
       if (level !== undefined) {
         spellFilters.push({ raw: { path: ['system', 'level'], equals: parseInt(level) } });
@@ -1628,7 +1941,7 @@ router.get('/compendium/:type', async (req, res) => {
         where.AND = spellFilters;
       }
     } else if (type === 'monster') {
-      const monsterFilters: any[] = [];
+      const monsterFilters: any[] = [...sharedFilters];
       
       if (crMin !== undefined) {
         monsterFilters.push({ raw: { path: ['system', 'cr'], gte: parseCrValue(crMin) } });
@@ -1664,8 +1977,54 @@ router.get('/compendium/:type', async (req, res) => {
       if (monsterFilters.length > 0) {
         where.AND = monsterFilters;
       }
+    } else if (type === 'item') {
+      const itemFilters: any[] = [...sharedFilters];
+
+      // Filter by item type - stored in system properties (wondrous, weapon, armor, etc.)
+      if (itemType) {
+        if (itemType === 'magic-item') {
+          // Magic items have a rarity set
+          itemFilters.push({ raw: { path: ['system', 'rarity'], not: null } });
+        } else {
+          itemFilters.push({ OR: getItemTypeFilterCandidates(itemType) });
+        }
+      }
+
+      // Filter by rarity - stored at system.rarity
+      if (rarity) {
+        if (rarity === 'mundane') {
+          // Mundane items have rarity 'none' or no rarity
+          itemFilters.push({ raw: { path: ['system', 'rarity'], in: ['none', 'common'] } });
+        } else {
+          itemFilters.push({ raw: { path: ['system', 'rarity'], equals: rarity } });
+        }
+      }
+
+      // Filter for magical items
+      if (magical === 'true') {
+        // Items with rarity other than 'none' are magical
+        itemFilters.push({ raw: { path: ['system', 'rarity'], not: 'none' } });
+      }
+
+      // Filter by attunement
+      if (attunement === 'required') {
+        itemFilters.push({ raw: { path: ['system', 'reqAttune'], not: null } });
+      } else if (attunement === 'not required') {
+        itemFilters.push({ OR: [
+          { raw: { path: ['system', 'reqAttune'], equals: null } },
+          { raw: { path: ['system', 'reqAttune'], not: null } }
+        ]});
+      }
+
+      if (itemFilters.length > 0) {
+        where.AND = itemFilters;
+      }
     }
-    
+
+    if (sharedFilters.length > 0 && !where.AND) {
+      where.AND = sharedFilters;
+    }
+
     const include: any = {
       module: {
         select: { name: true, system: true, version: true },
@@ -1997,6 +2356,12 @@ router.get('/compendium/search', async (req, res) => {
   const speedBurrow = req.query.speedBurrow as string | undefined;
   const speedClimb = req.query.speedClimb as string | undefined;
   
+  // Item filters
+  const itemType = req.query.itemType as string | undefined;
+  const rarity = req.query.rarity as string | undefined;
+  const magical = req.query.magical as string | undefined;
+  const attunement = req.query.attunement as string | undefined;
+  
   const limitNum = Math.min(parseInt(limit as string) || 50, 200);
   const offsetNum = parseInt(offset as string) || 0;
   
@@ -2101,8 +2466,72 @@ router.get('/compendium/search', async (req, res) => {
       if (monsterFilters.length > 0) {
         where.AND = monsterFilters;
       }
+    } else if (type === 'item') {
+      const itemFilters: any[] = [];
+
+      // Filter by item type - stored in system properties (wondrous, weapon, armor, etc.)
+      if (itemType) {
+        if (itemType === 'magic-item') {
+          itemFilters.push({ raw: { path: ['system', 'rarity'], not: null } });
+        } else {
+          switch (itemType) {
+            case 'W':
+              itemFilters.push({ raw: { path: ['system', 'wondrous'], equals: true } });
+              break;
+            case 'M':
+              itemFilters.push({ raw: { path: ['system', 'weapon'], not: null } });
+              itemFilters.push({ raw: { path: ['system', 'weapon', 'ranged'], not: true } });
+              break;
+            case 'R':
+              itemFilters.push({ raw: { path: ['system', 'weapon', 'ranged'], equals: true } });
+              break;
+            case 'LA':
+              itemFilters.push({ raw: { path: ['system', 'armor'], not: null } });
+              break;
+            case 'S':
+              itemFilters.push({ raw: { path: ['system', 'shield'], equals: true } });
+              break;
+            case 'P':
+              itemFilters.push({ raw: { path: ['system', 'potion'], equals: true } });
+              break;
+            case 'T':
+              itemFilters.push({ raw: { path: ['system', 'tool'], equals: true } });
+              break;
+            default:
+              itemFilters.push({ raw: { path: ['system', 'type'], equals: itemType } });
+          }
+        }
+      }
+
+      // Filter by rarity - stored at system.rarity
+      if (rarity) {
+        if (rarity === 'mundane') {
+          itemFilters.push({ raw: { path: ['system', 'rarity'], in: ['none', 'common'] } });
+        } else {
+          itemFilters.push({ raw: { path: ['system', 'rarity'], equals: rarity } });
+        }
+      }
+
+      // Filter for magical items
+      if (magical === 'true') {
+        itemFilters.push({ raw: { path: ['system', 'rarity'], not: 'none' } });
+      }
+
+      // Filter by attunement
+      if (attunement === 'required') {
+        itemFilters.push({ raw: { path: ['system', 'reqAttune'], not: null } });
+      } else if (attunement === 'not required') {
+        itemFilters.push({ OR: [
+          { raw: { path: ['system', 'reqAttune'], equals: null } },
+          { raw: { path: ['system', 'reqAttune'], not: null } }
+        ]});
+      }
+
+      if (itemFilters.length > 0) {
+        where.AND = itemFilters;
+      }
     }
-    
+
     const entries = await prisma.compendiumEntry.findMany({
       where,
       include: {

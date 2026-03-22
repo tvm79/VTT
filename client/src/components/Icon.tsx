@@ -71,6 +71,9 @@ import {
   faToggleOff,        // 🔛 (toggle off)
   faArrowLeft,        // ← (back)
   faFolder,           // 📁 (folder)
+  faFolderOpen,
+  faDumbbell,
+  faFolderPlus,       // 📁+ (create folder)
   faBolt,             // ⚡ (paralyzed)
   faBed,              // 🛏️ (bed)
   faDisease,         // 🦠 (diseased)
@@ -245,6 +248,9 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'toggle-off': faToggleOff,
   'arrow-left': faArrowLeft,
   'folder': faFolder,
+  'folder-open' : faFolderOpen,
+  'dumbell' : faDumbbell,
+  'folder-plus': faFolderPlus,
   'tired': faFaceTired,       // 😴 exhaustion
   'bolt': faBolt,        // ⚡ paralyzed
   'bed': faBed,          // 🛏️ unconscious

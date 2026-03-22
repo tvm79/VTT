@@ -7,3 +7,6 @@
 # TODO
 - Shapes should have button/icons like audio and light sources, which we can use to drag the shapes around
 - Give more spae to Offset X and Y boxes in Map Settings/Grid Settings
+- Fix grid types.
+- Add grid types (hex)
+- 
