@@ -55,9 +55,9 @@ import { GridOverlay } from '../utils/GridOverlay';
 const DEFAULT_TURN_TOKEN_URL = '/assets/art/turn_token.webp';
 import { colors } from '../ui/tokens';
 import { 
-  snapToGridIntersection, 
-  snapToGridCellCenter, 
-  snapTokenToGrid,
+  snapToGridIntersection as snapToGridIntersectionBase,
+  snapToGridCellCenter as snapToGridCellCenterBase,
+  snapTokenToGrid as snapTokenToGridBase,
   getTokenTopLeftFromCenter,
   getTokenCenterFromTopLeft
 } from '../utils/gridUtils';
@@ -1322,9 +1322,13 @@ export function GameBoard() {
     setGridOffsetX,
     setGridOffsetY,
     gridUnit,
+    gridType,
     gridStyle,
+    gridStyleAmount,
     gridOpacity,
     setGridUnit,
+    setGridType,
+    setGridStyleAmount,
     gridEditMode,
     panFriction,
     setPanFriction,
@@ -1945,6 +1949,47 @@ export function GameBoard() {
 
   // Helper to get effective grid size (store value overrides board value)
   const effectiveGridSize = gridSize || currentBoard?.gridSize || 50;
+  const effectiveGridType = gridType || currentBoard?.gridType || 'square';
+
+  const snapToGridIntersection = useCallback((
+    x: number,
+    y: number,
+    size: number = effectiveGridSize,
+    offsetX: number = gridOffsetX,
+    offsetY: number = gridOffsetY,
+  ) => snapToGridIntersectionBase(x, y, size, offsetX, offsetY, effectiveGridType), [
+    effectiveGridSize,
+    gridOffsetX,
+    gridOffsetY,
+    effectiveGridType,
+  ]);
+
+  const snapToGridCellCenter = useCallback((
+    x: number,
+    y: number,
+    size: number = effectiveGridSize,
+    offsetX: number = gridOffsetX,
+    offsetY: number = gridOffsetY,
+  ) => snapToGridCellCenterBase(x, y, size, offsetX, offsetY, effectiveGridType), [
+    effectiveGridSize,
+    gridOffsetX,
+    gridOffsetY,
+    effectiveGridType,
+  ]);
+
+  const snapTokenToGrid = useCallback((
+    x: number,
+    y: number,
+    tokenFootprint: number,
+    size: number = effectiveGridSize,
+    offsetX: number = gridOffsetX,
+    offsetY: number = gridOffsetY,
+  ) => snapTokenToGridBase(x, y, tokenFootprint, size, offsetX, offsetY, effectiveGridType), [
+    effectiveGridSize,
+    gridOffsetX,
+    gridOffsetY,
+    effectiveGridType,
+  ]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3093,8 +3138,9 @@ export function GameBoard() {
         gridOffsetY: gridOffsetY,
         gridColor: gridColor,
         gridEnabled: true,
-        gridType: currentBoard.gridType || 'square',
+        gridType: effectiveGridType,
         gridStyle,
+        gridStyleAmount,
         gridOpacity,
       });
       
@@ -3112,8 +3158,9 @@ export function GameBoard() {
       gridOffsetX: gridOffsetX,
       gridOffsetY: gridOffsetY,
       gridColor: gridColor,
-      gridType: currentBoard.gridType || 'square',
+      gridType: effectiveGridType,
       gridStyle,
+      gridStyleAmount,
       gridOpacity,
     });
     
@@ -3129,7 +3176,7 @@ export function GameBoard() {
     );
     
     console.log('[Grid] Config updated - gridSize:', effectiveGridSize, 'gridColor:', gridColor);
-  }, [appReady, currentBoard?.width, currentBoard?.height, currentBoard?.gridType, gridColor, gridOpacity, effectiveGridSize, gridOffsetX, gridOffsetY, gridStyle]);
+  }, [appReady, currentBoard?.width, currentBoard?.height, currentBoard?.gridType, gridType, gridColor, gridOpacity, effectiveGridSize, gridOffsetX, gridOffsetY, gridStyle, gridStyleAmount]);
 
   useEffect(() => {
     const system = particleSystemRef.current;

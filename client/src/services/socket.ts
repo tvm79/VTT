@@ -119,6 +119,19 @@ class SocketService {
     this.socket?.emit('select_board', { boardId });
   }
 
+  updateBoard(boardId: string, updates: {
+    gridType?: 'square' | 'hex';
+    gridSize?: number;
+    gridColor?: number;
+    gridOffsetX?: number;
+    gridOffsetY?: number;
+    gridStyle?: 'solid' | 'dashed' | 'dotted';
+    gridStyleAmount?: number;
+    gridOpacity?: number;
+  }): void {
+    this.socket?.emit('update_board', { boardId, updates });
+  }
+
   setBackground(boardId: string, imageUrl: string): void {
     this.socket?.emit('set_background', { boardId, imageUrl });
   }

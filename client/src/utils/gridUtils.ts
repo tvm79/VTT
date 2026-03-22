@@ -10,10 +10,86 @@
  * used by the visual shader.
  */
 
+export type GridType = 'square' | 'hex';
+
 export interface GridConfig {
   gridSize: number;
   gridOffsetX: number;
   gridOffsetY: number;
+}
+
+const SQRT3 = Math.sqrt(3);
+
+function pixelToAxial(point: { x: number; y: number }): { q: number; r: number } {
+  return {
+    q: (point.x * SQRT3) / 3 - point.y / 3,
+    r: (point.y * 2) / 3,
+  };
+}
+
+function axialToCube(axial: { q: number; r: number }): { x: number; y: number; z: number } {
+  return {
+    x: axial.q,
+    y: -axial.q - axial.r,
+    z: axial.r,
+  };
+}
+
+function cubeRound(cube: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  let rx = Math.round(cube.x);
+  let ry = Math.round(cube.y);
+  let rz = Math.round(cube.z);
+
+  const xDiff = Math.abs(rx - cube.x);
+  const yDiff = Math.abs(ry - cube.y);
+  const zDiff = Math.abs(rz - cube.z);
+
+  if (xDiff > yDiff && xDiff > zDiff) {
+    rx = -ry - rz;
+  } else if (yDiff > zDiff) {
+    ry = -rx - rz;
+  } else {
+    rz = -rx - ry;
+  }
+
+  return { x: rx, y: ry, z: rz };
+}
+
+function cubeToAxial(cube: { x: number; y: number; z: number }): { q: number; r: number } {
+  return {
+    q: cube.x,
+    r: cube.z,
+  };
+}
+
+function axialToPixel(axial: { q: number; r: number }): { x: number; y: number } {
+  return {
+    x: SQRT3 * (axial.q + axial.r / 2),
+    y: 1.5 * axial.r,
+  };
+}
+
+function snapToHexCellCenter(
+  x: number,
+  y: number,
+  gridSize: number,
+  offsetX: number = 0,
+  offsetY: number = 0
+): { x: number; y: number } {
+  if (gridSize <= 0) return { x, y };
+
+  const normalized = {
+    x: (x + offsetX) / gridSize,
+    y: (y + offsetY) / gridSize,
+  };
+  const axial = pixelToAxial(normalized);
+  const rounded = cubeRound(axialToCube(axial));
+  const center = axialToPixel(cubeToAxial(rounded));
+
+  return {
+    x: center.x * gridSize - offsetX,
+    y: center.y * gridSize - offsetY,
+  };
 }
 
 /**
@@ -50,9 +126,14 @@ export function snapToGridIntersection(
   y: number,
   gridSize: number,
   offsetX: number = 0,
-  offsetY: number = 0
+  offsetY: number = 0,
+  gridType: GridType = 'square'
 ): { x: number; y: number } {
   if (gridSize <= 0) return { x, y };
+
+  if (gridType === 'hex') {
+    return snapToHexCellCenter(x, y, gridSize, offsetX, offsetY);
+  }
   
   // The shader adds offset: world = local + offset
   // Grid lines at: world = n * gridSize
@@ -81,9 +162,14 @@ export function snapToGridCellCenter(
   y: number,
   gridSize: number,
   offsetX: number = 0,
-  offsetY: number = 0
+  offsetY: number = 0,
+  gridType: GridType = 'square'
 ): { x: number; y: number } {
   if (gridSize <= 0) return { x, y };
+
+  if (gridType === 'hex') {
+    return snapToHexCellCenter(x, y, gridSize, offsetX, offsetY);
+  }
   
   // Cell center: world = (n + 0.5) * gridSize
   // local + offset = (n + 0.5) * gridSize
@@ -118,9 +204,14 @@ export function snapTokenToGrid(
   tokenFootprint: number,
   gridSize: number,
   offsetX: number = 0,
-  offsetY: number = 0
+  offsetY: number = 0,
+  gridType: GridType = 'square'
 ): { x: number; y: number } {
   if (gridSize <= 0) return { x, y };
+
+  if (gridType === 'hex') {
+    return snapToHexCellCenter(x, y, gridSize, offsetX, offsetY);
+  }
   
   // Even footprint: snap to grid intersection
   // Odd footprint: snap to cell center

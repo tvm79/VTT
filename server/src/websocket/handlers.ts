@@ -94,6 +94,18 @@ function getAudioSourcesForBoard(boardId: string): AudioSource[] {
   return boardAudioSources.get(boardId) || [];
 }
 
+function buildBoardPayload(board: any): Board {
+  return {
+    ...board,
+    gridColor: board.gridColor ?? 0x444444,
+    gridOffsetX: board.gridOffsetX ?? 0,
+    gridOffsetY: board.gridOffsetY ?? 0,
+    gridStyle: (board.gridStyle ?? 'solid') as 'solid' | 'dashed' | 'dotted',
+    gridStyleAmount: board.gridStyleAmount ?? 0.5,
+    gridOpacity: board.gridOpacity ?? 0.55,
+  };
+}
+
 // Helper: Build game state for a session
 async function buildGameState(sessionId: string, socket: Socket, requestingUserId?: string): Promise<GameState | null> {
   const session = await prisma.session.findUnique({
@@ -203,6 +215,12 @@ async function buildGameState(sessionId: string, socket: Socket, requestingUserI
           backgroundUrl: board.backgroundUrl,
           gridSize: board.gridSize,
           gridType: board.gridType as 'square' | 'hex',
+          gridColor: board.gridColor ?? 0x444444,
+          gridOffsetX: board.gridOffsetX ?? 0,
+          gridOffsetY: board.gridOffsetY ?? 0,
+          gridStyle: (board.gridStyle ?? 'solid') as 'solid' | 'dashed' | 'dotted',
+          gridStyleAmount: board.gridStyleAmount ?? 0.5,
+          gridOpacity: board.gridOpacity ?? 0.55,
           width: board.width,
           height: board.height,
           createdAt: board.createdAt,
@@ -651,7 +669,7 @@ export function setupWebSocketHandlers(io: Server): void {
         });
 
         socket.emit('state_sync', { type: 'state_sync', state: gameState });
-        socket.emit('board_selected', { type: 'board_selected', board: { ...board, gridType: 'square' } });
+        socket.emit('board_selected', { type: 'board_selected', board: buildBoardPayload(board as Board) });
 
         console.log(`Session created: ${session.name} (${roomCode}) by ${currentUser.username}`);
       } catch (error) {
@@ -820,7 +838,7 @@ export function setupWebSocketHandlers(io: Server): void {
 
         io.to(currentSessionId).emit('board_updated', {
           type: 'board_updated',
-          board: { ...board, gridType: 'square' },
+          board: buildBoardPayload(board as Board),
         });
       } catch (error) {
         console.error('Create board error:', error);
@@ -850,7 +868,7 @@ export function setupWebSocketHandlers(io: Server): void {
 
         socket.emit('board_selected', {
           type: 'board_selected',
-          board: { ...board, gridType: 'square' },
+          board: buildBoardPayload(board as Board),
         });
 
         // Send tokens
@@ -904,8 +922,52 @@ export function setupWebSocketHandlers(io: Server): void {
             audioSource,
           });
         });
-      } catch (error) {
+    } catch (error) {
         console.error('Select board error:', error);
+      }
+    });
+
+    // Update board metadata
+    socket.on('update_board', async (data: { boardId: string; updates: { gridType?: 'square' | 'hex'; gridSize?: number; gridColor?: number; gridOffsetX?: number; gridOffsetY?: number; gridStyle?: 'solid' | 'dashed' | 'dotted'; gridStyleAmount?: number; gridOpacity?: number } }) => {
+      if (!currentUser || !currentSessionId) return;
+
+      const sessionState = sessions.get(currentSessionId);
+      if (!sessionState || !isGM(sessionState, currentUser.userId)) {
+        socket.emit('error', { type: 'error', code: 'PERMISSION_DENIED', message: 'Only GM can update boards' });
+        return;
+      }
+
+      try {
+        const board = await prisma.board.findUnique({ where: { id: data.boardId } });
+        if (!board || board.sessionId !== currentSessionId) {
+          socket.emit('error', { type: 'error', code: 'BOARD_NOT_FOUND', message: 'Board not found' });
+          return;
+        }
+
+        const boardUpdate: any = {};
+        if (data.updates.gridSize !== undefined) boardUpdate.gridSize = data.updates.gridSize;
+        if (data.updates.gridType !== undefined) boardUpdate.gridType = data.updates.gridType;
+        if (data.updates.gridColor !== undefined) boardUpdate.gridColor = data.updates.gridColor;
+        if (data.updates.gridOffsetX !== undefined) boardUpdate.gridOffsetX = data.updates.gridOffsetX;
+        if (data.updates.gridOffsetY !== undefined) boardUpdate.gridOffsetY = data.updates.gridOffsetY;
+        if (data.updates.gridStyle !== undefined) boardUpdate.gridStyle = data.updates.gridStyle;
+        if (data.updates.gridStyleAmount !== undefined) boardUpdate.gridStyleAmount = data.updates.gridStyleAmount;
+        if (data.updates.gridOpacity !== undefined) boardUpdate.gridOpacity = data.updates.gridOpacity;
+
+        const updatedBoard = Object.keys(boardUpdate).length > 0
+          ? await prisma.board.update({
+              where: { id: data.boardId },
+              data: boardUpdate,
+            })
+          : board;
+
+        io.to(currentSessionId).emit('board_updated', {
+          type: 'board_updated',
+          board: buildBoardPayload(updatedBoard as Board),
+        });
+      } catch (error) {
+        console.error('Update board error:', error);
+        socket.emit('error', { type: 'error', code: 'UPDATE_FAILED', message: 'Failed to update board' });
       }
     });
 
@@ -1156,7 +1218,7 @@ export function setupWebSocketHandlers(io: Server): void {
 
         io.to(currentSessionId).emit('board_updated', {
           type: 'board_updated',
-          board: { ...board, gridType: 'square' },
+          board: buildBoardPayload(board as Board),
         });
       } catch (error) {
         console.error('Set background error:', error);

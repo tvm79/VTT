@@ -141,8 +141,12 @@ export const Toolbar = memo(function Toolbar() {
     gridOffsetY, 
     setGridOffsetX, 
     setGridOffsetY,
+    gridType,
+    setGridType,
     gridStyle,
     setGridStyle,
+    gridStyleAmount,
+    setGridStyleAmount,
     gridOpacity,
     setGridOpacity,
     mapBleedEnabled,
@@ -427,6 +431,29 @@ export const Toolbar = memo(function Toolbar() {
     const bgHex = `#${backgroundColor.toString(16).padStart(6, '0')}`;
     return { color: getActivatedTextColor(bgHex) };
   }, [backgroundColor]);
+
+  const emitGridSettingsUpdate = (overrides: {
+    gridType?: 'square' | 'hex';
+    gridSize?: number;
+    gridColor?: number;
+    gridOffsetX?: number;
+    gridOffsetY?: number;
+    gridStyle?: 'solid' | 'dashed' | 'dotted';
+    gridStyleAmount?: number;
+    gridOpacity?: number;
+  }) => {
+    if (!currentBoard) return;
+    socketService.updateBoard(currentBoard.id, {
+      gridType: overrides.gridType ?? gridType,
+      gridSize: overrides.gridSize ?? gridSize,
+      gridColor: overrides.gridColor ?? gridColor,
+      gridOffsetX: overrides.gridOffsetX ?? gridOffsetX,
+      gridOffsetY: overrides.gridOffsetY ?? gridOffsetY,
+      gridStyle: overrides.gridStyle ?? gridStyle,
+      gridStyleAmount: overrides.gridStyleAmount ?? gridStyleAmount,
+      gridOpacity: overrides.gridOpacity ?? (gridOpacity ?? 0.55),
+    });
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'token') => {
     const file = e.target.files?.[0];
@@ -889,7 +916,11 @@ export const Toolbar = memo(function Toolbar() {
                   <input
                     type="color"
                     value={`#${gridColor.toString(16).padStart(6, '0')}`}
-                    onChange={(e) => setGridColor(parseInt(e.target.value.slice(1), 16))}
+                    onChange={(e) => {
+                      const nextColor = parseInt(e.target.value.slice(1), 16);
+                      setGridColor(nextColor);
+                      emitGridSettingsUpdate({ gridColor: nextColor });
+                    }}
                     className="background-panel-color-input"
                     title="Grid Color"
                   />
@@ -904,7 +935,11 @@ export const Toolbar = memo(function Toolbar() {
                     min="0"
                     max="100"
                     value={Math.round((gridOpacity ?? 0.55) * 100)}
-                    onChange={(e) => setGridOpacity(Number(e.target.value) / 100)}
+                    onChange={(e) => {
+                      const nextOpacity = Number(e.target.value) / 100;
+                      setGridOpacity(nextOpacity);
+                      emitGridSettingsUpdate({ gridOpacity: nextOpacity });
+                    }}
                     className="background-panel-slider"
                     title={`Grid Opacity: ${Math.round((gridOpacity ?? 0.55) * 100)}%`}
                   />
@@ -921,12 +956,33 @@ export const Toolbar = memo(function Toolbar() {
                   <input
                     type="number"
                     value={gridSize}
-                    onChange={(e) => setGridSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      const nextSize = Number(e.target.value);
+                      setGridSize(nextSize);
+                      emitGridSettingsUpdate({ gridSize: nextSize });
+                    }}
                     min={20}
                     max={200}
                     className="background-panel-input background-panel-input-compact"
                     title="Grid Size (pixels)"
                   />
+                </div>
+
+                <div className="background-panel-item">
+                  <span className="background-panel-item-label">Type</span>
+                  <select
+                    value={gridType || 'square'}
+                    onChange={(e) => {
+                      const nextType = e.target.value as 'square' | 'hex';
+                      setGridType(nextType);
+                      emitGridSettingsUpdate({ gridType: nextType });
+                    }}
+                    className="background-panel-input background-panel-input-compact"
+                    title="Grid type"
+                  >
+                    <option value="square">Square</option>
+                    <option value="hex">Hex</option>
+                  </select>
                 </div>
 
                 {/* Grid Offset */}
@@ -936,7 +992,11 @@ export const Toolbar = memo(function Toolbar() {
                   <input
                     type="number"
                     value={gridOffsetX}
-                    onChange={(e) => setGridOffsetX(Number(e.target.value))}
+                    onChange={(e) => {
+                      const nextOffsetX = Number(e.target.value);
+                      setGridOffsetX(nextOffsetX);
+                      emitGridSettingsUpdate({ gridOffsetX: nextOffsetX });
+                    }}
                     className="background-panel-input background-panel-input-compact"
                     title="Grid Offset X"
                   />
@@ -944,7 +1004,11 @@ export const Toolbar = memo(function Toolbar() {
                   <input
                     type="number"
                     value={gridOffsetY}
-                    onChange={(e) => setGridOffsetY(Number(e.target.value))}
+                    onChange={(e) => {
+                      const nextOffsetY = Number(e.target.value);
+                      setGridOffsetY(nextOffsetY);
+                      emitGridSettingsUpdate({ gridOffsetY: nextOffsetY });
+                    }}
                     className="background-panel-input background-panel-input-compact"
                     title="Grid Offset Y"
                   />
@@ -954,7 +1018,11 @@ export const Toolbar = memo(function Toolbar() {
                   <span className="background-panel-item-label">Style</span>
                   <select
                     value={gridStyle}
-                    onChange={(e) => setGridStyle(e.target.value as 'solid' | 'dashed' | 'dotted')}
+                    onChange={(e) => {
+                      const nextStyle = e.target.value as 'solid' | 'dashed' | 'dotted';
+                      setGridStyle(nextStyle);
+                      emitGridSettingsUpdate({ gridStyle: nextStyle });
+                    }}
                     className="background-panel-input background-panel-input-compact"
                     title="Grid line style"
                   >
@@ -962,6 +1030,24 @@ export const Toolbar = memo(function Toolbar() {
                     <option value="dashed">Dashed</option>
                     <option value="dotted">Dotted</option>
                   </select>
+                  <label className="background-panel-item-label" style={{ marginTop: 8 }}>Amount</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round(gridStyleAmount * 100)}
+                    onChange={(e) => {
+                      const nextAmount = Number(e.target.value) / 100;
+                      setGridStyleAmount(nextAmount);
+                      emitGridSettingsUpdate({ gridStyleAmount: nextAmount });
+                    }}
+                    className="background-panel-slider"
+                    title={`Grid style amount: ${Math.round(gridStyleAmount * 100)}%`}
+                    disabled={gridStyle === 'solid'}
+                  />
+                  <span className="background-panel-value-label">
+                    {gridStyle === 'solid' ? 'N/A' : `${Math.round(gridStyleAmount * 100)}%`}
+                  </span>
                 </div>
               </div>
 

@@ -83,6 +83,12 @@ export interface Board {
   backgroundUrl: string | null;
   gridSize: number;
   gridType: 'square' | 'hex';
+  gridColor?: number;
+  gridOffsetX?: number;
+  gridOffsetY?: number;
+  gridStyle?: 'solid' | 'dashed' | 'dotted';
+  gridStyleAmount?: number;
+  gridOpacity?: number;
   width: number;
   height: number;
   createdAt: Date;
@@ -312,6 +318,16 @@ export type ClientToServerMessage =
   | { type: 'kick_player'; userId: string }
   | { type: 'create_board'; name: string }
   | { type: 'select_board'; boardId: string }
+  | { type: 'update_board'; boardId: string; updates: {
+      gridType?: 'square' | 'hex';
+      gridSize?: number;
+      gridColor?: number;
+      gridOffsetX?: number;
+      gridOffsetY?: number;
+      gridStyle?: 'solid' | 'dashed' | 'dotted';
+      gridStyleAmount?: number;
+      gridOpacity?: number;
+    } }
   | { type: 'set_background'; boardId: string; imageUrl: string }
   | { type: 'create_token'; boardId: string; token: CreateTokenData }
   | { type: 'move_token'; tokenId: string; x: number; y: number }

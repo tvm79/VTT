@@ -11,6 +11,7 @@ export interface GridConfig {
   gridEnabled: boolean;
   gridType: GridType;
   gridStyle?: GridStyle;
+  gridStyleAmount?: number;
   gridOpacity?: number;
 }
 
@@ -61,21 +62,30 @@ uniform vec4 uGridColor;
 uniform float uGridEnabled;
 uniform float uGridType;
 uniform float uGridStyle;
+uniform float uGridStyleAmount;
 uniform float uGridOpacity;
 
 float lineStyleMask(float axisCoord)
 {
+    float styleAmount = clamp(uGridStyleAmount, 0.0, 1.0);
+
     if (uGridStyle < 0.5) {
         return 1.0;
     }
 
     if (uGridStyle < 1.5) {
-        float phase = fract(axisCoord * 0.35);
-        return 1.0 - step(0.62, phase);
+        float frequency = mix(0.18, 1.6, styleAmount);
+        float phase = fract(axisCoord * frequency);
+        float dash = abs(phase - 0.5);
+        float dashWidth = mix(0.30, 0.08, styleAmount);
+        return 1.0 - smoothstep(dashWidth, dashWidth + 0.12, dash);
     }
 
-    float phase = abs(fract(axisCoord * 0.5) - 0.5);
-    return 1.0 - smoothstep(0.14, 0.32, phase);
+    float frequency = mix(0.35, 2.6, styleAmount);
+    float phase = fract(axisCoord * frequency);
+    float dotPhase = abs(phase - 0.5);
+    float dotRadius = mix(0.24, 0.05, styleAmount);
+    return 1.0 - smoothstep(dotRadius, dotRadius + 0.12, dotPhase);
 }
 
 vec3 cubeRound(vec3 cube)
@@ -124,15 +134,29 @@ float sdHex(vec2 point)
 float squareGridAlpha(vec2 world)
 {
     vec2 gridCoord = world / max(uGridSize, 0.0001);
-    vec2 cell = fract(gridCoord);
-    vec2 dist = min(cell, 1.0 - cell);
+    vec2 localCell = fract(gridCoord);
+    vec2 dist = min(localCell, 1.0 - localCell);
     vec2 aa = vec2(max(0.0015, 1.25 / max(uZoom * uGridSize, 1.0)));
+    float styleAmount = clamp(uGridStyleAmount, 0.0, 1.0);
 
     float vertical = 1.0 - smoothstep(0.0, aa.x * 1.25, dist.x);
     float horizontal = 1.0 - smoothstep(0.0, aa.y * 1.25, dist.y);
 
-    vertical *= lineStyleMask(gridCoord.y);
-    horizontal *= lineStyleMask(gridCoord.x);
+    if (uGridStyle < 0.5) {
+        return max(vertical, horizontal);
+    }
+
+    float dashCount = mix(1.0, 5.0, styleAmount);
+    float dashWidth = mix(0.42, 0.10, styleAmount);
+    float dashEdge = 0.12;
+
+    float verticalPhase = fract(localCell.y * dashCount);
+    float horizontalPhase = fract(localCell.x * dashCount);
+    float verticalMask = 1.0 - smoothstep(dashWidth, dashWidth + dashEdge, abs(verticalPhase - 0.5));
+    float horizontalMask = 1.0 - smoothstep(dashWidth, dashWidth + dashEdge, abs(horizontalPhase - 0.5));
+
+    vertical *= verticalMask;
+    horizontal *= horizontalMask;
 
     return max(vertical, horizontal);
 }
@@ -148,10 +172,7 @@ float hexGridAlpha(vec2 world)
     float edgeDistance = abs(sdHex(local));
     float aa = max(0.002, 1.75 / max(uZoom * uGridSize, 1.0));
     float border = 1.0 - smoothstep(0.0, aa, edgeDistance);
-
-    float patternCoord = dot(center + local, normalize(vec2(1.0, 0.57735026919)));
-
-    return border * lineStyleMask(patternCoord);
+    return border;
 }
 
 void main(void)
@@ -244,6 +265,7 @@ export class GridOverlay {
           uGridEnabled: { value: config?.gridEnabled ?? true ? 1 : 0, type: 'f32' },
           uGridType: { value: config?.gridType === 'hex' ? 1 : 0, type: 'f32' },
           uGridStyle: { value: styleToIndex(config?.gridStyle ?? 'solid'), type: 'f32' },
+          uGridStyleAmount: { value: config?.gridStyleAmount ?? 0.5, type: 'f32' },
           uGridOpacity: { value: config?.gridOpacity ?? 0.55, type: 'f32' },
         },
       },
@@ -338,6 +360,10 @@ export class GridOverlay {
     this.uniforms.uGridStyle = styleToIndex(style);
   }
 
+  setGridStyleAmount(amount: number): void {
+    this.uniforms.uGridStyleAmount = Math.max(0, Math.min(1, amount));
+  }
+
   setGridOpacity(opacity: number): void {
     this.uniforms.uGridOpacity = opacity;
   }
@@ -368,6 +394,10 @@ export class GridOverlay {
 
     if (config.gridStyle !== undefined) {
       this.setGridStyle(config.gridStyle);
+    }
+
+    if (config.gridStyleAmount !== undefined) {
+      this.setGridStyleAmount(config.gridStyleAmount);
     }
 
     if (config.gridOpacity !== undefined) {
@@ -403,6 +433,7 @@ export class GridOverlay {
     uGridEnabled: number;
     uGridType: number;
     uGridStyle: number;
+    uGridStyleAmount: number;
     uGridOpacity: number;
   } {
     return this.filter.resources.gridUniforms.uniforms as {
@@ -415,6 +446,7 @@ export class GridOverlay {
       uGridEnabled: number;
       uGridType: number;
       uGridStyle: number;
+      uGridStyleAmount: number;
       uGridOpacity: number;
     };
   }

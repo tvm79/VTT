@@ -892,7 +892,9 @@ export interface Scene {
   gridOffsetX: number;
   gridOffsetY: number;
   gridUnit: 'ft' | 'km' | 'miles';
+  gridType?: 'square' | 'hex';
   gridStyle?: 'solid' | 'dashed' | 'dotted';
+  gridStyleAmount?: number;
   gridOpacity?: number;
   
   // Atmospheric fog settings
@@ -1230,7 +1232,9 @@ interface GameState {
   gridOffsetX: number;
   gridOffsetY: number;
   gridUnit: 'ft' | 'km' | 'miles';
+  gridType: 'square' | 'hex';
   gridStyle: 'solid' | 'dashed' | 'dotted';
+  gridStyleAmount: number;
   gridOpacity: number;
   
   // Panning settings
@@ -1471,7 +1475,9 @@ interface GameState {
   setGridOffsetX: (offset: number) => void;
   setGridOffsetY: (offset: number) => void;
   setGridUnit: (unit: 'ft' | 'km' | 'miles') => void;
+  setGridType: (type: 'square' | 'hex') => void;
   setGridStyle: (style: 'solid' | 'dashed' | 'dotted') => void;
+  setGridStyleAmount: (amount: number) => void;
   setGridOpacity: (opacity: number) => void;
 
   // Map bleed settings
@@ -1700,7 +1706,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   gridOffsetX: 0,
   gridOffsetY: 0,
   gridUnit: 'ft',
+  gridType: 'square',
   gridStyle: 'solid',
+  gridStyleAmount: 0.5,
   gridOpacity: 0.55,
   panFriction: 0.92,
   panEnabled: true,
@@ -1946,6 +1954,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setCurrentBoard: (board) => set((state) => ({
     currentBoard: board,
+    gridType: board?.gridType ?? state.gridType,
+    gridSize: board?.gridSize ?? state.gridSize,
+    gridColor: board?.gridColor ?? state.gridColor,
+    gridOffsetX: board?.gridOffsetX ?? state.gridOffsetX,
+    gridOffsetY: board?.gridOffsetY ?? state.gridOffsetY,
+    gridStyle: board?.gridStyle ?? state.gridStyle,
+    gridStyleAmount: board?.gridStyleAmount ?? state.gridStyleAmount,
+    gridOpacity: board?.gridOpacity ?? state.gridOpacity,
     tokens: [],
     fogReveals: [],
     fogAdds: [],
@@ -1958,11 +1974,29 @@ export const useGameStore = create<GameState>((set, get) => ({
   })),
   updateCurrentBoard: (board) => set((state) => {
     if (!state.currentBoard) {
-      return { currentBoard: board };
+      return {
+        currentBoard: board,
+        gridType: board.gridType ?? state.gridType,
+        gridSize: board.gridSize ?? state.gridSize,
+        gridColor: board.gridColor ?? state.gridColor,
+        gridOffsetX: board.gridOffsetX ?? state.gridOffsetX,
+        gridOffsetY: board.gridOffsetY ?? state.gridOffsetY,
+        gridStyle: board.gridStyle ?? state.gridStyle,
+        gridStyleAmount: board.gridStyleAmount ?? state.gridStyleAmount,
+        gridOpacity: board.gridOpacity ?? state.gridOpacity,
+      };
     }
     if (state.currentBoard.id !== board.id) {
       return {
         currentBoard: board,
+        gridType: board.gridType ?? state.gridType,
+        gridSize: board.gridSize ?? state.gridSize,
+        gridColor: board.gridColor ?? state.gridColor,
+        gridOffsetX: board.gridOffsetX ?? state.gridOffsetX,
+        gridOffsetY: board.gridOffsetY ?? state.gridOffsetY,
+        gridStyle: board.gridStyle ?? state.gridStyle,
+        gridStyleAmount: board.gridStyleAmount ?? state.gridStyleAmount,
+        gridOpacity: board.gridOpacity ?? state.gridOpacity,
         tokens: [],
         fogReveals: [],
         fogAdds: [],
@@ -1977,7 +2011,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Same board id: only refresh board metadata (e.g. background URL)
     // without wiping token/fog state.
-    return { currentBoard: board };
+    return {
+      currentBoard: board,
+      gridType: board.gridType ?? state.gridType,
+      gridSize: board.gridSize ?? state.gridSize,
+      gridColor: board.gridColor ?? state.gridColor,
+      gridOffsetX: board.gridOffsetX ?? state.gridOffsetX,
+      gridOffsetY: board.gridOffsetY ?? state.gridOffsetY,
+      gridStyle: board.gridStyle ?? state.gridStyle,
+      gridStyleAmount: board.gridStyleAmount ?? state.gridStyleAmount,
+      gridOpacity: board.gridOpacity ?? state.gridOpacity,
+    };
   }),
   setPlayers: (players) => set({ players }),
 
@@ -2399,7 +2443,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   setGridOffsetX: (offset) => set({ gridOffsetX: offset }),
   setGridOffsetY: (offset) => set({ gridOffsetY: offset }),
   setGridUnit: (unit) => set({ gridUnit: unit }),
+  setGridType: (type) => set((state) => ({
+    gridType: type,
+    currentBoard: state.currentBoard ? { ...state.currentBoard, gridType: type } : state.currentBoard,
+  })),
   setGridStyle: (style) => set({ gridStyle: style }),
+  setGridStyleAmount: (amount) => set({ gridStyleAmount: Math.max(0, Math.min(1, amount)) }),
   setGridOpacity: (opacity: number) => set({ gridOpacity: opacity }),
   setMapBleedEnabled: (enabled: boolean) => set((state) => {
     saveMapBleedSettingsToStorage({
@@ -2981,7 +3030,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       gridOffsetX: state.gridOffsetX,
       gridOffsetY: state.gridOffsetY,
       gridUnit: state.gridUnit,
+      gridType: state.currentBoard.gridType ?? 'square',
       gridStyle: state.gridStyle,
+      gridStyleAmount: state.gridStyleAmount,
       gridOpacity: state.gridOpacity,
       panFriction: state.panFriction,
       panEnabled: state.panEnabled,
@@ -3066,7 +3117,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       gridOffsetX: state.gridOffsetX,
       gridOffsetY: state.gridOffsetY,
       gridUnit: state.gridUnit,
+      gridType: state.currentBoard.gridType ?? 'square',
       gridStyle: state.gridStyle,
+      gridStyleAmount: state.gridStyleAmount,
       gridOpacity: state.gridOpacity,
       panFriction: state.panFriction,
       panEnabled: state.panEnabled,
@@ -3154,7 +3207,9 @@ export const useGameStore = create<GameState>((set, get) => ({
           gridOffsetX: state.gridOffsetX,
           gridOffsetY: state.gridOffsetY,
           gridUnit: state.gridUnit,
+          gridType: state.currentBoard.gridType ?? 'square',
           gridStyle: state.gridStyle,
+          gridStyleAmount: state.gridStyleAmount,
           gridOpacity: state.gridOpacity,
           panFriction: state.panFriction,
           panEnabled: state.panEnabled,
@@ -3253,7 +3308,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     // Update board if different background
     if (state.currentBoard) {
-      const updatedBoard = { ...state.currentBoard, backgroundUrl: scene.backgroundUrl };
+      const updatedBoard = {
+        ...state.currentBoard,
+        backgroundUrl: scene.backgroundUrl,
+        gridType: scene.gridType ?? state.currentBoard.gridType,
+      };
       set({ 
         activeSceneId: scene.id,
         sceneMapBleedOverrideEnabled: scene.mapBleedOverrideEnabled ?? false,
@@ -3274,7 +3333,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         gridOffsetX: scene.gridOffsetX,
         gridOffsetY: scene.gridOffsetY,
         gridUnit: scene.gridUnit,
+        gridType: scene.gridType ?? 'square',
         gridStyle: scene.gridStyle ?? 'solid',
+        gridStyleAmount: scene.gridStyleAmount ?? 0.5,
         gridOpacity: scene.gridOpacity ?? 0.55,
         panFriction: scene.panFriction ?? 0.92,
         panEnabled: scene.panEnabled ?? true,
@@ -3325,6 +3386,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       // Default panning settings for older scenes
       panFriction: s.panFriction ?? 0.92,
       panEnabled: s.panEnabled ?? true,
+      gridType: s.gridType ?? 'square',
+      gridStyleAmount: s.gridStyleAmount ?? 0.5,
     }));
     set({ scenes: parsedScenes });
   },
@@ -3383,7 +3446,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     // Load the last scene (same logic as loadScene but without re-saving the ID)
     if (state.currentBoard) {
-      const updatedBoard = { ...state.currentBoard, backgroundUrl: lastScene.backgroundUrl };
+      const updatedBoard = {
+        ...state.currentBoard,
+        backgroundUrl: lastScene.backgroundUrl,
+        gridType: lastScene.gridType ?? state.currentBoard.gridType,
+      };
       set({
         activeSceneId: lastScene.id,
         sceneMapBleedOverrideEnabled: lastScene.mapBleedOverrideEnabled ?? false,
@@ -3404,7 +3471,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         gridOffsetX: lastScene.gridOffsetX,
         gridOffsetY: lastScene.gridOffsetY,
         gridUnit: lastScene.gridUnit,
+        gridType: lastScene.gridType ?? 'square',
         gridStyle: lastScene.gridStyle ?? 'solid',
+        gridStyleAmount: lastScene.gridStyleAmount ?? 0.5,
         gridOpacity: lastScene.gridOpacity ?? 0.55,
         panFriction: lastScene.panFriction ?? 0.92,
         panEnabled: lastScene.panEnabled ?? true,
@@ -3457,7 +3526,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       gridOffsetX: state.gridOffsetX,
       gridOffsetY: state.gridOffsetY,
       gridUnit: state.gridUnit,
+      gridType: state.currentBoard.gridType ?? 'square',
       gridStyle: state.gridStyle,
+      gridStyleAmount: state.gridStyleAmount,
       gridOpacity: state.gridOpacity ?? 0.55,
       panFriction: state.panFriction,
       panEnabled: state.panEnabled,

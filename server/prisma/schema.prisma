@@ -215,6 +215,12 @@ model Board {
   backgroundUrl String? @map("background_url")
   gridSize   Int      @default(50) @map("grid_size")
   gridType   String   @default("square") @map("grid_type") // 'square', 'hex'
+  gridColor  Int      @default(4473924) @map("grid_color")
+  gridOffsetX Int     @default(0) @map("grid_offset_x")
+  gridOffsetY Int     @default(0) @map("grid_offset_y")
+  gridStyle  String   @default("solid") @map("grid_style")
+  gridStyleAmount Float @default(0.5) @map("grid_style_amount")
+  gridOpacity Float   @default(0.55) @map("grid_opacity")
   width      Int      @default(2000)
   height     Int      @default(2000)
   createdAt  DateTime @default(now()) @map("created_at")
