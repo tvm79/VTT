@@ -229,7 +229,72 @@ function App() {
       {/* Container for hover detection - wraps trigger and toolbar */}
       <div 
         className="toolbar-hover-container"
-        onMouseLeave={() => window.dispatchEvent(new CustomEvent('closeToolbarPanels'))}
+        onMouseEnter={() => {
+          // Clear any pending close timeout when mouse enters
+        }}
+        onMouseLeave={(e) => {
+          // Use a small delay to allow for panel detection
+          // This gives time for panels to render before we decide to close
+          const relatedTarget = e.relatedTarget;
+          
+          // If mouse is going to something interactive in the toolbar area, don't close
+          if (relatedTarget && relatedTarget instanceof Node) {
+            // Check if it's inside portal wrapper
+            const portalWrapper = document.querySelector('.portal-wrapper');
+            if (portalWrapper && portalWrapper.contains(relatedTarget)) {
+              return;
+            }
+            
+            // Check if it's inside toolbar panels container
+            const toolbarPanels = document.getElementById('toolbar-panels');
+            if (toolbarPanels && toolbarPanels.contains(relatedTarget)) {
+              return;
+            }
+            
+            // Check if it's a color input or its picker (they may be outside normal DOM hierarchy)
+            if (relatedTarget instanceof HTMLElement) {
+              const tagName = relatedTarget.tagName.toLowerCase();
+              // Color inputs and their associated elements
+              if (tagName === 'input' && (relatedTarget as HTMLInputElement).type === 'color') {
+                return;
+              }
+              // Check if inside a label or wrapper that might contain color pickers
+              const closestColorInput = relatedTarget.closest('input[type="color"]');
+              if (closestColorInput) {
+                return;
+              }
+            }
+          }
+          
+          // Check if any floating panels are open
+          const floatingPanels = document.querySelector('.portal-wrapper');
+          if (floatingPanels && floatingPanels.children.length > 0) {
+            return;
+          }
+          
+          // Check for any visible popups/dropdowns that might be color pickers
+          // Common patterns for color pickers
+          const activeElement = document.activeElement;
+          if (activeElement instanceof HTMLInputElement && activeElement.type === 'color') {
+            return;
+          }
+          
+          // Delay the close to allow for panel rendering
+          setTimeout(() => {
+            // Double-check before actually closing
+            const stillFloatingPanels = document.querySelector('.portal-wrapper');
+            if (stillFloatingPanels && stillFloatingPanels.children.length > 0) {
+              return;
+            }
+            
+            const activeEl = document.activeElement;
+            if (activeEl instanceof HTMLInputElement && activeEl.type === 'color') {
+              return;
+            }
+            
+            window.dispatchEvent(new CustomEvent('closeToolbarPanels'));
+          }, 100);
+        }}
       >
         <div className="header-hover-trigger" />
         <div className="toolbar-wrapper">
