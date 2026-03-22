@@ -340,7 +340,7 @@ export function CombatTracker() {
             )}
           </div>
 
-          <button type="button" className="combat-cards-nav" onClick={nextTurn} disabled={!isInCombat || sortedCombatants.length === 0}>
+          <button type="button" className="combat-cards-nav" onClick={nextTurn} disabled={sortedCombatants.length === 0}>
             <Icon name="chevron-right" />
           </button>
         </div>

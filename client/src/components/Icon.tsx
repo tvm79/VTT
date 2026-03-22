@@ -112,6 +112,7 @@ import {
   faGlobe,            // 🌐 (globe)
   faLocationDot,      // 📍 (map-marker-alt)
   faFileLines,
+  faInfo,
   faDice,        // 📄 (file-alt)
   faWandMagicSparkles, // ✨ (enchantment/aura)
   faDroplet,          // 💧 (droplet)
@@ -243,6 +244,7 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'search': faSearch,
   'copy': faCopy,
   'file': faFile,
+  'info': faInfo,
   'external-link-alt': faExternalLinkAlt,
   'toggle-on': faToggleOn,
   'toggle-off': faToggleOff,

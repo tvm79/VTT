@@ -278,16 +278,24 @@ class AudioPlayer {
 
   // Play combat start sound
   playCombatStart() {
-    if (!this.soundsEnabled || !this.context) return;
+    if (!this.soundsEnabled) return;
+    
+    this.initContext();
+    if (!this.context) {
+      console.warn('Audio context not available');
+      return;
+    }
+    
     this.resume();
 
     const now = this.context.currentTime;
     const targetGain = this.getGainNode();
     
-    // Drum-like sound
+    // More dramatic drum-like stinger sound
+    // Three loud drum hits
     for (let i = 0; i < 3; i++) {
-      const osc = this.context!.createOscillator();
-      const gain = this.context!.createGain();
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
       
       osc.connect(gain);
       if (targetGain) {
@@ -296,16 +304,37 @@ class AudioPlayer {
         gain.connect(this.masterGain);
       }
       
-      osc.frequency.value = 100 - i * 20;
+      // Lower frequency for deeper drum sound
+      osc.frequency.value = 80 - i * 15;
       osc.type = 'square';
       
-      const startTime = now + i * 0.2;
-      gain.gain.setValueAtTime(0.2, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+      // Start time with slight delay between hits
+      const startTime = now + i * 0.25;
+      
+      // Louder gain for more prominent sound
+      gain.gain.setValueAtTime(0.4, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
       
       osc.start(startTime);
-      osc.stop(startTime + 0.15);
+      osc.stop(startTime + 0.4);
     }
+    
+    // Add a rising tone to build tension
+    const tensionOsc = this.context.createOscillator();
+    const tensionGain = this.context.createGain();
+    tensionOsc.connect(tensionGain);
+    if (targetGain) {
+      tensionGain.connect(targetGain);
+    } else if (this.masterGain) {
+      tensionGain.connect(this.masterGain);
+    }
+    tensionOsc.frequency.setValueAtTime(200, now);
+    tensionOsc.frequency.exponentialRampToValueAtTime(400, now + 0.6);
+    tensionOsc.type = 'sawtooth';
+    tensionGain.gain.setValueAtTime(0.15, now);
+    tensionGain.gain.linearRampToValueAtTime(0, now + 0.6);
+    tensionOsc.start(now);
+    tensionOsc.stop(now + 0.6);
   }
 
   // Play a notification sound

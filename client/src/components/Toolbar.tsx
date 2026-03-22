@@ -229,6 +229,13 @@ export const Toolbar = memo(function Toolbar() {
     setChatCardsCollapsedByDefault,
     turnTokenImageUrl,
     setTurnTokenImageUrl,
+    battleStinger,
+    setBattleStinger,
+    battleStingerCustomUrl,
+    setBattleStingerCustomUrl,
+    combatPlaylist,
+    setCombatPlaylist,
+    customPlaylists,
     panFriction,
     setPanFriction,
     panEnabled,
@@ -425,6 +432,7 @@ export const Toolbar = memo(function Toolbar() {
   
   const tokenInputRef = useRef<HTMLInputElement>(null);
   const turnTokenInputRef = useRef<HTMLInputElement>(null);
+  const battleStingerInputRef = useRef<HTMLInputElement>(null);
 
   // Generate icon color for activated buttons based on background
   const activatedToolBtnStyle = useMemo(() => {
@@ -553,6 +561,33 @@ export const Toolbar = memo(function Toolbar() {
     }
 
     if (turnTokenInputRef.current) turnTokenInputRef.current.value = '';
+  };
+
+  const handleBattleStingerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+
+      const res = await fetch('/api/upload-audio', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      
+      if (data.success && data.files && data.files.length > 0) {
+        const uploadedPath = data.files[0].path;
+        setBattleStingerCustomUrl(uploadedPath);
+        setBattleStinger('custom');
+      }
+    } catch (error) {
+      console.error('Battle stinger upload failed:', error);
+    }
+
+    if (battleStingerInputRef.current) battleStingerInputRef.current.value = '';
   };
 
   // Advanced Settings Modal Component
@@ -1481,6 +1516,56 @@ export const Toolbar = memo(function Toolbar() {
           {settingsBattleExpanded && (
             <div className="toolbar-settings-stack">
               <div className="toolbar-settings-card">
+                <span className="toolbar-settings-caption">Battle Stinger</span>
+                <Dropdown
+                  value={battleStinger}
+                  onChange={(e) => setBattleStinger(e.target.value as 'drums' | 'none' | 'custom')}
+                  className="toolbar-compact-select"
+                >
+                  <option value="drums">Drums</option>
+                  <option value="custom">Custom</option>
+                  <option value="none">None</option>
+                </Dropdown>
+              </div>
+              <div className="toolbar-settings-card">
+                <span className="toolbar-settings-caption">Upload Audio</span>
+                <div className="toolbar-settings-inline toolbar-settings-actions">
+                  <button
+                    type="button"
+                    className="ui-button ui-button--secondary ui-button--sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      battleStingerInputRef.current?.click();
+                    }}
+                  >
+                    Upload
+                  </button>
+                  <Button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBattleStingerCustomUrl(null);
+                      setBattleStinger('none');
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <input
+                ref={battleStingerInputRef}
+                type="file"
+                accept="audio/*"
+                id="battle-stinger-upload"
+                onChange={handleBattleStingerUpload}
+                style={{ display: 'none' }}
+              />
+              <div className="toolbar-settings-helper">
+                {battleStingerCustomUrl ? `Custom: ${battleStingerCustomUrl.split('/').pop()}` : 'No custom audio uploaded - select Custom above to use uploaded file'}
+              </div>
+              <div className="toolbar-settings-card">
                 <span className="toolbar-settings-caption">Turn Token Marker</span>
                 <div className="toolbar-settings-inline toolbar-settings-actions">
                   <Button
@@ -1509,6 +1594,26 @@ export const Toolbar = memo(function Toolbar() {
               <div className="toolbar-settings-helper">
                 Current: {turnTokenImageUrl ? 'Custom marker active' : 'Default turn_token.webp'}
               </div>
+              <div className="toolbar-settings-card">
+                <span className="toolbar-settings-caption">Combat Playlist</span>
+                <Dropdown
+                  value={combatPlaylist || ''}
+                  onChange={(e) => setCombatPlaylist(e.target.value || null)}
+                  className="toolbar-compact-select"
+                >
+                  <option value="">None</option>
+                  {customPlaylists.map((playlist) => (
+                    <option key={playlist.id} value={playlist.id}>
+                      {playlist.name}
+                    </option>
+                  ))}
+                </Dropdown>
+              </div>
+              {combatPlaylist && (
+                <div className="toolbar-settings-helper">
+                  Will play when combat starts
+                </div>
+              )}
             </div>
           )}
 

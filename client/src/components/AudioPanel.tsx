@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, getCombatAudioElement } from '../store/gameStore';
 import { Icon } from './Icon';
 import { 
   AudioTrack, 
@@ -197,6 +197,55 @@ export function AudioPanel() {
       });
     }
   }, [isAudioPlaying, currentAudioFile, setIsAudioPlaying, toAbsoluteAudioUrl, cancelPendingPlayRequest, playAudioElement]);
+
+  // Handle external track selection - when currentAudioTrack changes from outside (e.g., combat start)
+  useEffect(() => {
+    if (!currentAudioTrack || !currentAudioFile || !allPlaylists.length) return;
+    
+    // Check if there's a shared combat audio element from gameStore
+    const combatAudio = getCombatAudioElement();
+    if (combatAudio && combatAudio.src) {
+      // Use the existing combat audio element
+      audioRef.current = combatAudio;
+      
+      if (isAudioPlaying && combatAudio.paused) {
+        playAudioElement(combatAudio, 'external-select').catch((error) => {
+          console.error('External track play error:', error);
+          setIsAudioPlaying(false);
+        });
+      }
+      return;
+    }
+    
+    // Find the track in playlists
+    const track = allPlaylists.flatMap(p => p.tracks).find(t => t.id === currentAudioTrack);
+    if (track) {
+      // External track selection
+      const resolvedPath = resolveAudioPath(track.file);
+      
+      // Stop current audio
+      if (audioRef.current) {
+        cancelPendingPlayRequest();
+        stopFade();
+        audioRef.current.onerror = null;
+        audioRef.current.pause();
+      }
+      
+      // Create new audio element with the track
+      const nextAudio = new Audio();
+      nextAudio.preload = 'auto';
+      nextAudio.src = resolvedPath;
+      audioRef.current = nextAudio;
+      
+      // Play the audio
+      if (isAudioPlaying) {
+        playAudioElement(nextAudio, 'external-select').catch((error) => {
+          console.error('External track play error:', error);
+          setIsAudioPlaying(false);
+        });
+      }
+    }
+  }, [currentAudioTrack, currentAudioFile, allPlaylists, isAudioPlaying, resolveAudioPath, cancelPendingPlayRequest, stopFade, playAudioElement, setIsAudioPlaying]);
 
   // Cleanup on unmount
   useEffect(() => {

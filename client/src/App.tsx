@@ -288,11 +288,18 @@ function App() {
             }
             
             const activeEl = document.activeElement;
-            if (activeEl instanceof HTMLInputElement && activeEl.type === 'color') {
+            if (activeEl instanceof HTMLInputElement && (activeEl.type === 'color' || activeEl.type === 'file')) {
               return;
             }
             
-            window.dispatchEvent(new CustomEvent('closeToolbarPanels'));
+            if (activeEl?.closest('.toolbar-settings')) {
+              return;
+            }
+            
+            // Check if there are any focused elements inside the toolbar
+            if (document.activeElement?.closest('.toolbar-wrapper')) {
+              return;
+            }
           }, 100);
         }}
       >

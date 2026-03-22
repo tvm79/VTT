@@ -23,7 +23,13 @@ import {
   nextTurn as getNextTurn,
   previousTurn as getPreviousTurn,
 } from '../utils/turnLogic';
+import { audioPlayer } from '../utils/audioPlayer';
 import type { RollTable } from '../macros/types';
+
+// Shared combat audio element - used by both gameStore and AudioPanel
+let combatAudioElement: HTMLAudioElement | null = null;
+export const getCombatAudioElement = () => combatAudioElement;
+export const setCombatAudioElement = (audio: HTMLAudioElement | null) => { combatAudioElement = audio; };
 
 // LocalStorage key for saving color scheme
 const COLOR_SCHEME_STORAGE_KEY = 'vtt-color-scheme';
@@ -555,10 +561,16 @@ const BATTLE_SETTINGS_KEY = 'vtt-battle-settings';
 
 interface BattleSettings {
   turnTokenImageUrl: string | null;
+  battleStinger: 'drums' | 'none' | 'custom';
+  battleStingerCustomUrl: string | null;
+  combatPlaylist: string | null;
 }
 
 const DEFAULT_BATTLE_SETTINGS: BattleSettings = {
   turnTokenImageUrl: null,
+  battleStinger: 'drums',
+  battleStingerCustomUrl: null,
+  combatPlaylist: null,
 };
 
 const loadSavedBattleSettings = (): BattleSettings => {
@@ -571,6 +583,9 @@ const loadSavedBattleSettings = (): BattleSettings => {
           typeof parsed.turnTokenImageUrl === 'string' && parsed.turnTokenImageUrl.trim().length > 0
             ? parsed.turnTokenImageUrl
             : null,
+        battleStinger: (parsed.battleStinger === 'none' || parsed.battleStinger === 'custom') ? parsed.battleStinger : 'drums',
+        battleStingerCustomUrl: typeof parsed.battleStingerCustomUrl === 'string' && parsed.battleStingerCustomUrl.trim().length > 0 ? parsed.battleStingerCustomUrl : null,
+        combatPlaylist: typeof parsed.combatPlaylist === 'string' ? parsed.combatPlaylist : null,
       };
     }
   } catch (e) {
@@ -1259,6 +1274,9 @@ interface GameState {
 
   // Battle settings
   turnTokenImageUrl: string | null;
+  battleStinger: 'drums' | 'none' | 'custom';
+  battleStingerCustomUrl: string | null;
+  combatPlaylist: string | null;
 
   // Feature flags
   dice3dEnabled: boolean;
@@ -1504,6 +1522,9 @@ interface GameState {
   setTokenHpSource: (source: 'average' | 'rolled') => void;
   setChatCardsCollapsedByDefault: (collapsed: boolean) => void;
   setTurnTokenImageUrl: (url: string | null) => void;
+  setBattleStinger: (stinger: 'drums' | 'none' | 'custom') => void;
+  setBattleStingerCustomUrl: (url: string | null) => void;
+  setCombatPlaylist: (playlistId: string | null) => void;
   setToolbarWidth: (width: number) => void;
   setToolbarHeight: (height: number) => void;
   setHeaderHeight: (height: number) => void;
@@ -1721,6 +1742,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   tokenHpSource: loadSavedTokenDisplayDefaults().tokenHpSource,
   chatCardsCollapsedByDefault: loadSavedChatCardDefaults().chatCardsCollapsedByDefault,
   turnTokenImageUrl: loadSavedBattleSettings().turnTokenImageUrl,
+  battleStinger: loadSavedBattleSettings().battleStinger,
+  battleStingerCustomUrl: loadSavedBattleSettings().battleStingerCustomUrl,
+  combatPlaylist: loadSavedBattleSettings().combatPlaylist,
   fogDrawMode: loadSavedFogToolsSettings().fogDrawMode,
   gmFogOpacity: loadSavedFogToolsSettings().gmFogOpacity,
   pencilSize: loadSavedFogToolsSettings().pencilSize,
@@ -2580,8 +2604,25 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   setTurnTokenImageUrl: (url: string | null) => {
     const normalized = typeof url === 'string' && url.trim().length > 0 ? url : null;
-    saveBattleSettingsToStorage({ turnTokenImageUrl: normalized });
+    const current = useGameStore.getState();
+    saveBattleSettingsToStorage({ turnTokenImageUrl: normalized, battleStinger: current.battleStinger, battleStingerCustomUrl: current.battleStingerCustomUrl, combatPlaylist: current.combatPlaylist });
     set({ turnTokenImageUrl: normalized });
+  },
+  setBattleStinger: (stinger: 'drums' | 'none' | 'custom') => {
+    const current = useGameStore.getState();
+    saveBattleSettingsToStorage({ turnTokenImageUrl: current.turnTokenImageUrl, battleStinger: stinger, battleStingerCustomUrl: current.battleStingerCustomUrl, combatPlaylist: current.combatPlaylist });
+    set({ battleStinger: stinger });
+  },
+  setBattleStingerCustomUrl: (url: string | null) => {
+    const normalized = typeof url === 'string' && url.trim().length > 0 ? url : null;
+    const current = useGameStore.getState();
+    saveBattleSettingsToStorage({ turnTokenImageUrl: current.turnTokenImageUrl, battleStinger: 'custom', battleStingerCustomUrl: normalized, combatPlaylist: current.combatPlaylist });
+    set({ battleStinger: 'custom', battleStingerCustomUrl: normalized });
+  },
+  setCombatPlaylist: (playlistId: string | null) => {
+    const current = useGameStore.getState();
+    saveBattleSettingsToStorage({ turnTokenImageUrl: current.turnTokenImageUrl, battleStinger: current.battleStinger, battleStingerCustomUrl: current.battleStingerCustomUrl, combatPlaylist: playlistId });
+    set({ combatPlaylist: playlistId });
   },
   setFogDrawMode: (mode: 'box' | 'polygon' | 'free' | 'grid' | 'pencil') => {
     const current = useGameStore.getState();
@@ -2791,7 +2832,61 @@ export const useGameStore = create<GameState>((set, get) => ({
   })),
 
   // Combat actions
-  setIsInCombat: (inCombat) => set({ isInCombat: inCombat }),
+  setIsInCombat: (inCombat) => set((state) => {
+    if (inCombat && !state.isInCombat) {
+      // Play stinger first
+      if (state.battleStinger === 'drums') {
+        audioPlayer.playCombatStart();
+      } else if (state.battleStinger === 'custom' && state.battleStingerCustomUrl) {
+        const audio = new Audio();
+        audio.src = state.battleStingerCustomUrl;
+        audio.volume = 0.5;
+        audio.play().catch(console.error);
+      }
+      
+      // Then play combat playlist if selected
+      if (state.combatPlaylist && state.customPlaylists) {
+        const playlist = state.customPlaylists.find(p => p.id === state.combatPlaylist);
+        if (playlist && playlist.tracks.length > 0) {
+          const firstTrack = playlist.tracks[0];
+          const audioPath = firstTrack.file;
+          
+          if (!audioPath) {
+            // No file path in track
+          } else {
+            // Play audio directly (works even when AudioPanel is closed)
+            
+            // Play audio directly (works even when AudioPanel is closed)
+            const playlistAudio = new Audio();
+            playlistAudio.src = audioPath;
+            playlistAudio.volume = state.audioVolume ?? 0.5;
+            playlistAudio.loop = firstTrack.loop ?? playlist.loopPlaylist ?? false;
+            
+            // Store reference so AudioPanel can control it
+            setCombatAudioElement(playlistAudio);
+            
+            playlistAudio.play().then(() => {
+              // Audio playing
+            }).catch(e => {
+              // Playlist play error
+            });
+            
+            // Update state for AudioPanel display (when opened)
+            set({ currentAudioTrack: firstTrack.id, currentAudioFile: audioPath, isAudioPlaying: true });
+          }
+        }
+      }
+    } else if (!inCombat && state.isInCombat) {
+      // Combat ended - stop any playing audio
+      const audioEl = document.querySelector('audio');
+      if (audioEl) {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+      }
+      set({ isAudioPlaying: false, currentAudioTrack: null, currentAudioFile: null });
+    }
+    return { isInCombat: inCombat };
+  }),
 
   addCombatant: (tokenId, name) =>
     set((state) => {
@@ -2849,6 +2944,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   nextTurn: () =>
     set((state) => {
+      const wasNotInCombat = !state.isInCombat;
       const next = getNextTurn({
         combatants: state.combatants,
         currentTurnIndex: state.currentTurnIndex,
@@ -2856,9 +2952,55 @@ export const useGameStore = create<GameState>((set, get) => ({
         started: state.isInCombat,
       });
 
+      // Play stinger when first turn starts combat
+      if (wasNotInCombat) {
+        if (state.battleStinger === 'drums') {
+          audioPlayer.playCombatStart();
+        } else if (state.battleStinger === 'custom' && state.battleStingerCustomUrl) {
+          const audio = new Audio();
+          audio.src = state.battleStingerCustomUrl;
+          audio.volume = 0.5;
+          audio.play().catch(e => console.error('Custom stinger error:', e));
+        }
+        
+        // Play combat playlist if selected after stinger
+        if (state.combatPlaylist && state.customPlaylists) {
+          const playlist = state.customPlaylists.find(p => p.id === state.combatPlaylist);
+          if (playlist && playlist.tracks.length > 0) {
+            const firstTrack = playlist.tracks[0];
+            const audioPath = firstTrack.file;
+            
+            if (!audioPath) {
+              // No file path in track
+            } else {
+              // Play audio directly (works even when AudioPanel is closed)
+              
+              // Play audio directly (works even when AudioPanel is closed)
+              const playlistAudio = new Audio();
+              playlistAudio.src = audioPath;
+              playlistAudio.volume = state.audioVolume ?? 0.5;
+              playlistAudio.loop = firstTrack.loop ?? playlist.loopPlaylist ?? false;
+              
+              // Store reference so AudioPanel can control it
+              setCombatAudioElement(playlistAudio);
+              
+              playlistAudio.play().then(() => {
+                // Audio playing
+              }).catch(e => {
+                // Playlist play error
+              });
+              
+              // Update state for AudioPanel display (when opened)
+              set({ currentAudioTrack: firstTrack.id, currentAudioFile: audioPath, isAudioPlaying: true });
+            }
+          }
+        }
+      }
+
       return {
         currentTurnIndex: next.currentTurnIndex,
         combatRound: next.round,
+        isInCombat: true,
       };
     }),
 
@@ -2900,7 +3042,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       };
     }),
 
-  endCombat: () => set({ isInCombat: false, combatRound: 1, currentTurnIndex: 0 }),
+  endCombat: () => set((state) => {
+    // Stop any playing audio when combat ends
+    const audioEl = document.querySelector('audio');
+    if (audioEl) {
+      audioEl.pause();
+      audioEl.currentTime = 0;
+    }
+    return { isInCombat: false, combatRound: 1, currentTurnIndex: 0, isAudioPlaying: false, currentAudioTrack: null, currentAudioFile: null };
+  }),
 
   autoRollAllInitiative: () =>
     set((state) => ({

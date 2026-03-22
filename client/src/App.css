@@ -6184,6 +6184,7 @@ canvas {
   cursor: se-resize;
   background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);;
   border-radius: 0 0 6px 0;
+  user-select: none;
 }
 
 .combat-tracker-resize:hover {
@@ -7454,6 +7455,7 @@ canvas {
   border-radius: 0 0 6px 0;
   pointer-events: auto;
   z-index: 10;
+  user-select: none;
 }
 
 .combat-cards-resize-handle:hover {
