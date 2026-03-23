@@ -21,6 +21,7 @@ interface AssetFolder {
 
 // Custom folders localStorage key
 const CUSTOM_FOLDERS_STORAGE_KEY = 'vtt_fileBrowserCustomFolders';
+const THUMBNAIL_SIZE_STORAGE_KEY = 'vtt_fileBrowserThumbnailSize';
 
 // Load custom folders from localStorage
 function loadCustomFolders(): AssetFolder[] {
@@ -41,6 +42,31 @@ function saveCustomFolders(folders: AssetFolder[]): void {
     localStorage.setItem(CUSTOM_FOLDERS_STORAGE_KEY, JSON.stringify(folders));
   } catch (e) {
     console.error('Failed to save custom folders:', e);
+  }
+}
+
+// Load thumbnail size from localStorage (0 = list view, 1-4 = thumbnail sizes)
+function loadThumbnailSize(): number {
+  try {
+    const saved = localStorage.getItem(THUMBNAIL_SIZE_STORAGE_KEY);
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 4) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load thumbnail size:', e);
+  }
+  return 2; // Default to medium size
+}
+
+// Save thumbnail size to localStorage
+function saveThumbnailSize(size: number): void {
+  try {
+    localStorage.setItem(THUMBNAIL_SIZE_STORAGE_KEY, String(size));
+  } catch (e) {
+    console.error('Failed to save thumbnail size:', e);
   }
 }
 
@@ -170,6 +196,7 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
   const [dragOverUpload, setDragOverUpload] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
   const [customFolders, setCustomFolders] = useState<AssetFolder[]>(loadCustomFolders);
+  const [thumbnailSize, setThumbnailSize] = useState<number>(loadThumbnailSize);
 
   // Folder creation state
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -1080,7 +1107,9 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                   className="file-browser-grid"
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gridTemplateColumns: thumbnailSize === 0 
+                      ? '1fr' 
+                      : `repeat(auto-fill, minmax(${60 + thumbnailSize * 40}px, 1fr))`,
                     gap: 12,
                     padding: 12,
                   }}
@@ -1148,14 +1177,18 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                       }
                       style={{
                         display: 'flex',
-                        flexDirection: 'column',
-                        gap: 8,
-                        minHeight: 150,
-                        padding: 0,
-                        borderRadius: 12,
+                        flexDirection: thumbnailSize === 0 ? 'row' : 'column',
+                        alignItems: thumbnailSize === 0 ? 'center' : undefined,
+                        justifyContent: thumbnailSize === 0 ? 'flex-start' : undefined,
+                        gap: thumbnailSize === 0 ? 12 : 8,
+                        minHeight: thumbnailSize === 0 ? 48 : 150,
+                        padding: thumbnailSize === 0 ? '8px 12px' : 0,
+                        borderRadius: thumbnailSize === 0 ? 6 : 12,
                         border: previewItem?.url === item.url
                           ? '1px solid rgba(255,255,255,0.24)'
-                          : '1px solid rgba(255,255,255,0.08)',
+                          : thumbnailSize === 0 
+                            ? '1px solid transparent'
+                            : '1px solid rgba(255,255,255,0.08)',
                         background: previewItem?.url === item.url
                           ? 'rgba(255,255,255,0.08)'
                           : 'rgba(255,255,255,0.03)',
@@ -1168,7 +1201,7 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                           aspectRatio: '1 / 1',
                           overflow: 'hidden',
                           background: 'rgba(255,255,255,0.04)',
-                          display: 'grid',
+                          display: thumbnailSize === 0 ? 'none' : 'grid',
                           placeItems: 'center',
                           position: 'relative',
                         }}
@@ -1215,11 +1248,11 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                               width: '80%',
                               height: '80%',
                               objectFit: 'cover',
-                              display: 'block',
+                              display: thumbnailSize === 0 ? 'none' : 'block',
                             }}
                           />
                         ) : (
-                          <Icon name={getFileIcon(item.type) as any} />
+                          thumbnailSize !== 0 && <Icon name={getFileIcon(item.type) as any} />
                         )}
                       </div>
 
@@ -1323,6 +1356,44 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Thumbnail Size Slider */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 12,
+                right: 12,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                borderRadius: 8,
+                background: 'rgba(0,0,0,0.65)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                zIndex: 10,
+              }}
+              title={thumbnailSize === 0 ? 'List view' : `${thumbnailSize * 25}% size`}
+            >
+              <Icon name={thumbnailSize === 0 ? 'list' : 'image'} style={{ opacity: 0.7, fontSize: 14 }} />
+              <input
+                type="range"
+                min="0"
+                max="4"
+                value={thumbnailSize}
+                onChange={(e) => {
+                  const newSize = parseInt(e.target.value, 10);
+                  setThumbnailSize(newSize);
+                  saveThumbnailSize(newSize);
+                }}
+                style={{
+                  width: 80,
+                  height: 4,
+                  cursor: 'pointer',
+                  accentColor: colorScheme?.id === 'custom' ? colorScheme.accent : '#4a9eff',
+                }}
+              />
             </div>
           </div>
 
