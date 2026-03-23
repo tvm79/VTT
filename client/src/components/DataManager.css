@@ -447,6 +447,7 @@
 
 .filter-sidebar .filter-panel {
   height: 100%;
+  width: 300px;
   display: flex;
   flex-direction: column;
 }
@@ -545,16 +546,22 @@
 .filter-range {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  min-width: 0;
 }
 
-.filter-range select {
+.filter-range select,
+.filter-range input {
   flex: 1;
+  min-width: 60px;
+  max-width: 120px;
 }
 
 .filter-range span {
   color: var(--text-secondary);
   font-size: 0.875rem;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .filter-checkboxes {

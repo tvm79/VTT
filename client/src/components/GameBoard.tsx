@@ -477,6 +477,11 @@ interface TokenVisualRefs {
   acContainer: PIXI.Container;
   statOrbitContainer: PIXI.Container;
   actionOrbitContainer: PIXI.Container;
+  // Mesh effect properties
+  tokenMeshEffect?: string;
+  tokenMeshIntensity?: number;
+  tokenMeshSpeed?: number;
+  originalSprite?: PIXI.Sprite;
 }
 
 type MonsterActionEntry = {
@@ -2984,6 +2989,8 @@ export function GameBoard() {
         const auraProps = (token.properties || {}) as Record<string, unknown>;
         const auraEnabled = auraProps.auraEnabled === true;
         const auraPulse = auraProps.auraPulse !== false;
+        const auraAlphaFade = auraProps.auraAlphaFade !== false;
+        const auraRotation = auraProps.auraRotation === true;
         const auraRadius = typeof auraProps.auraRadius === 'number' ? auraProps.auraRadius : 60;
         const auraOpacity = typeof auraProps.auraOpacity === 'number' ? auraProps.auraOpacity : 0.5;
         const auraColor = auraProps.auraColor ? parseInt(String(auraProps.auraColor).replace('#', ''), 16) : DEFAULT_AURA_COLOR;
@@ -3013,8 +3020,10 @@ export function GameBoard() {
           visuals.auraRing = auraRing;
         }
         
-        // Calculate pulse factor
+        // Calculate animation factors
         const pulseFactor = auraPulse ? (Math.sin(time * 0.003) * 0.15 + 1) : 1;
+        const alphaFadeFactor = auraAlphaFade ? (Math.sin(time * 0.002) * 0.3 + 0.7) : 1;
+        const rotationAngle = auraRotation ? (time * 0.001) : 0;
         
         // Get token size from sprite - use the scaled dimensions
         const sprite = visuals.sprite;
@@ -3027,7 +3036,8 @@ export function GameBoard() {
         for (let g = 0; g < glowCount; g++) {
           const t = (g + 1) / glowCount;
           const glowRadius = auraRadius * t * pulseFactor;
-          const glowAlpha = Math.max(0.01, auraOpacity * 0.25 * (1 - t * 0.7));
+          const baseAlpha = auraOpacity * 0.25 * (1 - t * 0.7);
+          const glowAlpha = Math.max(0.01, baseAlpha * alphaFadeFactor);
           
           const glow = auraGlows[g];
           if (glow) {
@@ -3037,16 +3047,88 @@ export function GameBoard() {
           }
         }
         
-        // Update ring
+        // Update ring with rotation
         if (auraRing) {
           auraRing.clear();
-          auraRing.circle(centerX, centerY, auraRadius * pulseFactor);
-          auraRing.stroke({ width: 2, color: auraColor, alpha: auraOpacity * 0.6 });
+          // Draw ring at origin, then position container will handle the offset
+          auraRing.circle(0, 0, auraRadius * pulseFactor);
+          auraRing.stroke({ width: 2, color: auraColor, alpha: auraOpacity * 0.6 * alphaFadeFactor });
+          // Apply rotation if enabled
+          auraRing.rotation = rotationAngle;
+          // Position the ring at center
+          auraRing.position.set(centerX, centerY);
+        }
+      });
+    };
+
+    // Mesh effect animation ticker - animates wave, twist, bulge effects using vertex manipulation
+    const updateMeshEffects = (ticker: PIXI.Ticker) => {
+      const time = Date.now();
+      tokenVisualsRef.current.forEach((visuals) => {
+        const meshAny = (visuals as any).tokenMesh as any;
+        const originalVertices = (visuals as any).originalVertices;
+        const tokenMeshEffect = visuals.tokenMeshEffect;
+        const tokenMeshIntensity = visuals.tokenMeshIntensity;
+        const tokenMeshSpeed = visuals.tokenMeshSpeed;
+        
+        if (!meshAny || !originalVertices || tokenMeshEffect === 'none' || tokenMeshEffect === undefined) return;
+        if (!meshAny.vertices) return;
+        
+        const speed = ((tokenMeshSpeed || 50) / 50) * 0.05;
+        const intensity = ((tokenMeshIntensity || 50) / 50) * 15;
+        const meshWidth = meshAny.width || 100;
+        const meshHeight = meshAny.height || 100;
+        
+        // Copy original vertices back first
+        for (let i = 0; i < meshAny.vertices.length; i++) {
+          meshAny.vertices[i] = originalVertices[i];
+        }
+        
+        switch (tokenMeshEffect) {
+          case 'wave':
+            // Wave effect - modify Y coordinates
+            for (let i = 0; i < meshAny.vertices.length; i += 2) {
+              const x = meshAny.vertices[i];
+              const progress = x / meshWidth;
+              meshAny.vertices[i + 1] += Math.sin((progress * Math.PI * 4) + (time * speed)) * intensity;
+            }
+            break;
+          case 'twist':
+            // Twist effect - rotate vertices around center
+            for (let i = 0; i < meshAny.vertices.length; i += 2) {
+              const x = meshAny.vertices[i];
+              const y = meshAny.vertices[i + 1];
+              const progress = x / meshWidth;
+              const angle = Math.sin(time * speed) * intensity * 0.02 * (progress - 0.5);
+              const newX = x * Math.cos(angle) - y * Math.sin(angle);
+              const newY = x * Math.sin(angle) + y * Math.cos(angle);
+              meshAny.vertices[i] = newX;
+              meshAny.vertices[i + 1] = newY;
+            }
+            break;
+          case 'bulge':
+            // Bulge effect - push vertices outward from center
+            for (let i = 0; i < meshAny.vertices.length; i += 2) {
+              const x = meshAny.vertices[i];
+              const y = meshAny.vertices[i + 1];
+              const centerX = meshWidth / 2;
+              const centerY = meshHeight / 2;
+              const dx = x - centerX;
+              const dy = y - centerY;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+              const bulgeFactor = Math.sin(time * speed * 2) * intensity * (1 - dist / maxDist);
+              const scale = 1 + bulgeFactor * 0.1;
+              meshAny.vertices[i] = centerX + dx * scale;
+              meshAny.vertices[i + 1] = centerY + dy * scale;
+            }
+            break;
         }
       });
     };
 
     app.ticker.add(updateAuraPulse);
+    app.ticker.add(updateMeshEffects);
     app.ticker.add(updateScreenShake);
     app.ticker.add(updateTurnMarkerSpin);
 
@@ -3060,6 +3142,7 @@ export function GameBoard() {
       destroyParticleSystem();
       particleSystemRef.current = null;
       app.ticker.remove(updateAuraPulse);
+      app.ticker.remove(updateMeshEffects);
       app.ticker.remove(updateScreenShake);
       app.ticker.remove(updateTurnMarkerSpin);
       app.destroy(true, { children: true, texture: true });
@@ -3881,7 +3964,82 @@ export function GameBoard() {
           sprite.filters = [];
         }
         
-        // Now sync with animation manager
+        // Apply mesh effects
+        const tokenMeshEffect = (effectProps.tokenMeshEffect as string) || 'none';
+        const tokenMeshIntensity = typeof effectProps.tokenMeshIntensity === 'number' ? effectProps.tokenMeshIntensity : 50;
+        const tokenMeshSpeed = typeof effectProps.tokenMeshSpeed === 'number' ? effectProps.tokenMeshSpeed : 50;
+        
+        // Store mesh settings in visuals for the ticker to use
+        visuals.tokenMeshEffect = tokenMeshEffect;
+        visuals.tokenMeshIntensity = tokenMeshIntensity;
+        visuals.tokenMeshSpeed = tokenMeshSpeed;
+        
+        // Initialize or update mesh if needed
+        // Check if we need to create a mesh (effect enabled and no existing mesh)
+        const existingMesh = (visuals as any).tokenMesh;
+        if (tokenMeshEffect !== 'none' && !existingMesh) {
+          try {
+            // Check if sprite is still a valid child of root
+            if (!root || !sprite || !root.children.includes(sprite)) {
+              return;
+            }
+            
+            // Create a Plane mesh with the sprite texture
+            // Using 20x20 segments for smooth animation
+            // @ts-ignore - Plane may not be in TypeScript definitions
+            const mesh: any = new PIXI.Mesh.Plane(sprite.texture, 20, 20);
+            mesh.width = sprite.width;
+            mesh.height = sprite.height;
+            mesh.position.set(sprite.x, sprite.y);
+            mesh.alpha = sprite.alpha;
+            mesh.rotation = sprite.rotation;
+            mesh.scale.set(sprite.scale.x, sprite.scale.y);
+            mesh.tint = sprite.tint;
+            mesh.blendMode = sprite.blendMode;
+            mesh.visible = sprite.visible;
+            
+            // Store original vertices for animation
+            (visuals as any).originalVertices = mesh.vertices.slice(0);
+            (visuals as any).meshWidth = mesh.width;
+            (visuals as any).meshHeight = mesh.height;
+            
+            // Replace sprite with mesh in the container
+            const spriteIndex = root.getChildIndex(sprite);
+            root.removeChild(sprite);
+            root.addChildAt(mesh as PIXI.Container, spriteIndex);
+            
+            (visuals as any).tokenMesh = mesh;
+            visuals.originalSprite = sprite;
+          } catch (e) {
+            console.warn('Failed to create mesh:', e);
+          }
+        } else if (tokenMeshEffect === 'none' && existingMesh) {
+          // Remove mesh and restore original sprite
+          try {
+            const mesh = (visuals as any).tokenMesh;
+            if (mesh) {
+              const meshIndex = root.getChildIndex(mesh as PIXI.Container);
+              root.removeChild(mesh as PIXI.Container);
+              if (visuals.originalSprite) {
+                root.addChildAt(visuals.originalSprite, meshIndex);
+              }
+              mesh.destroy();
+            }
+            (visuals as any).tokenMesh = undefined;
+            (visuals as any).originalVertices = undefined;
+            visuals.originalSprite = undefined;
+          } catch (e) {
+            console.warn('Failed to remove mesh:', e);
+          }
+        }
+        
+        // Now sync with animation manager - read tint from properties to preserve user-selected tint
+        const syncTintEnabled = effectProps.tokenTintEnabled === true;
+        const syncTintColor = (effectProps.tokenTintColor as string) || '#ffffff';
+        const syncTintValue = syncTintEnabled 
+          ? parseInt(syncTintColor.replace('#', ''), 16) 
+          : DEFAULT_TINT_COLOR;
+        
         animationManager.syncTokenBaseState(token.id, {
           x: token.x,
           y: token.y,
@@ -3890,7 +4048,7 @@ export function GameBoard() {
           scaleX: 1,
           scaleY: 1,
           alpha: getTokenBaseAlpha(isSelected, isHidden),
-          tint: DEFAULT_TINT_COLOR,
+          tint: syncTintValue,
         });
         if (shouldAnimateMove) {
           void animationManager.playTokenAnimation({

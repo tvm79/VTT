@@ -39,6 +39,7 @@ export class ParticlePool {
       const sprite = new PixiSprite(defaultTexture);
       sprite.anchor.set(0.5);
       sprite.visible = false;
+      sprite.eventMode = 'none';
       this.freeSprites.push(sprite);
       this.freeParticles.push({
         active: false,

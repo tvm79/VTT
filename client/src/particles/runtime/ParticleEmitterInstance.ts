@@ -91,6 +91,7 @@ export class ParticleEmitterInstance {
     this.presetId = preset.id;
     this.container = config.container;
     this.container.sortableChildren = true;
+    this.container.hitArea = null;
     this.container.zIndex = preset.zIndex;
     this.container.blendMode = preset.blendMode === 'add'
       ? 'add'

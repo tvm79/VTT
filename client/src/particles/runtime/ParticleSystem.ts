@@ -33,7 +33,7 @@ const DEFAULT_GRID_SIZE = 50;
 export class ParticleSystem implements ParticleSystemApi {
   private readonly app: Application;
   private readonly emitters: ParticleEmitterInstance[] = [];
-  private readonly emitterIndex: Map<string, ParticleEmitterInstance> = new Map();
+  public readonly emitterIndex: Map<string, ParticleEmitterInstance> = new Map();
   private readonly bindingThrottle: Map<string, number> = new Map();
   private readonly tokenPositions: Map<string, { x: number; y: number }> = new Map();
   private presets: Map<string, ParticlePreset> = new Map();
@@ -301,6 +301,7 @@ export class ParticleSystem implements ParticleSystemApi {
     root.sortableChildren = true;
     root.label = 'particleRoot';
     root.zIndex = 10;
+    root.hitArea = null;
     const below = this.createLayerGroup('below-token');
     const at = this.createLayerGroup('at-token');
     const above = this.createLayerGroup('above-token');
@@ -324,9 +325,13 @@ export class ParticleSystem implements ParticleSystemApi {
     const container = new PixiContainer();
     container.label = name;
     container.sortableChildren = true;
+    container.hitArea = null;
     const normal = new PixiContainer();
+    normal.hitArea = null;
     const add = new PixiContainer();
+    add.hitArea = null;
     const screen = new PixiContainer();
+    screen.hitArea = null;
     normal.label = `${name}-normal`;
     add.label = `${name}-add`;
     screen.label = `${name}-screen`;
