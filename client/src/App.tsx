@@ -37,6 +37,10 @@ const usePanelVisibility = () => useGameStore(state => ({
   chatVisible: state.chatVisible,
   profilePanelVisible: state.profilePanelVisible,
   audioPanelVisible: state.audioPanelVisible,
+  diceRollerVisible: state.diceRollerVisible,
+  macrosVisible: state.macrosVisible,
+  rollTablePanelVisible: state.rollTablePanelVisible,
+  particleEmitterVisible: state.particleEmitterVisible,
 }));
 
 // GM and permissions selector
@@ -83,8 +87,7 @@ function App() {
   const { userProfileImage } = useUserProfile();
   const { session, currentBoard } = useSessionBoard();
   const colorScheme = useColorScheme();
-  const { dndManagerVisible, fileBrowserVisible, chatVisible, profilePanelVisible, audioPanelVisible } = usePanelVisibility();
-  const rollTablePanelVisible = useGameStore(state => state.rollTablePanelVisible);
+  const { dndManagerVisible, fileBrowserVisible, chatVisible, profilePanelVisible, audioPanelVisible, diceRollerVisible, macrosVisible, rollTablePanelVisible, particleEmitterVisible } = usePanelVisibility();
   const { isGM } = useGMPermissions();
   const { timelinePosition, timelineStretched, timelineAnchor } = useTimeline();
   const dice3dEnabled = useGameStore(state => state.dice3dEnabled);
@@ -233,6 +236,29 @@ function App() {
           // Clear any pending close timeout when mouse enters
         }}
         onMouseLeave={(e) => {
+          // Check immediately if any toolbar panels are expanded - don't hide if panels are open
+          // This check runs right away, not in the timeout
+          if (diceRollerVisible || macrosVisible || rollTablePanelVisible || audioPanelVisible || fileBrowserVisible || particleEmitterVisible) {
+            return;
+          }
+          
+          // Check if any toolbar expand panels are open (Map Settings, Board Settings, Weather Effects)
+          // Look for expanded content sections that only appear when panels are open
+          const mapGridContent = document.querySelector('.background-panel-row:nth-child(3)');
+          const mapBleedContent = document.querySelector('.background-panel-row:nth-child(7)');
+          const mapFogContent = document.querySelector('.background-panel-row:nth-child(9)');
+          const boardPanningContent = document.querySelector('.toolbar-settings-grid');
+          const weatherFullContent = document.querySelector('.weather-effect-full');
+          
+          // Check if these elements are visible (meaning the panels are expanded)
+          const isMapExpanded = mapGridContent || mapBleedContent || mapFogContent;
+          const isBoardExpanded = boardPanningContent;
+          const isWeatherExpanded = weatherFullContent;
+          
+          if (isMapExpanded || isBoardExpanded || isWeatherExpanded) {
+            return;
+          }
+          
           // Use a small delay to allow for panel detection
           // This gives time for panels to render before we decide to close
           const relatedTarget = e.relatedTarget;
@@ -269,6 +295,11 @@ function App() {
           // Check if any floating panels are open
           const floatingPanels = document.querySelector('.portal-wrapper');
           if (floatingPanels && floatingPanels.children.length > 0) {
+            return;
+          }
+          
+          // Check if any toolbar child panels are open - prevent hiding if panels are visible
+          if (diceRollerVisible || macrosVisible || rollTablePanelVisible || audioPanelVisible || fileBrowserVisible || particleEmitterVisible) {
             return;
           }
           

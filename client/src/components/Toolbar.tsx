@@ -715,7 +715,7 @@ export const Toolbar = memo(function Toolbar() {
       {/* Token Display Defaults Advanced Modal */}
       {showTokenDefaultsAdvancedModal && (
         <AdvancedModal title="Token Display Advanced Settings" onClose={() => setShowTokenDefaultsAdvancedModal(false)}>
-          <button onClick={() => setTweenExpanded(!tweenExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }}>
+          <button onClick={() => setTweenExpanded(!tweenExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }} aria-pressed={tweenExpanded}>
             <span className="toolbar-settings-title">Tween Settings</span>
             <span className="toolbar-settings-title">{tweenExpanded ? '▾' : '▸'}</span>
           </button>
@@ -824,7 +824,7 @@ export const Toolbar = memo(function Toolbar() {
               <Button onClick={() => setTweenSettings({ moveMin: 160, moveMax: 420, attack: 180, damage: 140, heal: 220, miss: 160, downed: 260, selectPulse: 900, moveEasing: 'easeInOutCubic', attackEasing: 'easeOutCubic', damageEasing: 'easeOutCubic', healEasing: 'easeOutQuad', missEasing: 'easeOutQuad', downedEasing: 'easeOutQuad', selectEasing: 'easeOutBack' })} variant="secondary" className="toolbar-full-width-button">Reset to Defaults</Button>
             </div>
           )}
-          <button onClick={() => setScreenShakeExpanded(!screenShakeExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }}>
+          <button onClick={() => setScreenShakeExpanded(!screenShakeExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }} aria-pressed={screenShakeExpanded}>
             <span className="toolbar-settings-title">Screen Shake</span>
             <span className="toolbar-settings-title">{screenShakeExpanded ? '▾' : '▸'}</span>
           </button>
@@ -893,6 +893,7 @@ export const Toolbar = memo(function Toolbar() {
           {showUpload && (
             <div 
               className="background-panel"
+              data-panel-open="true"
             >
               <div className="background-panel-divider background-panel-header-block">
                 <span className="background-panel-title">Map Settings</span>
@@ -922,6 +923,7 @@ export const Toolbar = memo(function Toolbar() {
               <button
                 onClick={() => setMapGridExpanded(!mapGridExpanded)}
                 className="background-panel-section-toggle background-panel-divider"
+                aria-pressed={mapGridExpanded}
               >
                 <span className="background-panel-section-title">Grid Settings</span>
                 <span className="background-panel-section-title">{mapGridExpanded ? '▾' : '▸'}</span>
@@ -1132,6 +1134,7 @@ export const Toolbar = memo(function Toolbar() {
               <button
                 onClick={() => setMapBleedExpanded(!mapBleedExpanded)}
                 className="background-panel-section-toggle background-panel-divider"
+                aria-pressed={mapBleedExpanded}
               >
                 <span className="background-panel-section-title">Map Bleed</span>
                 <span className="background-panel-section-title">{mapBleedExpanded ? '▾' : '▸'}</span>
@@ -1216,6 +1219,7 @@ export const Toolbar = memo(function Toolbar() {
               <button
                 onClick={() => setMapFogExpanded(!mapFogExpanded)}
                 className="background-panel-section-toggle background-panel-divider"
+                aria-pressed={mapFogExpanded}
               >
                 <span className="background-panel-section-title">Fog of War Settings</span>
                 <span className="background-panel-section-title">{mapFogExpanded ? '▾' : '▸'}</span>
@@ -1411,6 +1415,7 @@ export const Toolbar = memo(function Toolbar() {
       {showSettings && (
         <div 
           className="settings-panel"
+          data-panel-open="true"
           style={{
             width: 'var(--toolbar-settings-width, 320px)',
             background: colorScheme && (colorScheme.id.includes('-custom-') || colorScheme.id === 'custom') ? colorScheme.surface : undefined,
@@ -1424,6 +1429,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setSettingsPanningExpanded(!settingsPanningExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={settingsPanningExpanded}
           >
             <span className="toolbar-settings-title">Panning</span>
             <span className="toolbar-settings-title">{settingsPanningExpanded ? '▾' : '▸'}</span>
@@ -1481,6 +1487,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setSettingsChatExpanded(!settingsChatExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={settingsChatExpanded}
           >
             <span className="toolbar-settings-title">Chat</span>
             <span className="toolbar-settings-title">{settingsChatExpanded ? '▾' : '▸'}</span>
@@ -1508,6 +1515,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setSettingsBattleExpanded(!settingsBattleExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={settingsBattleExpanded}
           >
             <span className="toolbar-settings-title">Battle</span>
             <span className="toolbar-settings-title">{settingsBattleExpanded ? '▾' : '▸'}</span>
@@ -1621,6 +1629,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setSettingsDice3dExpanded(!settingsDice3dExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={settingsDice3dExpanded}
           >
             <span className="toolbar-settings-title">3D Dice</span>
             <span className="toolbar-settings-title">{settingsDice3dExpanded ? '▾' : '▸'}</span>
@@ -1704,6 +1713,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setSettingsAudioFadeExpanded(!settingsAudioFadeExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={settingsAudioFadeExpanded}
           >
             <span className="toolbar-settings-title">Audio Fade</span>
             <span className="toolbar-settings-title">{settingsAudioFadeExpanded ? '▾' : '▸'}</span>
@@ -1739,6 +1749,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setSettingsKeyBindingsExpanded(!settingsKeyBindingsExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={settingsKeyBindingsExpanded}
           >
             <span className="toolbar-settings-title">Key Bindings</span>
             <span className="toolbar-settings-title">{settingsKeyBindingsExpanded ? '▾' : '▸'}</span>
@@ -1785,6 +1796,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setSettingsTokenDefaultsExpanded(!settingsTokenDefaultsExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={settingsTokenDefaultsExpanded}
           >
             <span className="toolbar-settings-title">Token Settings</span>
             <span className="toolbar-settings-title">{settingsTokenDefaultsExpanded ? '▾' : '▸'}</span>
@@ -1966,6 +1978,7 @@ export const Toolbar = memo(function Toolbar() {
           <button
             onClick={() => setThemeExpanded(!themeExpanded)}
             className="toolbar-settings-section-toggle"
+            aria-pressed={themeExpanded}
           >
             <span className="toolbar-settings-title">Themes ({DEFAULT_COLOR_SCHEMES.length})</span>
             <span className="toolbar-settings-title">{themeExpanded ? '▾' : '▸'}</span>
@@ -2148,6 +2161,7 @@ export const Toolbar = memo(function Toolbar() {
       {weatherVisible && isGM && (
         <div 
           className="settings-panel"
+          data-panel-open="true"
           style={{
             width: 'var(--toolbar-settings-width, 320px)',
             background: colorScheme && (colorScheme.id.includes('-custom-') || colorScheme.id === 'custom') ? colorScheme.surface : undefined,

@@ -73,10 +73,7 @@ export async function loadParticleAtlas(): Promise<ParticleTextureAtlas> {
             // Try next candidate variant.
           }
         }
-        console.warn('[particle-textures] failed to resolve custom texture, using Texture.WHITE', {
-          name: cacheKey,
-          candidates,
-        });
+        // Silent fallback - no logging needed
       })().finally(() => {
         pendingCustomLoads.delete(cacheKey);
       });
@@ -102,7 +99,8 @@ export async function loadParticleAtlas(): Promise<ParticleTextureAtlas> {
         if (textures[name]) {
           return textures[name];
         }
-        if (name && (name.includes('/') || name.includes('.') || name.startsWith('http'))) {
+        const isDataURL = name?.startsWith('data:');
+        if (name && (name.includes('/') || name.includes('.') || name.startsWith('http') || isDataURL)) {
           const normalized = normalizeCustomTexturePath(name);
           const candidates = normalized !== name ? [normalized, name] : [name];
 

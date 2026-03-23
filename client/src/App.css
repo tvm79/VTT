@@ -962,6 +962,30 @@ button.tool-btn i {
   pointer-events: auto;
 }
 
+/* Keep toolbar visible when expand panels are open (Map Settings, Board Settings, Weather Effects) */
+.toolbar-hover-container:has(.background-panel-section-toggle[aria-pressed="true"]) .toolbar-wrapper,
+.toolbar-hover-container:has(.toolbar-settings-section-toggle[aria-pressed="true"]) .toolbar-wrapper {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Keep toolbar visible when expand panel content is visible */
+.toolbar-hover-container:has(.background-panel-section-toggle + div:not([hidden])) .toolbar-wrapper,
+.toolbar-hover-container:has(.toolbar-settings-section-toggle + div:not([hidden])) .toolbar-wrapper,
+.toolbar-hover-container:has(.weather-effects-content) .toolbar-wrapper {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Keep toolbar visible when toolbar panels are open (Map Settings, Board Settings, Weather Effects) */
+.toolbar-hover-container:has([data-panel-open="true"]) .toolbar-wrapper {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .no-board {
   display: flex;
   align-items: center;
@@ -2650,6 +2674,7 @@ canvas {
 
 .gameboard-panel-section-spacing {
   margin-bottom: var(--space-3);
+  padding: 0 10px
 }
 
 .gameboard-chip-grid {

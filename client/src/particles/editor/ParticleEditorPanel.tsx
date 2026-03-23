@@ -19,7 +19,6 @@ import {
 import { ParticlePreview } from './ParticlePreview';
 import { Icon } from '../../components/Icon';
 import { PARTICLE_ATLAS_TEXTURES } from '../runtime/particleTextures';
-import { PARTICLE_ICON_NAMES, iconToDataURL } from '../runtime/iconToTexture';
 import { useGameStore } from '../../store/gameStore';
 
 const EVENT_TYPES: ParticleEventType[] = [
@@ -118,7 +117,6 @@ export function ParticleEditorPanel({
   const previewInstanceRef = useRef<ParticlePreview | null>(null);
   const [isUploadingTexture, setIsUploadingTexture] = useState(false);
   const [textureError, setTextureError] = useState<string | null>(null);
-  const [showIconPicker, setShowIconPicker] = useState(false);
   const [previewHeight, setPreviewHeight] = useState(170);
   const [isInspectorResizing, setIsInspectorResizing] = useState(false);
   const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
@@ -347,17 +345,6 @@ export function ParticleEditorPanel({
     }
   };
 
-  const handleSelectIcon = async (iconName: string) => {
-    const dataURL = await iconToDataURL(iconName, 64);
-    if (dataURL && activePreset?.id) {
-      const updatedPreset = { ...activePreset, texture: dataURL };
-      updatePreset(updatedPreset);
-      // Replay the preset to show the new icon
-      previewInstanceRef.current?.playPreset(activePreset.id);
-    }
-    setShowIconPicker(false);
-  };
-
   if (!activePreset) {
     return <div style={{ color: '#fff', fontSize: '12px' }}>No presets available.</div>;
   }
@@ -580,40 +567,8 @@ export function ParticleEditorPanel({
               >
                 <Icon name="upload" />
               </button>
-              <button
-                className="tool-btn"
-                title="Font Awesome Icons"
-                onClick={() => setShowIconPicker(!showIconPicker)}
-              >
-                <Icon name="star" />
-              </button>
               {textureError && <span style={{ color: '#ff8a8a', fontSize: '10px' }}>{textureError}</span>}
             </div>
-            {showIconPicker && (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: '4px',
-                padding: '8px',
-                background: '#2a2a2a',
-                borderRadius: '4px',
-                marginBottom: '8px',
-                maxHeight: '150px',
-                overflowY: 'auto',
-              }}>
-                {PARTICLE_ICON_NAMES.map((iconName) => (
-                  <button
-                    key={iconName}
-                    className="tool-btn"
-                    title={iconName}
-                    onClick={() => handleSelectIcon(iconName)}
-                    style={{ padding: '6px', minHeight: '28px' }}
-                  >
-                    <Icon name={iconName as any} />
-                  </button>
-                ))}
-              </div>
-            )}
             <label style={styles.label}>Blend Mode</label>
             <select
               style={styles.input}
@@ -1178,14 +1133,6 @@ function GradientAlphaField({
     };
   }, [openStopPopup]);
 
-  useEffect(() => {
-    console.debug('[GradientAlphaField] popup state changed', {
-      popupStopIndex,
-      selectedStopIndex,
-      stopCount: stops.length,
-      popupStop: popupStopIndex !== null ? stops[popupStopIndex] : null,
-    });
-  }, [popupStopIndex, selectedStopIndex, stops]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {

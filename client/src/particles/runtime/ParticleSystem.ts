@@ -18,7 +18,7 @@ export interface ParticleSystemConfig {
 
 export interface ParticleSystemApi {
   trigger(trigger: ParticleTrigger): void;
-  playPreset(presetId: string, payload?: ParticlePlayPayload): string | null;
+  playPreset(presetId: string, payload?: ParticlePlayPayload): Promise<string | null>;
   stopByToken(tokenId: string): void;
   moveByToken(tokenId: string, x: number, y: number): void;
   updateByToken(tokenId: string, overrides: Partial<ParticlePreset>): void;
@@ -149,26 +149,32 @@ export class ParticleSystem implements ParticleSystemApi {
       }
       const payload = this.resolvePayload(trigger, binding.anchor);
       if (!payload) continue;
-      this.playPreset(binding.presetId, payload);
+      // Fire and forget - we don't await async playPreset
+      void this.playPreset(binding.presetId, payload);
     }
   }
 
-  playPreset(presetId: string, payload?: ParticlePlayPayload): string | null {
+  async playPreset(presetId: string, payload?: ParticlePlayPayload): Promise<string | null> {
     if (!this.isReady || !this.pool || !this.textures || this.emitters.length >= this.maxEmitters) return null;
     const preset = this.presets.get(presetId);
     if (!preset) return null;
     const layer = this.layers.get(preset.sortGroup);
     if (!layer) return null;
-    const texture = this.textures.getTexture(preset.texture);
+    let texture = this.textures.getTexture(preset.texture);
+    const isDataURL = preset.texture.startsWith('data:');
     if (
       texture === Texture.WHITE &&
       (preset.texture.includes('/') ||
         preset.texture.includes('.') ||
         preset.texture.startsWith('http') ||
-        preset.texture.startsWith('data:'))
+        isDataURL)
     ) {
-      void this.textures.preloadTexture(preset.texture);
-      return null;
+      const loadedTexture = await this.textures.preloadTexture(preset.texture);
+      if (loadedTexture && loadedTexture !== Texture.WHITE) {
+        texture = loadedTexture;
+      } else {
+        return null;
+      }
     }
     const container = this.pickBlendContainer(layer, preset.blendMode);
     const id = `emitter_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
