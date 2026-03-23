@@ -1150,6 +1150,8 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             delete newProps.auraRadius;
             delete newProps.auraOpacity;
             delete newProps.auraPulse;
+            delete newProps.auraAlphaFade;
+            delete newProps.auraRotation;
             delete newProps.particleEnabled;
             delete newProps.particleType;
             delete newProps.particleColor;
