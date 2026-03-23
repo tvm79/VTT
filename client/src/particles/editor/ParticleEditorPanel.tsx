@@ -48,6 +48,14 @@ const CURVE_PRESETS: Array<{ label: string; icon: string; points: ParticleCurveP
 
 const GRADIENT_DRAG_THRESHOLD_PX = 5;
 
+const CATEGORY_OPTIONS: ParticlePreset['category'][] = [
+  'combat',
+  'movement',
+  'magic',
+  'status',
+  'utility',
+];
+
 interface ParticleEditorPanelProps {
   selectedPresetId?: string;
   onSelectPreset?: (presetId: string) => void;
@@ -119,6 +127,8 @@ export function ParticleEditorPanel({
   const [textureError, setTextureError] = useState<string | null>(null);
   const [previewHeight, setPreviewHeight] = useState(170);
   const [isInspectorResizing, setIsInspectorResizing] = useState(false);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [deleteConfirmPreset, setDeleteConfirmPreset] = useState<ParticlePreset | null>(null);
   const resizeStartRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const inspectorResizeStartRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const {
@@ -264,6 +274,21 @@ export function ParticleEditorPanel({
     navigator.clipboard.writeText(JSON.stringify(data, null, 2)).catch(() => {
       console.warn('Failed to copy presets to clipboard');
     });
+  };
+
+  const handleDeletePreset = (preset: ParticlePreset) => {
+    // Check if this is the last preset or the active one
+    if (presets.length <= 1) {
+      alert('Cannot delete the last preset');
+      return;
+    }
+    deleteParticlePreset(preset.id);
+    setDeleteConfirmPreset(null);
+    // If we deleted the active preset, switch to another one
+    if (preset.id === activePresetId && presets.length > 1) {
+      const remaining = presets.filter(p => p.id !== preset.id);
+      setActivePresetId(remaining[0]?.id ?? '');
+    }
   };
 
   // Preview resize handlers - using refs to avoid recreating on render
@@ -446,17 +471,44 @@ export function ParticleEditorPanel({
               </div>
               <div style={styles.presetGrid}>
                 {items.map((preset) => (
-                  <button
+                  <div
                     key={preset.id}
-                    onClick={() => handleSelect(preset.id)}
                     style={{
-                      ...styles.presetButton,
-                      ...(preset.id === activePreset.id ? styles.presetButtonActive : undefined),
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
                     }}
-                    title={preset.name}
                   >
-                    {preset.name}
-                  </button>
+                    <button
+                      onClick={() => handleSelect(preset.id)}
+                      style={{
+                        ...styles.presetButton,
+                        flex: 1,
+                        textAlign: 'left',
+                        ...(preset.id === activePreset.id ? styles.presetButtonActive : undefined),
+                      }}
+                      title={preset.name}
+                    >
+                      {preset.name}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmPreset(preset)}
+                      style={{
+                        background: '#2a2a2a',
+                        border: '1px solid #444',
+                        borderRadius: '3px',
+                        color: '#888',
+                        cursor: 'pointer',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        lineHeight: 1,
+                        height: '28px',
+                      }}
+                      title="Delete preset"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -506,12 +558,43 @@ export function ParticleEditorPanel({
               onChange={(e) => updatePreset({ ...activePreset, name: e.target.value })}
             />
             <label style={styles.label}>Category</label>
-            <input
-              style={styles.input}
-              value={activePreset.category}
-              disabled={Boolean(emitterEdit)}
-              onChange={(e) => updatePreset({ ...activePreset, category: e.target.value as ParticlePreset['category'] })}
-            />
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <select
+                style={{ ...styles.input, flex: 1 }}
+                value={activePreset.category}
+                disabled={Boolean(emitterEdit)}
+                onChange={(e) => updatePreset({ ...activePreset, category: e.target.value as ParticlePreset['category'] })}
+              >
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+                {customCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="tool-btn"
+                title="Add Category"
+                onClick={() => {
+                  const newCategory = prompt('Enter new category name:');
+                  if (newCategory && newCategory.trim()) {
+                    const trimmed = newCategory.trim().toLowerCase();
+                    if (!CATEGORY_OPTIONS.includes(trimmed as ParticlePreset['category']) && !customCategories.includes(trimmed)) {
+                      setCustomCategories((prev) => [...prev, trimmed]);
+                      updatePreset({ ...activePreset, category: trimmed as ParticlePreset['category'] });
+                    } else {
+                      alert('Category already exists');
+                    }
+                  }
+                }}
+              >
+                <Icon name="plus" />
+              </button>
+            </div>
             <label style={styles.label}>Texture</label>
             <div style={styles.textureRow}>
               <select
@@ -688,16 +771,6 @@ export function ParticleEditorPanel({
               gradientStops={activePreset.gradientStops}
               onChange={(next) => updatePreset({ ...activePreset, ...next })}
             />
-            <label style={styles.label}>Size (Start/End)</label>
-            <RangePair
-              minValue={activePreset.startSize}
-              maxValue={activePreset.endSize}
-              min={0.1}
-              max={50}
-              step={0.1}
-              onChangeMin={(value) => updatePreset({ ...activePreset, startSize: value })}
-              onChangeMax={(value) => updatePreset({ ...activePreset, endSize: value })}
-            />
             <label style={styles.label}>Size Unit</label>
             <select
               style={styles.input}
@@ -707,6 +780,16 @@ export function ParticleEditorPanel({
               <option value="px">px</option>
               <option value="grid">grid units</option>
             </select>
+            <label style={styles.label}>Size (Start/End)</label>
+            <RangePair
+              minValue={activePreset.startSize}
+              maxValue={activePreset.endSize}
+              min={0.1}
+              max={activePreset.sizeUnit === 'grid' ? 10 : 200}
+              step={0.1}
+              onChangeMin={(value) => updatePreset({ ...activePreset, startSize: value })}
+              onChangeMax={(value) => updatePreset({ ...activePreset, endSize: value })}
+            />
             <CurveField
               label="Size Curve"
               curve={activePreset.sizeCurve}
@@ -919,7 +1002,7 @@ export function ParticleEditorPanel({
               <button
                 className="tool-btn"
                 style={{ background: '#4b1a1a', display: 'flex', alignItems: 'center', gap: '6px' }}
-                onClick={() => deleteParticlePreset(activePreset.id)}
+                onClick={() => setDeleteConfirmPreset(activePreset)}
                 title="Delete Preset"
               >
                 <Icon name="trash" />
@@ -928,6 +1011,74 @@ export function ParticleEditorPanel({
           </Section>
           )}
         </div>
+
+        {/* Custom Delete Confirmation Modal */}
+        {deleteConfirmPreset && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+            onClick={() => setDeleteConfirmPreset(null)}
+          >
+            <div
+              style={{
+                background: '#2a2a2a',
+                border: '1px solid #444',
+                borderRadius: '8px',
+                padding: '20px',
+                maxWidth: '300px',
+                textAlign: 'center',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: '#fff' }}>
+                Delete Preset
+              </div>
+              <div style={{ fontSize: '12px', color: '#aaa', marginBottom: '20px' }}>
+                Are you sure you want to delete "{deleteConfirmPreset.name}"?
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setDeleteConfirmPreset(null)}
+                  style={{
+                    background: '#444',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    color: '#ddd',
+                    cursor: 'pointer',
+                    padding: '8px 16px',
+                    fontSize: '12px',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeletePreset(deleteConfirmPreset)}
+                  style={{
+                    background: '#c44',
+                    border: '1px solid #d55',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    padding: '8px 16px',
+                    fontSize: '12px',
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

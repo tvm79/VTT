@@ -19,6 +19,31 @@ interface AssetFolder {
   accepts: string;
 }
 
+// Custom folders localStorage key
+const CUSTOM_FOLDERS_STORAGE_KEY = 'vtt_fileBrowserCustomFolders';
+
+// Load custom folders from localStorage
+function loadCustomFolders(): AssetFolder[] {
+  try {
+    const saved = localStorage.getItem(CUSTOM_FOLDERS_STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load custom folders:', e);
+  }
+  return [];
+}
+
+// Save custom folders to localStorage
+function saveCustomFolders(folders: AssetFolder[]): void {
+  try {
+    localStorage.setItem(CUSTOM_FOLDERS_STORAGE_KEY, JSON.stringify(folders));
+  } catch (e) {
+    console.error('Failed to save custom folders:', e);
+  }
+}
+
 interface FileBrowserProps {
   onFileSelect?: (fileUrl: string) => void;
 }
@@ -144,6 +169,15 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [dragOverUpload, setDragOverUpload] = useState(false);
   const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
+  const [customFolders, setCustomFolders] = useState<AssetFolder[]>(loadCustomFolders);
+
+  // Folder creation state
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
+  // Drag state for moving files between folders
+  const [draggedFile, setDraggedFile] = useState<FileItem | null>(null);
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
 
   const dragRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,7 +242,9 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
 
   const handleItemClick = (item: FileItem) => {
     setPreviewItem(item);
-    onFileSelect?.(item.url);
+    // Don't call onFileSelect here - that would close the browser.
+    // The user can drag the file to use it, or the file is selected
+    // via the select callback when the browser was opened for selection.
   };
 
   const handleFileDragStart = (e: React.DragEvent, item: FileItem) => {
@@ -245,6 +281,17 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
     e.dataTransfer.setData('text/uri-list', item.url);
     e.dataTransfer.setData('text/plain', item.url);
     e.dataTransfer.effectAllowed = 'copy';
+
+    // Store the dragged file for folder tab drop handling
+    if (isGM) {
+      setDraggedFile(item);
+    }
+  };
+
+  // Clear dragged file when drag ends
+  const handleFileDragEnd = () => {
+    setDraggedFile(null);
+    setDragOverFolder(null);
   };
 
   const handlePanelDragStart = (e: React.MouseEvent) => {
@@ -419,6 +466,87 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
     } catch (err) {
       console.error('Delete error:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete file');
+    }
+  };
+
+  // Create a new folder tab in the navigation
+  const handleCreateFolder = async () => {
+    if (!isGM) return;
+    const folderName = newFolderName.trim();
+    if (!folderName) {
+      setShowCreateFolder(false);
+      setNewFolderName('');
+      return;
+    }
+
+    // Create a new folder tab (AssetFolder)
+    const id = folderName.toLowerCase().replace(/\s+/g, '-');
+    const newFolder: AssetFolder = {
+      id,
+      name: folderName,
+      path: `/${id}`,
+      icon: 'folder',
+      accepts: 'image/*,audio/*,video/*',
+    };
+
+    // Add to custom folders
+    const updatedFolders = [...customFolders, newFolder];
+    setCustomFolders(updatedFolders);
+    saveCustomFolders(updatedFolders);
+
+    // Select the new folder
+    setSelectedFolder(newFolder);
+    setCurrentPath(newFolder.path);
+
+    setShowCreateFolder(false);
+    setNewFolderName('');
+    setSearch('');
+    setPreviewItem(null);
+  };
+
+  // Move a file to a different folder
+  const handleMoveFile = async (file: FileItem, destinationFolder: AssetFolder) => {
+    if (!isGM) return;
+
+    const sourcePath = file.url;
+    const destPath = destinationFolder.path;
+
+    try {
+      const res = await fetch('/api/assets/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: sourcePath, destination: destPath }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data?.error || 'Failed to move file');
+      }
+
+      // Refresh the current folder to reflect the file being moved out
+      await fetchFiles(currentPath);
+      setDraggedFile(null);
+      setDragOverFolder(null);
+    } catch (err) {
+      console.error('Move file error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to move file');
+    }
+  };
+
+  // Delete a custom folder tab (not the actual files, just the tab)
+  const handleDeleteFolderTab = (folderId: string) => {
+    if (!isGM) return;
+    if (!window.confirm('Remove this folder tab? (Files will not be deleted)')) return;
+
+    const updatedFolders = customFolders.filter((f) => f.id !== folderId);
+    setCustomFolders(updatedFolders);
+    saveCustomFolders(updatedFolders);
+
+    // If currently on the deleted folder, switch to first default folder
+    if (selectedFolder.id === folderId) {
+      setSelectedFolder(DEFAULT_ASSET_FOLDERS[0]);
+      setCurrentPath(DEFAULT_ASSET_FOLDERS[0].path);
     }
   };
 
@@ -645,30 +773,163 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
               borderBottom: '1px solid rgba(255,255,255,0.06)',
             }}
           >
-            {DEFAULT_ASSET_FOLDERS.map((folder) => {
+            {DEFAULT_ASSET_FOLDERS.concat(customFolders).map((folder) => {
               const active = selectedFolder.id === folder.id;
+              const isDragOver = dragOverFolder === folder.id;
               return (
                 <button
                   key={folder.id}
                   className={`folder-tab ${active ? 'active' : ''}`}
                   onClick={() => handleSelectFolder(folder)}
                   title={folder.path}
+                  onDragOver={(e) => {
+                    if (!isGM || !draggedFile) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDragOverFolder(folder.id);
+                  }}
+                  onDragLeave={(e) => {
+                    if (!isGM || !draggedFile) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    setDragOverFolder(null);
+                  }}
+                  onDrop={(e) => {
+                    if (!isGM || !draggedFile) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleMoveFile(draggedFile, folder);
+                    setDragOverFolder(null);
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 8,
                     padding: '0.45rem 0.75rem',
                     borderRadius: 999,
-                    border: active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.08)',
-                    background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                    border: isDragOver
+                      ? '2px solid rgba(100,200,100,0.6)'
+                      : active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.08)',
+                    background: isDragOver
+                      ? 'rgba(100,200,100,0.15)'
+                      : active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
                     cursor: 'pointer',
+                    transition: 'all 0.15s ease',
                   }}
                 >
                   <Icon name={folder.icon as any} />
                   <span>{folder.name}</span>
+                  {customFolders.some((cf) => cf.id === folder.id) && (
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteFolderTab(folder.id);
+                      }}
+                      style={{
+                        marginLeft: 4,
+                        padding: '2px 4px',
+                        borderRadius: 4,
+                        fontSize: '0.75rem',
+                        opacity: 0.5,
+                        cursor: 'pointer',
+                      }}
+                      title="Remove folder tab"
+                    >
+                      ×
+                    </span>
+                  )}
                 </button>
               );
             })}
+
+            {/* Create Folder button - only visible to GM */}
+            {isGM && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                {showCreateFolder ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input
+                      type="text"
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleCreateFolder();
+                        } else if (e.key === 'Escape') {
+                          setShowCreateFolder(false);
+                          setNewFolderName('');
+                        }
+                      }}
+                      placeholder="Folder name"
+                      autoFocus
+                      style={{
+                        width: 120,
+                        padding: '0.35rem 0.5rem',
+                        borderRadius: 6,
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        background: 'rgba(255,255,255,0.06)',
+                        color: 'inherit',
+                        fontSize: '0.85rem',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateFolder}
+                      title="Create"
+                      style={{
+                        padding: '0.35rem',
+                        borderRadius: 6,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.06)',
+                        cursor: 'pointer',
+                        color: 'inherit',
+                      }}
+                    >
+                      <Icon name="check" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateFolder(false);
+                        setNewFolderName('');
+                      }}
+                      title="Cancel"
+                      style={{
+                        padding: '0.35rem',
+                        borderRadius: 6,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.06)',
+                        cursor: 'pointer',
+                        color: 'inherit',
+                      }}
+                    >
+                      <Icon name="times" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateFolder(true)}
+                    title="Create new folder"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '0.45rem 0.75rem',
+                      borderRadius: 999,
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.03)',
+                      cursor: 'pointer',
+                      color: 'inherit',
+                      opacity: 0.7,
+                    }}
+                  >
+                    <Icon name="folder-plus" />
+                    <span>New Folder</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div
@@ -875,13 +1136,14 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                       onClick={() => handleItemClick(item)}
                       draggable
                       onDragStart={(e) => handleFileDragStart(e, item)}
+                      onDragEnd={handleFileDragEnd}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         if (isGM) handleDeleteFile(item);
                       }}
                       title={
                         isGM
-                          ? `Drag to use • Click to preview • Right-click to delete`
+                          ? `Drag to use • Click to preview • Right-click to delete • Drag to folder to move`
                           : `Drag to use • Click to preview`
                       }
                       style={{

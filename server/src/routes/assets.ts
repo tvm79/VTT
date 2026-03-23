@@ -145,11 +145,28 @@ router.get('/', async (req: Request, res: Response) => {
           url: fileUrl,
         };
 
-        // Add thumbnail for images
+        // Add thumbnail for images - generate on-the-fly if not exists
         if (fileType === 'image') {
           const thumbName = path.basename(entry.name, ext) + '.webp';
-          const thumbPath = path.join('_thumbs', thumbName);
-          fileInfo.thumb = `/assets/${thumbPath.replace(/\\/g, '/')}`;
+          const thumbPath = path.join(thumbsDir, thumbName);
+          
+          // Generate thumbnail if it doesn't exist
+          if (!fs.existsSync(thumbPath)) {
+            try {
+              const sourcePath = path.join(assetsDir, sanitizedPath, entry.name);
+              await sharp(sourcePath)
+                .resize(256, 256, { fit: 'inside', withoutEnlargement: true })
+                .webp({ quality: 80 })
+                .toFile(thumbPath);
+              console.log(`🖼️ Thumbnail generated: ${thumbName}`);
+            } catch (thumbError) {
+              console.error('Error creating thumbnail:', thumbError);
+            }
+          }
+          
+          // Set thumb URL (now guaranteed to exist)
+          const thumbUrlPath = path.join('_thumbs', thumbName);
+          fileInfo.thumb = `/assets/${thumbUrlPath.replace(/\\/g, '/')}`;
         }
 
         files.push(fileInfo);
@@ -332,6 +349,124 @@ router.delete('/', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error deleting asset:', error);
     res.status(500).json({ success: false, error: 'Failed to delete asset' });
+  }
+});
+
+// POST /api/assets/folder - Create a new folder
+router.post('/folder', async (req: Request, res: Response) => {
+  try {
+    const { path: requestPath, name } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'No folder name provided' });
+    }
+
+    if (!requestPath) {
+      return res.status(400).json({ success: false, error: 'No path provided' });
+    }
+
+    // Sanitize folder name to prevent directory traversal
+    const sanitizedName = name.replace(/[^a-zA-Z0-9/_-]/g, '').replace(/^\/+/, '').replace(/^-+/, '');
+    
+    if (!sanitizedName) {
+      return res.status(400).json({ success: false, error: 'Invalid folder name' });
+    }
+
+    // Sanitize the parent path
+    const sanitizedPath = requestPath.replace(/[^a-zA-Z0-9/_-]/g, '').replace(/^\/+/, '');
+    const fullPath = path.join(assetsDir, sanitizedPath, sanitizedName);
+
+    // Security check: ensure path is within assets directory
+    if (!fullPath.startsWith(assetsDir)) {
+      return res.status(403).json({ success: false, error: 'Invalid path' });
+    }
+
+    // Check if folder already exists
+    if (fs.existsSync(fullPath)) {
+      return res.status(409).json({ success: false, error: 'Folder already exists' });
+    }
+
+    // Create the folder
+    fs.mkdirSync(fullPath, { recursive: true });
+    console.log(`📁 Folder created: ${sanitizedPath}/${sanitizedName}`);
+
+    res.json({ success: true, path: `${requestPath}/${sanitizedName}` });
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    res.status(500).json({ success: false, error: 'Failed to create folder' });
+  }
+});
+
+// POST /api/assets/move - Move a file to a different folder
+router.post('/move', async (req: Request, res: Response) => {
+  try {
+    const { source, destination } = req.body;
+    
+    if (!source) {
+      return res.status(400).json({ success: false, error: 'No source path provided' });
+    }
+
+    if (!destination) {
+      return res.status(400).json({ success: false, error: 'No destination path provided' });
+    }
+
+    // Sanitize paths - remove /assets prefix if present
+    const sourceRelative = source.replace(/^\/assets\//, '').replace(/^assets\//, '');
+    const sourceSanitized = sourceRelative.replace(/[^a-zA-Z0-9/_.-]/g, '');
+    const sourcePath = path.join(assetsDir, sourceSanitized);
+
+    // For destination, we expect a folder path like /tokens or /maps/mysubfolder
+    const destRelative = destination.replace(/^\/+/, '');
+    const destSanitized = destRelative.replace(/[^a-zA-Z0-9/_-]/g, '');
+    const destPath = path.join(assetsDir, destSanitized);
+
+    // Security check: ensure both paths are within assets directory
+    if (!sourcePath.startsWith(assetsDir)) {
+      return res.status(403).json({ success: false, error: 'Invalid source path' });
+    }
+    if (!destPath.startsWith(assetsDir)) {
+      return res.status(403).json({ success: false, error: 'Invalid destination path' });
+    }
+
+    // Check if source file exists
+    if (!fs.existsSync(sourcePath)) {
+      return res.status(404).json({ success: false, error: 'Source file not found' });
+    }
+
+    // Check if destination folder exists
+    if (!fs.existsSync(destPath)) {
+      return res.status(404).json({ success: false, error: 'Destination folder not found' });
+    }
+
+    // Get the filename from source path
+    const fileName = path.basename(sourcePath);
+    const destFilePath = path.join(destPath, fileName);
+
+    // Check if a file with same name exists in destination
+    if (fs.existsSync(destFilePath)) {
+      return res.status(409).json({ success: false, error: 'File already exists in destination folder' });
+    }
+
+    // Move the file
+    fs.renameSync(sourcePath, destFilePath);
+    console.log(`📦 File moved: ${sourceSanitized} -> ${destSanitized}/${fileName}`);
+
+    // Move thumbnail if exists
+    const sourceExt = path.extname(sourceSanitized);
+    const sourceBase = path.basename(sourceSanitized, sourceExt);
+    const sourceThumbName = sourceBase + '.webp';
+    const sourceThumbPath = path.join(thumbsDir, sourceThumbName);
+    
+    if (fs.existsSync(sourceThumbPath)) {
+      const destThumbPath = path.join(thumbsDir, path.basename(destFilePath, path.extname(destFilePath)) + '.webp');
+      fs.renameSync(sourceThumbPath, destThumbPath);
+      console.log(`📦 Thumbnail moved: ${sourceThumbName} -> ${path.basename(destThumbPath)}`);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error moving file:', error);
+    res.status(500).json({ success: false, error: 'Failed to move file' });
   }
 });
 
