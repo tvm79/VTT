@@ -147,11 +147,16 @@ router.get('/', async (req: Request, res: Response) => {
 
         // Add thumbnail for images - generate on-the-fly if not exists
         if (fileType === 'image') {
-          const thumbName = path.basename(entry.name, ext) + '.webp';
+          // Include folder path in thumbnail name to prevent collisions
+          const thumbName = (sanitizedPath.replace(/[/\\]/g, '_') + '_' + path.basename(entry.name, ext)) + '.webp';
           const thumbPath = path.join(thumbsDir, thumbName);
           
+          // Also check for legacy thumbnail (without folder path) as fallback
+          const legacyThumbName = path.basename(entry.name, ext) + '.webp';
+          const legacyThumbPath = path.join(thumbsDir, legacyThumbName);
+          
           // Generate thumbnail if it doesn't exist
-          if (!fs.existsSync(thumbPath)) {
+          if (!fs.existsSync(thumbPath) && !fs.existsSync(legacyThumbPath)) {
             try {
               const sourcePath = path.join(assetsDir, sanitizedPath, entry.name);
               await sharp(sourcePath)
@@ -164,9 +169,14 @@ router.get('/', async (req: Request, res: Response) => {
             }
           }
           
-          // Set thumb URL (now guaranteed to exist)
-          const thumbUrlPath = path.join('_thumbs', thumbName);
-          fileInfo.thumb = `/assets/${thumbUrlPath.replace(/\\/g, '/')}`;
+          // Use new thumbnail if exists, otherwise try legacy
+          if (fs.existsSync(thumbPath)) {
+            const thumbUrlPath = path.join('_thumbs', thumbName);
+            fileInfo.thumb = `/assets/${thumbUrlPath.replace(/\\/g, '/')}`;
+          } else if (fs.existsSync(legacyThumbPath)) {
+            const thumbUrlPath = path.join('_thumbs', legacyThumbName);
+            fileInfo.thumb = `/assets/${thumbUrlPath.replace(/\\/g, '/')}`;
+          }
         }
 
         files.push(fileInfo);
@@ -275,7 +285,8 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     let thumbUrl: string | undefined;
     if (fileType === 'image') {
       try {
-        const thumbName = path.basename(sanitizedName, ext) + '.webp';
+        // Include folder path in thumbnail name to prevent collisions
+        const thumbName = (safePath.replace(/[/\\]/g, '_') + '_' + path.basename(sanitizedName, ext)) + '.webp';
         const thumbPath = path.join(thumbsDir, thumbName);
         
         await sharp(filePath)

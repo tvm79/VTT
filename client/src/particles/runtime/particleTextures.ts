@@ -8,13 +8,8 @@ function normalizeCustomTexturePath(path: string): string {
   if (trimmed.startsWith('data:')) return trimmed;
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
 
-  // Uploaded assets are often stored/referenced as /assets/<folder>/<file>,
-  // but Pixi texture resolution in this runtime expects the public path directly.
-  // Example: /assets/maps/cloud1.webp -> /maps/cloud1.webp
-  if (trimmed.startsWith('/assets/')) {
-    return trimmed.slice('/assets'.length);
-  }
-
+  // Assets are served from /assets/ - don't strip the prefix
+  // The file at /assets/particles/dirt_01.png should be loaded as /assets/particles/dirt_01.png
   return trimmed;
 }
 

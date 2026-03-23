@@ -866,9 +866,6 @@ button.tool-btn i {
 
 .room-code {
   padding: var(--space-1) var(--space-2);
-  background: var(--color-state-hover);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
   font-family: var(--typography-family-mono);
   font-size: var(--font-size-sm);
   color: var(--text-secondary, var(--color-text-secondary));

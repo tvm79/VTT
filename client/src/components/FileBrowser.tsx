@@ -197,6 +197,99 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
   const [previewItem, setPreviewItem] = useState<FileItem | null>(null);
   const [customFolders, setCustomFolders] = useState<AssetFolder[]>(loadCustomFolders);
   const [thumbnailSize, setThumbnailSize] = useState<number>(loadThumbnailSize);
+  const [showFolderText, setShowFolderText] = useState<boolean>(() => {
+    const stored = localStorage.getItem('fileBrowserShowFolderText');
+    return stored === null ? true : stored === 'true';
+  });
+  const [iconPickerFolder, setIconPickerFolder] = useState<AssetFolder | null>(null);
+
+  // Folder icons - stored in localStorage for custom icons on any folder
+  const FOLDER_ICONS_STORAGE_KEY = 'vtt_fileBrowserFolderIcons';
+  
+  function loadFolderIcons(): Record<string, string> {
+    try {
+      const saved = localStorage.getItem(FOLDER_ICONS_STORAGE_KEY);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to load folder icons:', e);
+    }
+    return {};
+  }
+
+  function saveFolderIcons(icons: Record<string, string>): void {
+    try {
+      localStorage.setItem(FOLDER_ICONS_STORAGE_KEY, JSON.stringify(icons));
+    } catch (e) {
+      console.error('Failed to save folder icons:', e);
+    }
+  }
+
+  const [folderIcons, setFolderIcons] = useState<Record<string, string>>(loadFolderIcons);
+
+  // Get folder icon - custom icon takes priority, then folder's default icon
+  const getFolderIcon = (folder: AssetFolder): string => {
+    return folderIcons[folder.id] || folder.icon;
+  };
+
+  // Update folder icon
+  const updateFolderIcon = (folder: AssetFolder, newIcon: string) => {
+    const updated = { ...folderIcons, [folder.id]: newIcon };
+    setFolderIcons(updated);
+    saveFolderIcons(updated);
+    setIconPickerFolder(null);
+  };
+
+  // Available icons for the picker - more icons to enable scrolling
+  const AVAILABLE_ICONS = [
+    // Folders
+    'folder', 'folder-open', 'folder-plus',
+    // Files & Media
+    'image', 'music', 'video', 'file', 'file-lines', 'file-alt',
+    // Items & Objects
+    'cube', 'gem', 'coins', 'ring', 'key', 'anchor', 'gift',
+    // Places & Maps
+    'map', 'globe', 'mountain', 'tree', 'map-marker', 'location-dot',
+    // Characters
+    'user', 'users', 'user-group', 'crown', 'user-secret', 'face-dizzy', 'face-tired',
+    'face-surprise', 'face-stars', 'smile', 'tired',
+    // Fantasy
+    'book', 'scroll', 'star', 'database', 'hat-wizard', 'mask', 'dragon',
+    'ghost', 'skull', 'skull-crossbones', 'spider', 'paw', 'flask', 'vial',
+    'brain', 'spell', 'wand-magic-sparkles',
+    // Combat
+    'shield', 'sword', 'hand-fist', 'bolt', 'fire', 'skull',
+    // Nature
+    'snowflake', 'cloud', 'cloud-rain', 'cloud-bolt', 'wind', 'rain', 'sun', 'moon',
+    'temperature-high', 'temperature-low', 'droplet', 'hand-holding-droplet',
+    // UI & Actions
+    'cog', 'filter', 'list', 'search', 'tag', 'layer-group', 'tag',
+    'palette', 'border-all', 'draw-polygon', 'ruler',
+    // Audio
+    'play', 'pause', 'stop', 'volume-up', 'volume-mute', 'volume-off',
+    'repeat', 'random', 'shuffle',
+    // Files
+    'download', 'upload', 'save', 'copy', 'external-link-alt',
+    // UI Controls
+    'check', 'plus', 'minus', 'times', 'ban',
+    'chevron-up', 'chevron-down', 'chevron-left', 'chevron-right',
+    'arrow-left', 'arrow-up', 'expand', 'compress', 'compress-alt',
+    'arrow-left', 'sign-out-alt',
+    // Status
+    'lock', 'unlock', 'link',
+    'info', 'info-circle', 'question-circle',
+    'redo', 'rotate', 'eye', 'lightbulb',
+    // Dice
+    'dice', 'dice-d20', 'dice-four', 'dice-six', 'dice-d20',
+    // Misc
+    'bed', 'beer', 'door-open', 'car', 'bomb',
+    'bug', 'brain', 'feather', 'fingerprint', 'graduation-cap',
+    'hand-pointer', 'heart', 'heart-crack', 'home', 'laptop',
+    'mobile', 'money-bill', 'newspaper', 'phone', 'plane',
+    'rocket', 'server', 'shopping-cart', 'ticket', 'toolbox', 'trophy',
+    'utensils', 'walking', 'wallet', 'wifi',
+  ];
 
   // Folder creation state
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -268,6 +361,7 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
   };
 
   const handleItemClick = (item: FileItem) => {
+    console.log('[FileBrowser] handleItemClick, item:', item.name);
     setPreviewItem(item);
     // Don't call onFileSelect here - that would close the browser.
     // The user can drag the file to use it, or the file is selected
@@ -750,6 +844,42 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
             Dragging from the browser sends structured metadata so the canvas/audio systems can route files correctly.
           </div>
 
+          {/* Show folder text toggle */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.6rem 0.8rem',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.03)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name={showFolderText ? 'toggle-on' : 'toggle-off'} />
+              <span>Show folder text</span>
+            </div>
+            <button
+              onClick={() => {
+                const newValue = !showFolderText;
+                setShowFolderText(newValue);
+                localStorage.setItem('fileBrowserShowFolderText', String(newValue));
+              }}
+              style={{
+                padding: '0.3rem 0.6rem',
+                borderRadius: 6,
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: showFolderText ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+                color: 'inherit',
+                fontSize: '0.8rem',
+              }}
+            >
+              {showFolderText ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
           <div
             className="folder-list"
             style={{
@@ -809,6 +939,12 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                   className={`folder-tab ${active ? 'active' : ''}`}
                   onClick={() => handleSelectFolder(folder)}
                   title={folder.path}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (isGM) {
+                      setIconPickerFolder(folder);
+                    }
+                  }}
                   onDragOver={(e) => {
                     if (!isGM || !draggedFile) return;
                     e.preventDefault();
@@ -845,8 +981,8 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  <Icon name={folder.icon as any} />
-                  <span>{folder.name}</span>
+                  <Icon name={getFolderIcon(folder) as any} />
+                  {showFolderText && <span>{folder.name}</span>}
                   {customFolders.some((cf) => cf.id === folder.id) && (
                     <span
                       onClick={(e) => {
@@ -1267,9 +1403,7 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                         >
                           {item.name}
                         </div>
-                        <div style={{ marginTop: 4, fontSize: '0.74rem', opacity: 0.6 }}>
-                          {item.type}{item.size ? ` • ${formatBytes(item.size)}` : ''}
-                        </div>
+
                       </div>
                     </div>
                   ))}
@@ -1296,6 +1430,7 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                 </div>
               ) : (
                 <>
+                  {console.log('[FileBrowser] Preview item exists, should show Use Asset button:', previewItem.name)}
                   <div
                     style={{
                       borderRadius: 12,
@@ -1311,6 +1446,13 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                       <img
                         src={previewItem.url}
                         alt={previewItem.name}
+                        onError={(e) => {
+                          // Fallback to thumbnail if main image fails to load
+                          const target = e.currentTarget;
+                          if (previewItem.thumb && target.src !== previewItem.thumb) {
+                            target.src = previewItem.thumb;
+                          }
+                        }}
                         style={{
                           maxWidth: '100%',
                           maxHeight: 260,
@@ -1339,7 +1481,7 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                       Type: {previewItem.type}
                     </div>
                     <div style={{ marginTop: 4, fontSize: '0.8rem', opacity: 0.65 }}>
-                      Folder: {getFolderIdFromPath(previewItem.url)}
+                      Folder: {selectedFolder.name}
                     </div>
                     <div style={{ marginTop: 4, fontSize: '0.8rem', opacity: 0.65, wordBreak: 'break-all' }}>
                       URL: {previewItem.url}
@@ -1349,7 +1491,12 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     <button
                       className="tool-btn"
-                      onClick={() => onFileSelect?.(previewItem.url)}
+                      style={{ background: '#4a5568', border: '1px solid #718096', color: '#fff', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+                      onClick={() => {
+                        console.log('[FileBrowser] Use Asset clicked, URL:', previewItem?.url);
+                        console.log('[FileBrowser] onFileSelect callback:', onFileSelect);
+                        onFileSelect?.(previewItem.url);
+                      }}
                     >
                       Use Asset
                     </button>
@@ -1427,6 +1574,121 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
           background: 'transparent',
         }}
       />
+
+      {/* Icon Picker Modal - positioned within Asset Browser */}
+      {iconPickerFolder && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            borderRadius: 12,
+          }}
+          onClick={() => setIconPickerFolder(null)}
+        >
+          <div
+            style={{
+              background: colorScheme?.id === 'custom' ? colorScheme.surface : '#2a2a2a',
+              borderRadius: 12,
+              border: `1px solid ${colorScheme?.id === 'custom' ? colorScheme.accent : 'rgba(255,255,255,0.12)'}`,
+              padding: '0.8rem',
+              width: 'calc(100% - 40px)',
+              maxHeight: 'calc(100% - 60px)',
+              overflowY: 'auto',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.75rem',
+                paddingBottom: '0.5rem',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                position: 'sticky',
+                top: 0,
+                background: colorScheme?.id === 'custom' ? colorScheme.surface : '#2a2a2a',
+                zIndex: 1,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name={getFolderIcon(iconPickerFolder) as any} />
+                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Icon for "{iconPickerFolder.name}"</span>
+              </div>
+              <button
+                onClick={() => setIconPickerFolder(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  padding: 2,
+                  fontSize: '1rem',
+                  opacity: 0.7,
+                }}
+              >
+                <Icon name="times" />
+              </button>
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: 8,
+                overflowY: 'auto',
+                paddingRight: 4,
+              }}
+            >
+              {AVAILABLE_ICONS.map((iconName) => (
+                <button
+                  key={iconName}
+                  onClick={() => updateFolderIcon(iconPickerFolder, iconName)}
+                  title={iconName}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0.6rem',
+                    borderRadius: 8,
+                    border: getFolderIcon(iconPickerFolder) === iconName
+                      ? '2px solid rgba(59,130,246,0.6)'
+                      : '1px solid rgba(255,255,255,0.08)',
+                    background: getFolderIcon(iconPickerFolder) === iconName
+                      ? 'rgba(59,130,246,0.15)'
+                      : 'rgba(255,255,255,0.04)',
+                    cursor: 'pointer',
+                    color: 'inherit',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <Icon name={iconName as any} />
+                </button>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: '0.75rem',
+                paddingTop: '0.5rem',
+                borderTop: '1px solid rgba(255,255,255,0.08)',
+                fontSize: '0.75rem',
+                opacity: 0.6,
+                textAlign: 'center',
+              }}
+            >
+              Right-click a folder tab to change its icon
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
