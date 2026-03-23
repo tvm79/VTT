@@ -101,6 +101,8 @@ export class ParticlePreview {
       requestAnimationFrame(() => this.playPreset(presetId));
       return;
     }
+    // Stop any currently playing particles before playing the new preset
+    this.system.stopAll();
     this.system.setBounds(this.width, this.height);
     this.system.playPreset(presetId, {
       x: this.width / 2,
