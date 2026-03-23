@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect, useMemo } from 'react';
 import * as PIXI from 'pixi.js';
-import { BlurFilter } from 'pixi.js';
+import { BlurFilter, ColorMatrixFilter, NoiseFilter, DisplacementFilter } from 'pixi.js';
 import type { BLEND_MODES } from 'pixi.js';
 import { useGameStore, type SceneParticleEmitterConfig, type WeatherFilterConfig } from '../store/gameStore';
 import { shallow } from 'zustand/shallow';
@@ -468,6 +468,8 @@ interface TokenVisualRefs {
   turnMarkerFallback: PIXI.Graphics;
   turnMarkerSprite: PIXI.Sprite;
   auraContainer: PIXI.Container;
+  auraGlows?: PIXI.Graphics[];
+  auraRing?: PIXI.Graphics;
   statusContainer: PIXI.Container;
   labelContainer: PIXI.Container;
   barsContainer: PIXI.Container;
@@ -2963,6 +2965,88 @@ export function GameBoard() {
       });
     };
 
+    // Aura animation ticker - continuously animates aura pulse effect
+    const updateAuraPulse = (ticker: PIXI.Ticker) => {
+      const time = Date.now();
+      // Get tokens from the game store
+      const allTokens = useGameStore.getState().tokens;
+      const currentBoard = useGameStore.getState().currentBoard;
+      const boardId = currentBoard?.id;
+      const boardTokens = boardId ? allTokens.filter(t => t.boardId === boardId) : allTokens;
+      
+      tokenVisualsRef.current.forEach((visuals, tokenId) => {
+        const { auraContainer, root } = visuals;
+        if (!auraContainer || !auraContainer.visible) return;
+        
+        // Get token properties for aura settings
+        const token = boardTokens.find(t => t.id === tokenId);
+        if (!token) return;
+        const auraProps = (token.properties || {}) as Record<string, unknown>;
+        const auraEnabled = auraProps.auraEnabled === true;
+        const auraPulse = auraProps.auraPulse !== false;
+        const auraRadius = typeof auraProps.auraRadius === 'number' ? auraProps.auraRadius : 60;
+        const auraOpacity = typeof auraProps.auraOpacity === 'number' ? auraProps.auraOpacity : 0.5;
+        const auraColor = auraProps.auraColor ? parseInt(String(auraProps.auraColor).replace('#', ''), 16) : DEFAULT_AURA_COLOR;
+        
+        if (!auraEnabled) return;
+        
+        // Get or create stored aura graphics references
+        let auraGlows = visuals.auraGlows as PIXI.Graphics[] | undefined;
+        let auraRing = visuals.auraRing as PIXI.Graphics | undefined;
+        
+        // Initialize glows if not present
+        if (!auraGlows || auraGlows.length === 0) {
+          auraGlows = [];
+          const glowCount = 5;
+          for (let g = glowCount; g >= 1; g--) {
+            const glow = new PIXI.Graphics();
+            auraContainer.addChild(glow);
+            auraGlows.push(glow);
+          }
+          visuals.auraGlows = auraGlows;
+        }
+        
+        // Initialize ring if not present
+        if (!auraRing) {
+          auraRing = new PIXI.Graphics();
+          auraContainer.addChild(auraRing);
+          visuals.auraRing = auraRing;
+        }
+        
+        // Calculate pulse factor
+        const pulseFactor = auraPulse ? (Math.sin(time * 0.003) * 0.15 + 1) : 1;
+        
+        // Get token size from sprite - use the scaled dimensions
+        const sprite = visuals.sprite;
+        const tokenSize = sprite ? Math.max(sprite.width, sprite.height) : auraRadius * 2;
+        const centerX = tokenSize / 2;
+        const centerY = tokenSize / 2;
+        
+        // Update glow circles
+        const glowCount = 5;
+        for (let g = 0; g < glowCount; g++) {
+          const t = (g + 1) / glowCount;
+          const glowRadius = auraRadius * t * pulseFactor;
+          const glowAlpha = Math.max(0.01, auraOpacity * 0.25 * (1 - t * 0.7));
+          
+          const glow = auraGlows[g];
+          if (glow) {
+            glow.clear();
+            glow.circle(centerX, centerY, glowRadius);
+            glow.fill({ color: auraColor, alpha: glowAlpha });
+          }
+        }
+        
+        // Update ring
+        if (auraRing) {
+          auraRing.clear();
+          auraRing.circle(centerX, centerY, auraRadius * pulseFactor);
+          auraRing.stroke({ width: 2, color: auraColor, alpha: auraOpacity * 0.6 });
+        }
+      });
+    };
+
+    app.ticker.add(updateAuraPulse);
     app.ticker.add(updateScreenShake);
     app.ticker.add(updateTurnMarkerSpin);
 
@@ -2975,6 +3059,7 @@ export function GameBoard() {
       particlePresetUnsubRef.current = null;
       destroyParticleSystem();
       particleSystemRef.current = null;
+      app.ticker.remove(updateAuraPulse);
       app.ticker.remove(updateScreenShake);
       app.ticker.remove(updateTurnMarkerSpin);
       app.destroy(true, { children: true, texture: true });
@@ -3735,6 +3820,68 @@ export function GameBoard() {
         const shouldAnimateMove = !!previous && (previous.x !== token.x || previous.y !== token.y);
         // Gameplay state stays in the store/socket layer. The animation manager only
         // receives the current authoritative base transform and composes disposable FX on top.
+        // Apply visual effects from token properties (filters, tint, mesh) - apply BEFORE sync
+        const effectProps = (token.properties || {}) as Record<string, unknown>;
+        
+        // Apply tint & color effects
+        const tokenTintEnabled = effectProps.tokenTintEnabled === true;
+        const tokenTintColor = (effectProps.tokenTintColor as string) || '#ffffff';
+        const tokenAlpha = typeof effectProps.tokenAlpha === 'number' ? effectProps.tokenAlpha : 100;
+        const tokenBlendMode = (effectProps.tokenBlendMode as string) || 'normal';
+        
+        // Apply tint color if enabled
+        if (tokenTintEnabled) {
+          const tintNumber = parseInt(tokenTintColor.replace('#', ''), 16);
+          sprite.tint = tintNumber;
+        } else {
+          sprite.tint = DEFAULT_TINT_COLOR;
+        }
+        
+        // Apply alpha (combine with base alpha for selection/hidden states)
+        const baseAlpha = getTokenBaseAlpha(isSelected, isHidden);
+        sprite.alpha = (tokenAlpha / 100) * baseAlpha;
+        
+        // Apply blend mode
+        sprite.blendMode = tokenBlendMode as BLEND_MODES;
+        
+        // Apply filter effects
+        const tokenEffectFilter = (effectProps.tokenEffectFilter as string) || 'none';
+        const tokenFilterIntensity = typeof effectProps.tokenFilterIntensity === 'number' ? effectProps.tokenFilterIntensity : 50;
+        
+        if (tokenEffectFilter !== 'none') {
+          const filters: PIXI.Filter[] = [];
+          
+          switch (tokenEffectFilter) {
+            case 'blur':
+              filters.push(new BlurFilter({ strength: tokenFilterIntensity / 20 }));
+              break;
+            case 'glow':
+              const glowMatrix = new ColorMatrixFilter();
+              glowMatrix.brightness(1 + tokenFilterIntensity / 100, false);
+              filters.push(glowMatrix);
+              break;
+            case 'colorMatrix':
+              const colorMatrix = new ColorMatrixFilter();
+              colorMatrix.contrast(1 + tokenFilterIntensity / 200, false);
+              filters.push(colorMatrix);
+              break;
+            case 'noise':
+              filters.push(new NoiseFilter({ noise: tokenFilterIntensity / 100 }));
+              break;
+            case 'displacement':
+              const displacementFilter = new DisplacementFilter(new PIXI.Sprite(PIXI.Texture.WHITE));
+              displacementFilter.scale.x = tokenFilterIntensity / 10;
+              displacementFilter.scale.y = tokenFilterIntensity / 10;
+              filters.push(displacementFilter);
+              break;
+          }
+          
+          sprite.filters = filters;
+        } else {
+          sprite.filters = [];
+        }
+        
+        // Now sync with animation manager
         animationManager.syncTokenBaseState(token.id, {
           x: token.x,
           y: token.y,
@@ -4020,36 +4167,22 @@ export function GameBoard() {
 
         const auraProps = (token.properties || {}) as Record<string, unknown>;
         const auraEnabled = auraProps.auraEnabled === true;
-        const auraColor = auraProps.auraColor ? parseInt(String(auraProps.auraColor).replace('#', ''), 16) : DEFAULT_AURA_COLOR;
-        const auraRadius = typeof auraProps.auraRadius === 'number' ? auraProps.auraRadius : 60;
-        const auraOpacity = typeof auraProps.auraOpacity === 'number' ? auraProps.auraOpacity : 0.5;
-        const auraPulse = auraProps.auraPulse !== false;
+        
+        // Aura animation is now handled by the ticker (updateAuraPulse)
+        // Just toggle visibility here - the ticker creates/animates the graphics
         if (auraEnabled) {
-          auraContainer.removeChildren();
-
-          const glowCount = 5;
-          for (let g = glowCount; g >= 1; g--) {
-            const t = g / glowCount;
-            const glowRadius = auraRadius * t;
-            const glowAlpha = Math.max(0.01, auraOpacity * 0.25 * (1 - t * 0.7));
-            
-            // Pulse animation
-            const pulseFactor = auraPulse ? (Math.sin(Date.now() * 0.003) * 0.15 + 1) : 1;
-            const finalRadius = glowRadius * pulseFactor;
-            
-            const glow = new PIXI.Graphics();
-            glow.circle(size / 2, size / 2, finalRadius);
-            glow.fill({ color: auraColor, alpha: glowAlpha });
-            auraContainer.addChild(glow);
-          }
-
-          const ring = new PIXI.Graphics();
-          ring.circle(size / 2, size / 2, auraRadius);
-          ring.stroke({ width: 2, color: auraColor, alpha: auraOpacity * 0.6 });
-          auraContainer.addChild(ring);
-          
           auraContainer.visible = true;
         } else {
+          // Clear the aura graphics when disabled
+          if (visuals.auraGlows) {
+            visuals.auraGlows.forEach(g => g.destroy());
+            visuals.auraGlows = undefined;
+          }
+          if (visuals.auraRing) {
+            visuals.auraRing.destroy();
+            visuals.auraRing = undefined;
+          }
+          auraContainer.removeChildren();
           auraContainer.visible = false;
         }
 
@@ -8527,7 +8660,8 @@ export function GameBoard() {
                 case 'aura':
                   // Open aura/enchantment editor
                   {
-                    const pos = clampToBounds(menuX - 160, menuY - 250, 320, 500);
+                    // Place the panel to the right of the token (beside it)
+                    const pos = clampToBounds(menuX + 20, menuY - 50, 320, 500);
                     setAuraEditorState({
                       tokenId: token.id,
                       position: pos,
@@ -9883,6 +10017,7 @@ export function GameBoard() {
         return (
           <AuraSettingsModal 
             token={token} 
+            position={auraEditorState.position}
             onClose={() => setAuraEditorState(null)} 
           />
         );

@@ -109,11 +109,12 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.7)',
+    background: 'transparent',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: zIndex.debug,
+    zIndex: zIndex.modal,
+    pointerEvents: 'none' as const,
   },
   modal: {
     background: colors.surface.base,
@@ -209,7 +210,7 @@ const styles = {
   segmentedControl: {
     display: 'flex',
     gap: '2px',
-    background: 'rgba(0, 0, 0, 0.3)',
+    background: colors.state.active,
     borderRadius: '6px',
     padding: '2px',
   },
@@ -222,6 +223,8 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     flex: 1,
+    color: colors.text.muted,
+    background: 'transparent',
   },
   dangerButton: {
     width: '100%',
@@ -266,18 +269,26 @@ const styles = {
 };
 
 // Modal Component
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+function Modal({ title, onClose, children, position }: { title: string; onClose: () => void; children: React.ReactNode; position?: { x: number; y: number } }) {
+  const modalStyle = position ? {
+    ...styles.modal,
+    position: 'absolute' as const,
+    left: position.x,
+    top: position.y,
+    pointerEvents: 'auto' as const,
+  } : { ...styles.modal, pointerEvents: 'auto' as const };
+  
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ color: '#fff', margin: 0, fontSize: '16px' }}>{title}</h3>
+          <h3 style={{ color: colors.text.primary, margin: 0, fontSize: '16px' }}>{title}</h3>
           <button
             onClick={onClose}
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'rgba(255, 255, 255, 0.5)',
+              color: colors.text.muted,
               cursor: 'pointer',
               padding: '4px',
               fontSize: '18px',
@@ -592,7 +603,7 @@ function StatusSettingsModal({ token, onClose }: { token: Token; onClose: () => 
 }
 
 // Aura Settings Modal - Visual enchantment effects for tokens
-export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: () => void }) {
+export function AuraSettingsModal({ token, onClose, position }: { token: Token; onClose: () => void; position?: { x: number; y: number } }) {
   const tokenProps = (token.properties || {}) as Record<string, unknown>;
   
   // Aura settings from token properties
@@ -629,7 +640,7 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
   };
 
   return (
-    <Modal title="Enchantment Aura" onClose={onClose}>
+    <Modal title="Enchantment Aura" onClose={onClose} position={position}>
       {/* Preset Selection */}
       <div style={{ marginBottom: '16px' }}>
         <label style={styles.label}>Aura Preset</label>
@@ -640,10 +651,10 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
               onClick={() => applyPreset(preset.id)}
               style={{
                 padding: '8px 4px',
-                background: auraPreset === preset.id ? `rgba(72, 187, 120, 0.3)` : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${auraPreset === preset.id ? 'rgba(72, 187, 120, 0.5)' : 'rgba(255, 255, 255, 0.1)'}`,
+                background: auraEnabled && auraPreset === preset.id ? colors.state.selected : colors.state.hover,
+                border: `1px solid ${auraEnabled && auraPreset === preset.id ? colors.border.accent : colors.border.subtle}`,
                 borderRadius: '6px',
-                color: preset.color !== '#00000000' ? preset.color : '#888',
+                color: preset.color !== '#00000000' ? preset.color : colors.text.muted,
                 fontSize: '10px',
                 cursor: 'pointer',
                 textShadow: preset.color !== '#00000000' ? `0 0 8px ${preset.color}` : 'none',
@@ -663,8 +674,8 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
             onClick={() => updateAuraProp('auraEnabled', true)}
             style={{
               ...styles.segmentButton,
-              background: auraEnabled ? 'rgba(72, 187, 120, 0.3)' : 'transparent',
-              color: auraEnabled ? '#48bb78' : 'rgba(255, 255, 255, 0.5)',
+              background: auraEnabled ? colors.state.selected : 'transparent',
+              color: auraEnabled ? colors.accent.success : colors.text.muted,
             }}
           >
             ON
@@ -674,7 +685,7 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
             style={{
               ...styles.segmentButton,
               background: !auraEnabled ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-              color: !auraEnabled ? '#ef4444' : 'rgba(255, 255, 255, 0.5)',
+              color: !auraEnabled ? colors.accent.danger : colors.text.muted,
             }}
           >
             OFF
@@ -729,8 +740,8 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
                 onClick={() => updateAuraProp('auraPulse', true)}
                 style={{
                   ...styles.segmentButton,
-                  background: auraPulse ? 'rgba(72, 187, 120, 0.3)' : 'transparent',
-                  color: auraPulse ? '#48bb78' : 'rgba(255, 255, 255, 0.5)',
+                  background: auraPulse ? colors.state.selected : 'transparent',
+                  color: auraPulse ? colors.accent.success : colors.text.muted,
                 }}
               >
                 ON
@@ -740,7 +751,61 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
                 style={{
                   ...styles.segmentButton,
                   background: !auraPulse ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-                  color: !auraPulse ? '#ef4444' : 'rgba(255, 255, 255, 0.5)',
+                  color: !auraPulse ? colors.accent.danger : colors.text.muted,
+                }}
+              >
+                OFF
+              </button>
+            </div>
+          </div>
+
+          {/* Aura Alpha Fade */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={styles.label}>Alpha Fade</label>
+            <div style={styles.segmentedControl}>
+              <button
+                onClick={() => updateAuraProp('auraAlphaFade', true)}
+                style={{
+                  ...styles.segmentButton,
+                  background: (tokenProps.auraAlphaFade !== false) ? colors.state.selected : 'transparent',
+                  color: (tokenProps.auraAlphaFade !== false) ? colors.accent.success : colors.text.muted,
+                }}
+              >
+                ON
+              </button>
+              <button
+                onClick={() => updateAuraProp('auraAlphaFade', false)}
+                style={{
+                  ...styles.segmentButton,
+                  background: tokenProps.auraAlphaFade === false ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
+                  color: tokenProps.auraAlphaFade === false ? colors.accent.danger : colors.text.muted,
+                }}
+              >
+                OFF
+              </button>
+            </div>
+          </div>
+
+          {/* Aura Rotation */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={styles.label}>Rotation</label>
+            <div style={styles.segmentedControl}>
+              <button
+                onClick={() => updateAuraProp('auraRotation', true)}
+                style={{
+                  ...styles.segmentButton,
+                  background: tokenProps.auraRotation === true ? colors.state.selected : 'transparent',
+                  color: tokenProps.auraRotation === true ? colors.accent.success : colors.text.muted,
+                }}
+              >
+                ON
+              </button>
+              <button
+                onClick={() => updateAuraProp('auraRotation', false)}
+                style={{
+                  ...styles.segmentButton,
+                  background: !tokenProps.auraRotation ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
+                  color: !tokenProps.auraRotation ? colors.accent.danger : colors.text.muted,
                 }}
               >
                 OFF
@@ -749,8 +814,8 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
           </div>
 
           {/* Particle Effects */}
-          <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-            <span style={{ color: '#fff', fontWeight: 500, display: 'block', marginBottom: '12px' }}>Particle Effects</span>
+          <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
+            <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Particle Effects</span>
             
             <div style={{ marginBottom: '12px' }}>
               <label style={styles.label}>Enable Particles</label>
@@ -759,8 +824,8 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
                   onClick={() => updateAuraProp('particleEnabled', true)}
                   style={{
                     ...styles.segmentButton,
-                    background: particleEnabled ? 'rgba(72, 187, 120, 0.3)' : 'transparent',
-                    color: particleEnabled ? '#48bb78' : 'rgba(255, 255, 255, 0.5)',
+                    background: particleEnabled ? colors.state.selected : 'transparent',
+                    color: particleEnabled ? colors.accent.success : colors.text.muted,
                   }}
                 >
                   ON
@@ -770,7 +835,7 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
                   style={{
                     ...styles.segmentButton,
                     background: !particleEnabled ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-                    color: !particleEnabled ? '#ef4444' : 'rgba(255, 255, 255, 0.5)',
+                    color: !particleEnabled ? colors.accent.danger : colors.text.muted,
                   }}
                 >
                   OFF
@@ -790,10 +855,10 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
                         onClick={() => updateAuraProp('particleType', type)}
                         style={{
                           padding: '6px 2px',
-                          background: particleType === type ? 'rgba(72, 187, 120, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                          border: `1px solid ${particleType === type ? 'rgba(72, 187, 120, 0.5)' : 'rgba(255, 255, 255, 0.1)'}`,
+                          background: particleType === type ? colors.state.selected : colors.state.hover,
+                          border: `1px solid ${particleType === type ? colors.border.accent : colors.border.subtle}`,
                           borderRadius: '4px',
-                          color: '#fff',
+                          color: colors.text.primary,
                           fontSize: '9px',
                           cursor: 'pointer',
                           textTransform: 'capitalize',
@@ -834,8 +899,248 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
         </>
       )}
 
+      {/* Filter Effects Section */}
+      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
+        <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Filter Effects</span>
+        
+        {/* Filter Type */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={styles.label}>Filter Type</label>
+          <select
+            value={(tokenProps.tokenEffectFilter as string) || 'none'}
+            onChange={(e) => updateAuraProp('tokenEffectFilter', e.target.value)}
+            style={styles.select}
+          >
+            <option value="none">None</option>
+            <option value="blur">Blur</option>
+            <option value="glow">Glow</option>
+            <option value="displacement">Displacement</option>
+            <option value="noise">Noise</option>
+            <option value="colorMatrix">Color Matrix</option>
+          </select>
+        </div>
+
+        {/* Filter Intensity */}
+        {Boolean(tokenProps.tokenEffectFilter) && tokenProps.tokenEffectFilter !== 'none' && (
+          <div style={{ marginBottom: '12px' }}>
+            <label style={styles.label}>Filter Intensity: {((tokenProps.tokenFilterIntensity as number) || 50)}%</label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={(tokenProps.tokenFilterIntensity as number) || 50}
+              onChange={(e) => updateAuraProp('tokenFilterIntensity', parseInt(e.target.value))}
+              style={{ width: '100%', cursor: 'pointer' }}
+            />
+          </div>
+        )}
+
+        {/* Filter Presets */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={styles.label}>Quick Presets</label>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                updateAuraProp('tokenEffectFilter', 'blur');
+                updateAuraProp('tokenFilterIntensity', 30);
+              }}
+              style={{
+                padding: '6px 10px',
+                background: colors.state.hover,
+                border: `1px solid ${colors.border.subtle}`,
+                borderRadius: '4px',
+                color: colors.accent.primary,
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Ethereal
+            </button>
+            <button
+              onClick={() => {
+                updateAuraProp('tokenEffectFilter', 'glow');
+                updateAuraProp('tokenFilterIntensity', 70);
+              }}
+              style={{
+                padding: '6px 10px',
+                background: colors.state.hover,
+                border: `1px solid ${colors.border.subtle}`,
+                borderRadius: '4px',
+                color: colors.accent.warning,
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Fire
+            </button>
+            <button
+              onClick={() => {
+                updateAuraProp('tokenEffectFilter', 'colorMatrix');
+                updateAuraProp('tokenFilterIntensity', 60);
+              }}
+              style={{
+                padding: '6px 10px',
+                background: colors.state.hover,
+                border: `1px solid ${colors.border.subtle}`,
+                borderRadius: '4px',
+                color: colors.accent.info,
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Ice
+            </button>
+            <button
+              onClick={() => {
+                updateAuraProp('tokenEffectFilter', 'noise');
+                updateAuraProp('tokenFilterIntensity', 40);
+              }}
+              style={{
+                padding: '6px 10px',
+                background: colors.state.hover,
+                border: `1px solid ${colors.border.subtle}`,
+                borderRadius: '4px',
+                color: colors.text.secondary,
+                fontSize: '11px',
+                cursor: 'pointer',
+              }}
+            >
+              Shadow
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tint & Color Section */}
+      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
+        <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Tint & Color</span>
+        
+        {/* Enable Tint */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={styles.label}>Enable Tint</label>
+          <div style={styles.segmentedControl}>
+            <button
+              onClick={() => updateAuraProp('tokenTintEnabled', true)}
+              style={{
+                ...styles.segmentButton,
+                background: tokenProps.tokenTintEnabled ? colors.state.selected : 'transparent',
+                color: tokenProps.tokenTintEnabled ? colors.accent.success : colors.text.muted,
+              }}
+            >
+              ON
+            </button>
+            <button
+              onClick={() => updateAuraProp('tokenTintEnabled', false)}
+              style={{
+                ...styles.segmentButton,
+                background: !tokenProps.tokenTintEnabled ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
+                color: !tokenProps.tokenTintEnabled ? colors.accent.danger : colors.text.muted,
+              }}
+            >
+              OFF
+            </button>
+          </div>
+        </div>
+
+        {/* Tint Color */}
+        {Boolean(tokenProps.tokenTintEnabled) && (
+          <>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Tint Color</label>
+              <input
+                type="color"
+                value={(tokenProps.tokenTintColor as string) || '#ffffff'}
+                onChange={(e) => updateAuraProp('tokenTintColor', e.target.value)}
+                style={{ width: '100%', height: '36px', cursor: 'pointer', border: 'none', borderRadius: '6px' }}
+              />
+            </div>
+
+            {/* Alpha */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Alpha: {((tokenProps.tokenAlpha as number) ?? 100)}%</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={(tokenProps.tokenAlpha as number) ?? 100}
+                onChange={(e) => updateAuraProp('tokenAlpha', parseInt(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Blend Mode */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Blend Mode</label>
+              <select
+                value={(tokenProps.tokenBlendMode as string) || 'normal'}
+                onChange={(e) => updateAuraProp('tokenBlendMode', e.target.value)}
+                style={styles.select}
+              >
+                <option value="normal">Normal</option>
+                <option value="add">Add</option>
+                <option value="multiply">Multiply</option>
+                <option value="screen">Screen</option>
+                <option value="overlay">Overlay</option>
+                <option value="darken">Darken</option>
+                <option value="lighten">Lighten</option>
+              </select>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Mesh Effects Section */}
+      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
+        <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Mesh Effects</span>
+        
+        {/* Mesh Type */}
+        <div style={{ marginBottom: '12px' }}>
+          <label style={styles.label}>Effect Type</label>
+          <select
+            value={(tokenProps.tokenMeshEffect as string) || 'none'}
+            onChange={(e) => updateAuraProp('tokenMeshEffect', e.target.value)}
+            style={styles.select}
+          >
+            <option value="none">None</option>
+            <option value="wave">Wave</option>
+            <option value="twist">Twist</option>
+            <option value="bulge">Bulge</option>
+          </select>
+        </div>
+
+        {/* Mesh Intensity */}
+        {Boolean(tokenProps.tokenMeshEffect) && tokenProps.tokenMeshEffect !== 'none' && (
+          <>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Intensity: {((tokenProps.tokenMeshIntensity as number) || 50)}%</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={(tokenProps.tokenMeshIntensity as number) || 50}
+                onChange={(e) => updateAuraProp('tokenMeshIntensity', parseInt(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+            </div>
+
+            {/* Mesh Speed */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Animation Speed: {((tokenProps.tokenMeshSpeed as number) || 50)}%</label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={(tokenProps.tokenMeshSpeed as number) || 50}
+                onChange={(e) => updateAuraProp('tokenMeshSpeed', parseInt(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Clear All */}
-      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
         <button
           onClick={() => {
             const newProps = { ...tokenProps };
@@ -849,15 +1154,27 @@ export function AuraSettingsModal({ token, onClose }: { token: Token; onClose: (
             delete newProps.particleType;
             delete newProps.particleColor;
             delete newProps.particleCount;
+            // Clear filter effects
+            delete newProps.tokenEffectFilter;
+            delete newProps.tokenFilterIntensity;
+            // Clear tint effects
+            delete newProps.tokenTintEnabled;
+            delete newProps.tokenTintColor;
+            delete newProps.tokenAlpha;
+            delete newProps.tokenBlendMode;
+            // Clear mesh effects
+            delete newProps.tokenMeshEffect;
+            delete newProps.tokenMeshIntensity;
+            delete newProps.tokenMeshSpeed;
             socketService.updateToken(token.id, { properties: newProps });
           }}
           style={{
             width: '100%',
             padding: '10px',
-            background: 'rgba(239, 68, 68, 0.2)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
+            background: colors.state.hover,
+            border: `1px solid ${colors.border.subtle}`,
             borderRadius: '6px',
-            color: '#ef4444',
+            color: colors.accent.danger,
             cursor: 'pointer',
           }}
         >
