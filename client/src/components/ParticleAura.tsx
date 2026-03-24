@@ -49,7 +49,7 @@ export function useParticleAuras({ app, tokens, gridSize }: ParticleAuraProps) {
       const activeTokenIds = new Set(tokens.map((t) => t.id));
       const tokensWithAuras = tokens.filter((token) => {
         const tokenProps = (token.properties || {}) as Record<string, unknown>;
-        return tokenProps.particleEnabled === true && tokenProps.auraEnabled === true;
+        return tokenProps.particleEnabled === true;
       });
 
       const seenEmitterIds = new Set<string>();
@@ -60,14 +60,52 @@ export function useParticleAuras({ app, tokens, gridSize }: ParticleAuraProps) {
         const auraRadius = typeof tokenProps.auraRadius === 'number' ? tokenProps.auraRadius : 60;
         const particleColor = typeof tokenProps.particleColor === 'string' ? tokenProps.particleColor : undefined;
         const particleCount = typeof tokenProps.particleCount === 'number' ? tokenProps.particleCount : 20;
-        const presetId = PARTICLE_TYPE_TO_PRESET[particleType] || 'BlessAura';
+        const particleSize = typeof tokenProps.particleSize === 'number' ? tokenProps.particleSize : 10;
+        const particleRate = typeof tokenProps.particleRate === 'number' ? tokenProps.particleRate : 5;
+        const particleLifetime = typeof tokenProps.particleLifetime === 'number' ? tokenProps.particleLifetime : 3;
+        
+        // Use particlePresetId if available, otherwise fall back to legacy mapping
+        const presetId = (tokenProps.particlePresetId as string) || (PARTICLE_TYPE_TO_PRESET[particleType] || 'BlessAura');
         const size = gridSize * (token.size || 1);
         const tokenCenterX = token.x + size / 2;
         const tokenCenterY = token.y + size / 2;
         const existingEmitterId = emitterKeysRef.current.get(token.id);
+        const existingPresetId = emitterKeysRef.current.get(`preset:${token.id}`);
 
-        if (existingEmitterId) {
+        // If emitter exists but preset has changed, stop the old one and recreate
+        if (existingEmitterId && existingPresetId !== presetId) {
+          try {
+            const system = getParticleSystem();
+            if (system) {
+              system.stopByToken(token.id);
+            }
+          } catch (e) {
+            // Ignore errors when stopping
+          }
+          emitterKeysRef.current.delete(token.id);
+          emitterKeysRef.current.delete(`preset:${token.id}`);
+        }
+
+        if (existingEmitterId && existingPresetId === presetId) {
           seenEmitterIds.add(existingEmitterId);
+          // Update existing emitter with new properties
+          try {
+            const system = getParticleSystem();
+            if (system) {
+              system.updateByToken(token.id, {
+                spawnRadius: auraRadius,
+                emitRate: Math.max(6, particleCount),
+                startColor: particleColor,
+                endColor: particleColor,
+                startSize: particleSize,
+                endSize: particleSize * 0.5,
+                lifetimeMinMs: particleLifetime * 1000,
+                lifetimeMaxMs: particleLifetime * 1000,
+              });
+            }
+          } catch (e) {
+            // Ignore errors when updating
+          }
           return;
         }
 
@@ -83,9 +121,14 @@ export function useParticleAuras({ app, tokens, gridSize }: ParticleAuraProps) {
               startColor: particleColor,
               endColor: particleColor,
               attachMode: 'follow-token',
+              startSize: particleSize,
+              endSize: particleSize * 0.5,
+              lifetimeMinMs: particleLifetime * 1000,
+              lifetimeMaxMs: particleLifetime * 1000,
             },
           });
           emitterKeysRef.current.set(token.id, key);
+          emitterKeysRef.current.set(`preset:${token.id}`, presetId);
           seenEmitterIds.add(key);
         } catch (e) {
           console.warn('Failed to create aura emitter:', e);

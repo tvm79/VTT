@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, CSSProperties } from 'react';
+// TEST: Is this file being loaded?
+(window as any).__DATAMANAGER_LOADED = true;
+console.log('>>> DataManager.tsx loaded, __DATAMANAGER_LOADED:', (window as any).__DATAMANAGER_LOADED);
 import { Icon } from './Icon';
 import { JournalPanel } from './JournalPanel';
 import { CharacterSheetPanel } from './CharacterSheetPanel';
@@ -762,7 +765,7 @@ function getSpellPrimaryEntries(item: any): any[] {
 }
 
 function getSpellEditorSections(system: Record<string, any>): Array<{ title: string; description?: string; keys: string[] }> {
-  return [
+  const spellSections = [
     {
       title: 'Spell Core',
       description: 'Core spellbook identity and casting information.',
@@ -776,7 +779,7 @@ function getSpellEditorSections(system: Record<string, any>): Array<{ title: str
     {
       title: 'Mechanics',
       description: 'Damage, saves, targeting, and gameplay tags.',
-      keys: ['target', 'damageInflict', 'savingThrow', 'miscTags', 'areaTags'],
+      keys: ['target', 'damageInflict', 'savingThrow', 'miscTags', 'areaTags', 'spellCastEffect', 'spellImpactEffect'],
     },
     {
       title: 'References',
@@ -790,10 +793,14 @@ function getSpellEditorSections(system: Record<string, any>): Array<{ title: str
         'level', 'school', 'time', 'range', 'components', 'duration',
         'entries', 'entriesHigherLevel', 'scalingLevelDice', 'scaling',
         'target', 'damageInflict', 'savingThrow', 'miscTags', 'areaTags',
+        'spellCastEffect', 'spellImpactEffect',
         'srd', 'basicRules', 'referenceSources', 'reprintedAs', 'page',
       ].includes(key)),
     },
   ].filter((section) => section.keys.length > 0);
+  
+  console.log('[DEBUG] getSpellSections called for spell, sections:', spellSections.map(s => s.title).join(', '));
+  return spellSections;
 }
 
 function getPanelLayoutType(type: string): string {
@@ -932,10 +939,12 @@ function getEntityEditorSections(
   system: Record<string, any>,
 ): Array<{ title: string; description?: string; keys: string[] }> {
   const layoutType = getPanelLayoutType(itemType);
+  console.log('[DEBUG getEntityEditorSections] itemType:', itemType, 'layoutType:', layoutType, 'system keys:', Object.keys(system));
 
   const buildSections = (configuredSections: Array<{ title: string; description?: string; keys: string[] }>) => {
     const coveredKeys = new Set(configuredSections.flatMap((section) => section.keys));
     const remainingKeys = Object.keys(system).filter((key) => !coveredKeys.has(key));
+    console.log('[DEBUG buildSections] configuredSections keys:', configuredSections.map(s => s.keys), 'remainingKeys:', remainingKeys);
 
     return [
       ...configuredSections,
@@ -1051,7 +1060,7 @@ function getEntityEditorSections(
         {
           title: 'Item Properties',
           description: 'Properties, charges, and rule text.',
-          keys: ['properties', 'charges', 'benefits', 'entries'],
+          keys: ['properties', 'charges', 'benefits', 'entries', 'weaponAttackEffect', 'weaponHitEffect'],
         },
       ]);
     default:
@@ -4255,15 +4264,18 @@ interface OpenPanel {
 
     const entitySections = (layoutType === 'creature'
       ? monsterSections
-      : getEntityEditorSections(itemType, system).map((section) => ({
-          key: `entity-${section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-          title: section.title,
-          description: section.description,
-          fields: section.keys,
-        }))
+      : getEntityEditorSections(itemType, system).map((section) => {
+          console.log('[DEBUG DataManager] getEntityEditorSections for itemType:', itemType, 'section:', section.title, 'keys:', section.keys);
+          return ({
+            key: `entity-${section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+            title: section.title,
+            description: section.description,
+            fields: section.keys,
+          });
+        })
     ).map((section) => ({
       ...section,
-      fields: section.fields.filter((key) => system[key] !== undefined),
+      fields: section.fields,
     })).filter((section) => section.fields.length > 0);
 
     const allSections = [

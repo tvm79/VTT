@@ -80,6 +80,25 @@ const SPELL_SELECT_OPTIONS_MAP: Record<string, EditorSelectOption[]> = {
     { value: 'hour', label: 'Hour' },
     { value: 'day', label: 'Day' },
   ],
+  // Particle effect fields for spells
+  spellCastEffect: [
+    { value: '', label: 'None' },
+    { value: 'FireCast', label: 'Fire Cast' },
+    { value: 'FrostCast', label: 'Frost Cast' },
+    { value: 'ArcaneCast', label: 'Arcane Cast' },
+    { value: 'HolyCast', label: 'Holy Cast' },
+    { value: 'NatureCast', label: 'Nature Cast' },
+    { value: 'ShadowCast', label: 'Shadow Cast' },
+  ],
+  spellImpactEffect: [
+    { value: '', label: 'None' },
+    { value: 'FireImpact', label: 'Fire Impact' },
+    { value: 'FrostImpact', label: 'Frost Impact' },
+    { value: 'ArcaneBurst', label: 'Arcane Burst' },
+    { value: 'HolyHeal', label: 'Holy Heal' },
+    { value: 'BloodHit', label: 'Blood Hit' },
+    { value: 'LightningStrike', label: 'Lightning Strike' },
+  ],
 };
 
 const SHARED_SELECT_OPTIONS_MAP: Record<string, EditorSelectOption[]> = {
@@ -132,6 +151,24 @@ const SHARED_SELECT_OPTIONS_MAP: Record<string, EditorSelectOption[]> = {
     { value: 'none', label: 'No Attunement' },
     { value: 'optional', label: 'Optional Attunement' },
     { value: 'required', label: 'Requires Attunement' },
+  ],
+  // Particle effect fields for weapons
+  weaponAttackEffect: [
+    { value: '', label: 'None' },
+    { value: 'BloodHit', label: 'Blood Hit' },
+    { value: 'Slash', label: 'Slash' },
+    { value: 'FireSlash', label: 'Fire Slash' },
+    { value: 'FrostSlash', label: 'Frost Slash' },
+    { value: 'LightningStrike', label: 'Lightning Strike' },
+    { value: 'HolyHeal', label: 'Holy Impact' },
+  ],
+  weaponHitEffect: [
+    { value: '', label: 'None' },
+    { value: 'BloodHit', label: 'Blood Hit' },
+    { value: 'FireImpact', label: 'Fire Impact' },
+    { value: 'FrostImpact', label: 'Frost Impact' },
+    { value: 'LightningStrike', label: 'Lightning Strike' },
+    { value: 'ArcaneBurst', label: 'Arcane Burst' },
   ],
   cr: [
     { value: '0', label: '0' },

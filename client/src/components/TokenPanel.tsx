@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Icon } from './Icon';
 import { useGameStore } from '../store/gameStore';
 import type { Token } from '../../../shared/src/index';
 import { socketService } from '../services/socket';
 import { TOKEN_DISPOSITIONS, type TokenDisposition } from '../utils/colorUtils';
 import { colors, radius, shadows, spacing, typography, zIndex } from '../ui/tokens';
+import { getParticlePresets, subscribeParticlePresets } from '../particles/editor/particlePresetStore';
 
 interface TokenPanelProps {
   token: Token;
@@ -279,7 +280,7 @@ function Modal({ title, onClose, children, position }: { title: string; onClose:
   } : { ...styles.modal, pointerEvents: 'auto' as const };
   
   return (
-    <div style={styles.modalOverlay} onClick={onClose}>
+    <div style={{...styles.modalOverlay, pointerEvents: 'auto'}} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ color: colors.text.primary, margin: 0, fontSize: '16px' }}>{title}</h3>
@@ -618,6 +619,22 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
   const particleColor = (tokenProps.particleColor as string) || colors.accent.warning;
   const particleCount = typeof tokenProps.particleCount === 'number' ? tokenProps.particleCount : 20;
 
+  // Get available particle presets from the store
+  const [particlePresets, setParticlePresets] = useState<Array<{id: string; name: string}>>(() => 
+    getParticlePresets().map(p => ({ id: p.id, name: p.name }))
+  );
+  
+  // Subscribe to preset changes
+  useEffect(() => {
+    const unsubscribe = subscribeParticlePresets(() => {
+      setParticlePresets(getParticlePresets().map(p => ({ id: p.id, name: p.name })));
+    });
+    return unsubscribe;
+  }, []);
+
+  // Get the currently selected particle preset ID
+  const particlePresetId = (tokenProps.particlePresetId as string) || '';
+
   const updateAuraProp = (key: string, value: unknown) => {
     const newProps = { ...tokenProps, [key]: value };
     socketService.updateToken(token.id, { properties: newProps });
@@ -639,11 +656,98 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
     }
   };
 
+  // Collapse state for sections - controlled by feature toggles
+  // Sections auto-expand when their feature is enabled
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    aura: true,
+    auraSettings: true,
+    particles: true,
+    filters: true,
+    tint: true,
+    mesh: true,
+  });
+
+  // Helper to expand section when enabling, collapse when disabling
+  const expandSection = (section: string) => {
+    setCollapsedSections(prev => ({ ...prev, [section]: false }));
+  };
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Toggle component for sections
+  const CollapsibleSection = ({ sectionKey, title, children, defaultOpen = false }: { sectionKey: string; title: string; children: React.ReactNode; defaultOpen?: boolean }) => {
+    const isCollapsed = collapsedSections[sectionKey] ?? true;
+    return (
+      <div style={{ marginBottom: '12px', borderTop: `1px solid ${colors.border.subtle}`, paddingTop: '12px' }}>
+        <button
+          onClick={() => toggleSection(sectionKey)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '8px 0',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: colors.text.primary,
+            fontWeight: 500,
+            fontSize: '13px',
+          }}
+        >
+          <span>{title}</span>
+          <span style={{
+            transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+            color: colors.text.muted,
+          }}>▼</span>
+        </button>
+        {!isCollapsed && <div style={{ paddingTop: '8px' }}>{children}</div>}
+      </div>
+    );
+  };
+
+  // Toggle switch component - expands section when enabled
+  const ToggleSwitch = ({ checked, onChange, section, label }: { checked: boolean; onChange: (v: boolean) => void; section?: string; label?: string }) => (
+    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+      <div
+        onClick={() => {
+          if (!checked && section) {
+            expandSection(section);
+          }
+          onChange(!checked);
+        }}
+        style={{
+          width: '40px',
+          height: '22px',
+          background: checked ? colors.accent.success : colors.state.hover,
+          borderRadius: '11px',
+          position: 'relative',
+          transition: 'background 0.2s',
+          border: `1px solid ${checked ? colors.accent.success : colors.border.subtle}`,
+        }}
+      >
+        <div style={{
+          position: 'absolute',
+          top: '2px',
+          left: checked ? '20px' : '2px',
+          width: '16px',
+          height: '16px',
+          background: '#fff',
+          borderRadius: '50%',
+          transition: 'left 0.2s',
+        }} />
+      </div>
+      {label && <span style={{ color: colors.text.secondary, fontSize: '12px' }}>{label}</span>}
+    </label>
+  );
+
   return (
     <Modal title="Enchantment Aura" onClose={onClose} position={position}>
       {/* Preset Selection */}
-      <div style={{ marginBottom: '16px' }}>
-        <label style={styles.label}>Aura Preset</label>
+      <CollapsibleSection sectionKey="aura" title="Aura Presets">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
           {auraPresets.slice(0, 18).map((preset) => (
             <button
@@ -664,39 +768,18 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             </button>
           ))}
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* Enable/Disable Aura */}
-      <div style={{ marginBottom: '16px' }}>
-        <label style={styles.label}>Enable Aura</label>
-        <div style={styles.segmentedControl}>
-          <button
-            onClick={() => updateAuraProp('auraEnabled', true)}
-            style={{
-              ...styles.segmentButton,
-              background: auraEnabled ? colors.state.selected : 'transparent',
-              color: auraEnabled ? colors.accent.success : colors.text.muted,
-            }}
-          >
-            ON
-          </button>
-          <button
-            onClick={() => updateAuraProp('auraEnabled', false)}
-            style={{
-              ...styles.segmentButton,
-              background: !auraEnabled ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-              color: !auraEnabled ? colors.accent.danger : colors.text.muted,
-            }}
-          >
-            OFF
-          </button>
+      {/* Enable Aura Toggle */}
+      <CollapsibleSection sectionKey="auraSettings" title="Aura Settings">
+        <div style={{ marginBottom: '12px' }}>
+          <ToggleSwitch checked={auraEnabled} onChange={(v) => updateAuraProp('auraEnabled', v)} section="auraSettings" label={auraEnabled ? 'Enabled' : 'Disabled'} />
         </div>
-      </div>
 
       {/* Aura Color */}
       {auraEnabled && (
         <>
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={styles.label}>Aura Color</label>
             <input
               type="color"
@@ -707,202 +790,160 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
           </div>
 
           {/* Aura Radius */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={styles.label}>Aura Radius: {auraRadius}px</label>
             <input
               type="range"
               min="20"
               max="200"
               value={auraRadius}
-              onChange={(e) => updateAuraProp('auraRadius', parseInt(e.target.value))}
-              style={{ width: '100%', cursor: 'pointer' }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => { e.stopPropagation(); updateAuraProp('auraRadius', parseInt(e.target.value)); }}
+              style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
             />
           </div>
 
           {/* Aura Opacity */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={styles.label}>Aura Opacity: {Math.round(auraOpacity * 100)}%</label>
             <input
               type="range"
               min="10"
               max="100"
               value={auraOpacity * 100}
-              onChange={(e) => updateAuraProp('auraOpacity', parseInt(e.target.value) / 100)}
-              style={{ width: '100%', cursor: 'pointer' }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => { e.stopPropagation(); updateAuraProp('auraOpacity', parseInt(e.target.value) / 100); }}
+              style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
             />
           </div>
 
           {/* Aura Pulse */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={styles.label}>Pulse Animation</label>
-            <div style={styles.segmentedControl}>
-              <button
-                onClick={() => updateAuraProp('auraPulse', true)}
-                style={{
-                  ...styles.segmentButton,
-                  background: auraPulse ? colors.state.selected : 'transparent',
-                  color: auraPulse ? colors.accent.success : colors.text.muted,
-                }}
-              >
-                ON
-              </button>
-              <button
-                onClick={() => updateAuraProp('auraPulse', false)}
-                style={{
-                  ...styles.segmentButton,
-                  background: !auraPulse ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-                  color: !auraPulse ? colors.accent.danger : colors.text.muted,
-                }}
-              >
-                OFF
-              </button>
-            </div>
+            <ToggleSwitch checked={auraPulse} onChange={(v) => updateAuraProp('auraPulse', v)} section="auraSettings" />
           </div>
 
           {/* Aura Alpha Fade */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={styles.label}>Alpha Fade</label>
-            <div style={styles.segmentedControl}>
-              <button
-                onClick={() => updateAuraProp('auraAlphaFade', true)}
-                style={{
-                  ...styles.segmentButton,
-                  background: (tokenProps.auraAlphaFade !== false) ? colors.state.selected : 'transparent',
-                  color: (tokenProps.auraAlphaFade !== false) ? colors.accent.success : colors.text.muted,
-                }}
-              >
-                ON
-              </button>
-              <button
-                onClick={() => updateAuraProp('auraAlphaFade', false)}
-                style={{
-                  ...styles.segmentButton,
-                  background: tokenProps.auraAlphaFade === false ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-                  color: tokenProps.auraAlphaFade === false ? colors.accent.danger : colors.text.muted,
-                }}
-              >
-                OFF
-              </button>
-            </div>
+            <ToggleSwitch checked={(tokenProps.auraAlphaFade !== false)} onChange={(v) => updateAuraProp('auraAlphaFade', v)} section="auraSettings" />
           </div>
 
           {/* Aura Rotation */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <label style={styles.label}>Rotation</label>
-            <div style={styles.segmentedControl}>
-              <button
-                onClick={() => updateAuraProp('auraRotation', true)}
-                style={{
-                  ...styles.segmentButton,
-                  background: tokenProps.auraRotation === true ? colors.state.selected : 'transparent',
-                  color: tokenProps.auraRotation === true ? colors.accent.success : colors.text.muted,
-                }}
-              >
-                ON
-              </button>
-              <button
-                onClick={() => updateAuraProp('auraRotation', false)}
-                style={{
-                  ...styles.segmentButton,
-                  background: !tokenProps.auraRotation ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-                  color: !tokenProps.auraRotation ? colors.accent.danger : colors.text.muted,
-                }}
-              >
-                OFF
-              </button>
-            </div>
-          </div>
-
-          {/* Particle Effects */}
-          <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
-            <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Particle Effects</span>
-            
-            <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Enable Particles</label>
-              <div style={styles.segmentedControl}>
-                <button
-                  onClick={() => updateAuraProp('particleEnabled', true)}
-                  style={{
-                    ...styles.segmentButton,
-                    background: particleEnabled ? colors.state.selected : 'transparent',
-                    color: particleEnabled ? colors.accent.success : colors.text.muted,
-                  }}
-                >
-                  ON
-                </button>
-                <button
-                  onClick={() => updateAuraProp('particleEnabled', false)}
-                  style={{
-                    ...styles.segmentButton,
-                    background: !particleEnabled ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-                    color: !particleEnabled ? colors.accent.danger : colors.text.muted,
-                  }}
-                >
-                  OFF
-                </button>
-              </div>
-            </div>
-
-            {particleEnabled && (
-              <>
-                {/* Particle Type */}
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={styles.label}>Particle Type</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
-                    {['sparkle', 'flame', 'smoke', 'snow', 'shield', 'ghost', 'drip', 'star'].map((type) => (
-                      <button
-                        key={type}
-                        onClick={() => updateAuraProp('particleType', type)}
-                        style={{
-                          padding: '6px 2px',
-                          background: particleType === type ? colors.state.selected : colors.state.hover,
-                          border: `1px solid ${particleType === type ? colors.border.accent : colors.border.subtle}`,
-                          borderRadius: '4px',
-                          color: colors.text.primary,
-                          fontSize: '9px',
-                          cursor: 'pointer',
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Particle Color */}
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={styles.label}>Particle Color</label>
-                  <input
-                    type="color"
-                    value={particleColor}
-                    onChange={(e) => updateAuraProp('particleColor', e.target.value)}
-                    style={{ width: '100%', height: '32px', cursor: 'pointer', border: 'none', borderRadius: '4px' }}
-                  />
-                </div>
-
-                {/* Particle Count */}
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={styles.label}>Particle Count: {particleCount}</label>
-                  <input
-                    type="range"
-                    min="5"
-                    max="50"
-                    value={particleCount}
-                    onChange={(e) => updateAuraProp('particleCount', parseInt(e.target.value))}
-                    style={{ width: '100%', cursor: 'pointer' }}
-                  />
-                </div>
-              </>
-            )}
+            <ToggleSwitch checked={tokenProps.auraRotation === true} onChange={(v) => updateAuraProp('auraRotation', v)} section="auraSettings" />
           </div>
         </>
       )}
+      </CollapsibleSection>
+
+      {/* Particle Effects Section - Independent of Aura */}
+      <CollapsibleSection sectionKey="particles" title="Particle Effects">
+        <div style={{ marginBottom: '12px' }}>
+          <ToggleSwitch checked={particleEnabled} onChange={(v) => updateAuraProp('particleEnabled', v)} section="particles" label={particleEnabled ? 'Enabled' : 'Disabled'} />
+        </div>
+
+        {particleEnabled && (
+          <>
+            {/* Particle Preset */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Particle Preset</label>
+              <select
+                value={particlePresetId}
+                onChange={(e) => updateAuraProp('particlePresetId', e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  background: colors.state.hover,
+                  border: `1px solid ${colors.border.subtle}`,
+                  borderRadius: '4px',
+                  color: colors.text.primary,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">-- Select a Preset --</option>
+                {particlePresets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Particle Color */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Particle Color</label>
+              <input
+                type="color"
+                value={particleColor}
+                onChange={(e) => updateAuraProp('particleColor', e.target.value)}
+                style={{ width: '100%', height: '36px', cursor: 'pointer', border: 'none', borderRadius: '6px' }}
+              />
+            </div>
+
+            {/* Particle Count */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Particle Count: {particleCount}</label>
+              <input
+                type="range"
+                min="5"
+                max="50"
+                value={particleCount}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); updateAuraProp('particleCount', parseInt(e.target.value)); }}
+                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+              />
+            </div>
+
+            {/* Particle Size */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Particle Size: {(tokenProps.particleSize as number) || 10}px</label>
+              <input
+                type="range"
+                min="2"
+                max="50"
+                value={(tokenProps.particleSize as number) || 10}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); updateAuraProp('particleSize', parseInt(e.target.value)); }}
+                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+              />
+            </div>
+
+            {/* Particle Rate */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Spawn Rate: {(tokenProps.particleRate as number) || 5}/s</label>
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={(tokenProps.particleRate as number) || 5}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); updateAuraProp('particleRate', parseInt(e.target.value)); }}
+                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+              />
+            </div>
+
+            {/* Particle Lifetime */}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={styles.label}>Lifetime: {(tokenProps.particleLifetime as number) || 3}s</label>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={(tokenProps.particleLifetime as number) || 3}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); updateAuraProp('particleLifetime', parseInt(e.target.value)); }}
+                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+              />
+            </div>
+          </>
+        )}
+      </CollapsibleSection>
 
       {/* Filter Effects Section */}
-      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
-        <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Filter Effects</span>
-        
+      <CollapsibleSection sectionKey="filters" title="Filter Effects">
         {/* Filter Type */}
         <div style={{ marginBottom: '12px' }}>
           <label style={styles.label}>Filter Type</label>
@@ -929,8 +970,9 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
               min="0"
               max="100"
               value={(tokenProps.tokenFilterIntensity as number) || 50}
-              onChange={(e) => updateAuraProp('tokenFilterIntensity', parseInt(e.target.value))}
-              style={{ width: '100%', cursor: 'pointer' }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenFilterIntensity', parseInt(e.target.value)); }}
+              style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
             />
           </div>
         )}
@@ -1009,37 +1051,13 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             </button>
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       {/* Tint & Color Section */}
-      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
-        <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Tint & Color</span>
-        
+      <CollapsibleSection sectionKey="tint" title="Tint & Color">
         {/* Enable Tint */}
         <div style={{ marginBottom: '12px' }}>
-          <label style={styles.label}>Enable Tint</label>
-          <div style={styles.segmentedControl}>
-            <button
-              onClick={() => updateAuraProp('tokenTintEnabled', true)}
-              style={{
-                ...styles.segmentButton,
-                background: tokenProps.tokenTintEnabled ? colors.state.selected : 'transparent',
-                color: tokenProps.tokenTintEnabled ? colors.accent.success : colors.text.muted,
-              }}
-            >
-              ON
-            </button>
-            <button
-              onClick={() => updateAuraProp('tokenTintEnabled', false)}
-              style={{
-                ...styles.segmentButton,
-                background: !tokenProps.tokenTintEnabled ? 'rgba(239, 68, 68, 0.3)' : 'transparent',
-                color: !tokenProps.tokenTintEnabled ? colors.accent.danger : colors.text.muted,
-              }}
-            >
-              OFF
-            </button>
-          </div>
+          <ToggleSwitch checked={Boolean(tokenProps.tokenTintEnabled)} onChange={(v) => updateAuraProp('tokenTintEnabled', v)} section="tint" label="Enable Tint" />
         </div>
 
         {/* Tint Color */}
@@ -1063,8 +1081,9 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 min="0"
                 max="100"
                 value={(tokenProps.tokenAlpha as number) ?? 100}
-                onChange={(e) => updateAuraProp('tokenAlpha', parseInt(e.target.value))}
-                style={{ width: '100%', cursor: 'pointer' }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenAlpha', parseInt(e.target.value)); }}
+                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
               />
             </div>
 
@@ -1087,12 +1106,10 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             </div>
           </>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Mesh Effects Section */}
-      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>
-        <span style={{ color: colors.text.primary, fontWeight: 500, display: 'block', marginBottom: '12px' }}>Mesh Effects</span>
-        
+      <CollapsibleSection sectionKey="mesh" title="Mesh Effects">
         {/* Mesh Type */}
         <div style={{ marginBottom: '12px' }}>
           <label style={styles.label}>Effect Type</label>
@@ -1118,8 +1135,9 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 min="0"
                 max="100"
                 value={(tokenProps.tokenMeshIntensity as number) || 50}
-                onChange={(e) => updateAuraProp('tokenMeshIntensity', parseInt(e.target.value))}
-                style={{ width: '100%', cursor: 'pointer' }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenMeshIntensity', parseInt(e.target.value)); }}
+                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
               />
             </div>
 
@@ -1131,13 +1149,14 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 min="0"
                 max="100"
                 value={(tokenProps.tokenMeshSpeed as number) || 50}
-                onChange={(e) => updateAuraProp('tokenMeshSpeed', parseInt(e.target.value))}
-                style={{ width: '100%', cursor: 'pointer' }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenMeshSpeed', parseInt(e.target.value)); }}
+                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
               />
             </div>
           </>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* Clear All */}
       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>

@@ -24,6 +24,7 @@ import { TokenAnimationManager } from '../animation/TokenAnimationManager';
 import { emitTokenAnimation, subscribeToTokenAnimations } from '../animation/tokenAnimationEvents';
 import { easeOutBack } from '../animation/easing';
 import { requestAuthoritativeRoll } from '../dice/rollOrchestrator';
+import { triggerParticleEffect, getParticleEventForPreset } from '../utils/particleEffectHelpers';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -268,14 +269,20 @@ function toBoardSafeImageUrl(url: string | null | undefined): string {
   if (!raw) return '';
 
   // Normalize already-proxied URLs to extension-aware route so PIXI can pick parser.
-  if (raw.startsWith('/api/assets/proxy-image?')) {
+  if (raw.startsWith('/api/assets/proxy-image') && raw.includes('?url=')) {
+    // Already a proxy URL - preserve it (handles both /proxy-image? and /proxy-image.webp?)
     const ext = inferImageExtensionFromUrl(raw);
-    return raw.replace('/api/assets/proxy-image?', `/api/assets/proxy-image.${ext}?`);
+    // Ensure the URL has the proper extension format
+    if (!raw.includes('/proxy-image.')) {
+      return raw.replace('/api/assets/proxy-image?', `/api/assets/proxy-image.${ext}?`);
+    }
+    return raw;
   }
 
   // Handle Vite asset imports - they come as URLs with hashes like /assets/turn_token.webp?hash
   // Convert to a clean path that PixiJS can load
-  if (raw.includes('/assets/') && raw.includes('?')) {
+  // BUT exclude proxy URLs which need the query parameter to function
+  if (raw.includes('/assets/') && raw.includes('?') && !raw.includes('/proxy-image')) {
     // Strip query params for cleaner loading
     const cleanPath = raw.split('?')[0];
     return cleanPath;
@@ -816,7 +823,18 @@ export function GameBoard() {
     attackFormula: string | null;
     damageFormula: string | null;
     position: { x: number; y: number };
+    // Particle effect IDs from the item/spell
+    spellCastEffect?: string;
+    spellImpactEffect?: string;
+    weaponAttackEffect?: string;
+    weaponHitEffect?: string;
   } | null>(null);
+
+  // Debug wrapper to log when actionPopupState is set
+  const debugSetActionPopupState = useCallback((newState: typeof actionPopupState) => {
+    console.log('[DEBUG setActionPopupState] Called with:', newState, '\nCall stack:', new Error().stack);
+    setActionPopupState(newState);
+  }, []);
 
   const [orbitTooltipState, setOrbitTooltipState] = useState<{
     text: string;
@@ -1487,15 +1505,55 @@ export function GameBoard() {
     };
   }, [tokens]);
 
-  const rollFromTokenAction = useCallback(async (formula: string, tokenName: string, actionName: string) => {
+  const rollFromTokenAction = useCallback(async (
+    formula: string,
+    tokenName: string,
+    actionName: string,
+    options?: {
+      spellCastEffect?: string;
+      spellImpactEffect?: string;
+      weaponAttackEffect?: string;
+      weaponHitEffect?: string;
+      isAttack?: boolean;
+      isDamage?: boolean;
+    }
+  ) => {
+    console.log('[DEBUG rollFromTokenAction] Called with:', { formula, tokenName, actionName, options });
     try {
       const result = await requestAuthoritativeRoll({ formula, source: 'chat', visibility: 'public' });
       socketService.sendChatMessage(`🎲 ${tokenName} • ${actionName} • ${formula} = ${result.total}`);
       socketService.sendChatMessage(`⚔️ ${tokenName} • ${actionName} • ${formula}`);
+
+      // Get token position for particle effect
+      const token = tokens.find(t => t.name === tokenName);
+      const tokenId = token?.id;
+      const x = token?.x;
+      const y = token?.y;
+
+      // Trigger particle effects based on action type
+      console.log('[DEBUG rollFromTokenAction] Checking particle effects, isAttack:', options?.isAttack, 'weaponAttackEffect:', options?.weaponAttackEffect, 'isDamage:', options?.isDamage, 'spellImpactEffect:', options?.spellImpactEffect, 'weaponHitEffect:', options?.weaponHitEffect, 'spellCastEffect:', options?.spellCastEffect);
+      if (options?.isAttack && options?.weaponAttackEffect) {
+        // Weapon attack - play attack effect from source token
+        console.log('[DEBUG rollFromTokenAction] Triggering weaponAttackEffect:', options.weaponAttackEffect);
+        await triggerParticleEffect(options.weaponAttackEffect, tokenId, undefined, x, y);
+      } else if (options?.isDamage) {
+        // Damage roll - could be spell impact or weapon hit
+        if (options?.spellImpactEffect) {
+          console.log('[DEBUG rollFromTokenAction] Triggering spellImpactEffect:', options.spellImpactEffect);
+          await triggerParticleEffect(options.spellImpactEffect, tokenId, undefined, x, y);
+        } else if (options?.weaponHitEffect) {
+          console.log('[DEBUG rollFromTokenAction] Triggering weaponHitEffect:', options.weaponHitEffect);
+          await triggerParticleEffect(options.weaponHitEffect, tokenId, undefined, x, y);
+        }
+      } else if (options?.spellCastEffect && !options?.isDamage) {
+        // Spell cast effect (not a damage roll)
+        console.log('[DEBUG rollFromTokenAction] Triggering spellCastEffect:', options.spellCastEffect);
+        await triggerParticleEffect(options.spellCastEffect, tokenId, undefined, x, y);
+      }
     } catch (error) {
       console.warn('[Token Action] authoritative roll failed:', error);
     }
-  }, []);
+  }, [tokens]);
 
   // Deselect lights when switching to audio tool, and vice versa
   useEffect(() => {
@@ -3469,8 +3527,6 @@ export function GameBoard() {
         ? combatants[currentTurnIndex]?.tokenId ?? null
         : null;
     
-    console.log('[TurnMarkerDebug] Token render effect - isInCombat:', isInCombat, 'currentTurnIndex:', currentTurnIndex, 'combatants.length:', combatants.length, 'activeTurnTokenId:', activeTurnTokenId);
-    
     // Determine the turn marker URL - use custom URL if set, otherwise use default
     // The default is now in public/assets/art for proper PixiJS loading
     let turnMarkerUrl = turnTokenImageUrl;
@@ -3508,15 +3564,6 @@ export function GameBoard() {
       
       // Only owner or controlling player can see hidden tokens
       return isOwner || controlsToken;
-    });
-
-    console.debug('[TurnMarkerDebug] frame state', {
-      isInCombat,
-      currentTurnIndex,
-      combatantCount: combatants.length,
-      activeTurnTokenId,
-      visibleTokenIds: visibleTokens.map((t) => t.id),
-      turnMarkerTextureUrl,
     });
 
     const tokenLayer = (app as any).tokenLayer as PIXI.Container;
@@ -3840,51 +3887,9 @@ export function GameBoard() {
         }
         // FIX: Only show TurnMarker when actually in combat AND token is the active turn
         shouldShowTurnMarker = shouldShowTurnMarker && isInCombat;
-        if (shouldShowTurnMarker) {
-          console.log('[TurnMarkerDebug] Showing TurnMarker for token:', token.id, token.name, 'activeTurnTokenId:', activeTurnTokenId, 'isInCombat:', isInCombat, 'currentTurnIndex:', currentTurnIndex, 'combatants:', combatants.map(c => ({ tokenId: c.tokenId, name: c.name })));
-        }
-        console.info('[TurnMarkerDebug] Drag/marker visibility state', {
-          tokenId: token.id,
-          tokenName: token.name,
-          isInCombat,
-          currentTurnIndex,
-          activeTurnTokenId,
-          shouldShowTurnMarker,
-          dragMode,
-          pendingDropType,
-        });
         turnMarkerContainer.visible = shouldShowTurnMarker;
         const markerTexture = turnMarkerSprite.texture as any;
-        console.debug('[TurnMarkerDebug] token marker render state', {
-          tokenId: token.id,
-          tokenName: token.name,
-          activeTurnTokenId,
-          isActiveTurnToken: token.id === activeTurnTokenId,
-          markerContainerVisible: turnMarkerContainer.visible,
-          markerContainerWorldVisible: (turnMarkerContainer as any).worldVisible,
-          markerContainerWorldAlpha: (turnMarkerContainer as any).worldAlpha,
-          markerTextureUrl: (turnMarkerSprite as any).__sourceUrl,
-          markerTextureValid: Boolean(markerTexture?.source),
-          markerTextureWidth: markerTexture?.source?.pixelWidth,
-          markerTextureHeight: markerTexture?.source?.pixelHeight,
-          markerSprite: {
-            x: turnMarkerSprite.x,
-            y: turnMarkerSprite.y,
-            width: turnMarkerSprite.width,
-            height: turnMarkerSprite.height,
-            alpha: turnMarkerSprite.alpha,
-            worldAlpha: (turnMarkerSprite as any).worldAlpha,
-            visible: turnMarkerSprite.visible,
-            renderable: turnMarkerSprite.renderable,
-          },
-          tokenRoot: {
-            x: root.x,
-            y: root.y,
-            visible: root.visible,
-            worldVisible: (root as any).worldVisible,
-            worldAlpha: (root as any).worldAlpha,
-          },
-        });
+        
         // Center AC container so scale tween grows from token center (not top-left)
         acContainer.position.set(size / 2, size / 2);
         acContainer.pivot.set(0, 0);
@@ -4097,7 +4102,6 @@ export function GameBoard() {
 
         // Render AC (Armor Class) with shield icon in center of token
         const acValue = tokenData.ac;
-        console.log('[DEBUG AC] Rendering AC for token:', token.name, 'acValue:', acValue, 'isDead:', isDead);
         if (acValue && !isDead) {
           // Parse AC value - can be number, array like [12], or object {ac: number, from: string[]}
           let acDisplay = '';
@@ -9224,7 +9228,17 @@ export function GameBoard() {
                 disabled={!attackFormula}
                 onClick={() => {
                   if (!attackFormula) return;
-                  void rollFromTokenAction(attackFormula, tokenName, actionPopupState.action.name);
+                  console.log('[DEBUG GameBoard] Attack button clicked, weaponAttackEffect:', actionPopupState.weaponAttackEffect, 'spellCastEffect:', actionPopupState.spellCastEffect);
+                  void rollFromTokenAction(
+                    attackFormula,
+                    tokenName,
+                    actionPopupState.action.name,
+                    {
+                      weaponAttackEffect: actionPopupState.weaponAttackEffect,
+                      spellCastEffect: actionPopupState.spellCastEffect,
+                      isAttack: true,
+                    }
+                  );
                 }}
                 className={`token-panel-button gameboard-action-popup-button ${attackFormula ? '' : 'is-disabled'}`}
               >
@@ -9234,7 +9248,17 @@ export function GameBoard() {
                 disabled={!damageFormula}
                 onClick={() => {
                   if (!damageFormula) return;
-                  void rollFromTokenAction(damageFormula, tokenName, actionPopupState.action.name);
+                  console.log('[DEBUG GameBoard] Damage button clicked, spellImpactEffect:', actionPopupState.spellImpactEffect, 'weaponHitEffect:', actionPopupState.weaponHitEffect);
+                  void rollFromTokenAction(
+                    damageFormula,
+                    tokenName,
+                    actionPopupState.action.name,
+                    {
+                      spellImpactEffect: actionPopupState.spellImpactEffect,
+                      weaponHitEffect: actionPopupState.weaponHitEffect,
+                      isDamage: true,
+                    }
+                  );
                 }}
                 className={`token-panel-button gameboard-action-popup-button ${damageFormula ? '' : 'is-disabled'}`}
               >
