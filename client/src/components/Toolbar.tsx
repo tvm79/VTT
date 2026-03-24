@@ -642,7 +642,6 @@ export const Toolbar = memo(function Toolbar() {
             overflowY: 'auto',
             boxShadow: shadows.md,
             cursor: isDragging ? 'grabbing' : 'default',
-            userSelect: 'none',
             pointerEvents: 'auto',
           }}
           onClick={(e) => e.stopPropagation()}

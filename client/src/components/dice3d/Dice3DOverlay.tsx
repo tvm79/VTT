@@ -289,15 +289,6 @@ export function Dice3DOverlay() {
     clearDissolveTimers();
 
     const perDieMs = input.diceCount > 0 ? Math.round(DISSOLVE_DURATION_MS / input.diceCount) : DISSOLVE_DURATION_MS;
-    console.info('[dice3d] dissolve scheduled', {
-      requestId: input.requestId,
-      holdMs: DISSOLVE_HOLD_MS,
-      durationMs: DISSOLVE_DURATION_MS,
-      diceCount: input.diceCount,
-      perDieMs,
-      note: 'Per-die timing is a diagnostic schedule; dissolve is rendered as a single canvas pass.',
-    });
-
     dissolveTimerRef.current = window.setTimeout(() => {
       const startedAt = performance.now();
       setIsDissolving(true);
@@ -317,9 +308,6 @@ export function Dice3DOverlay() {
         setDissolveProgress(0);
         diceBoxRef.current?.clear();
         diceBoxRef.current?.hide();
-        console.info('[dice3d] dissolve complete; cleared and hid settled dice', {
-          requestId: input.requestId,
-        });
       };
 
       dissolveFrameRef.current = window.requestAnimationFrame(tick);
@@ -445,58 +433,6 @@ export function Dice3DOverlay() {
       restitution: effectiveRestitution,
       friction: effectiveFriction,
     });
-
-    console.info('[dice3d] physics-config-applied', {
-      reason,
-      area: dice3dRollArea,
-      config: {
-        throwForce: tuning.throwForce,
-        scale: tuning.scale,
-        torque: tuning.torque,
-        size: effectiveSize,
-        startingHeight: effectiveStartingHeight,
-        themeColor: dice3dColor,
-        material: dice3dMaterial,
-        lightIntensity: effectiveLightIntensity,
-        shadowTransparency: effectiveShadowTransparency,
-        restitution: effectiveRestitution,
-        friction: effectiveFriction,
-        torqueFactor,
-      },
-      inferredWalls: {
-        aspect,
-        xMin: -xHalfSpan,
-        xMax: xHalfSpan,
-        zMin: -zHalfSpan,
-        zMax: zHalfSpan,
-        yTop: topWallY,
-      },
-      rollControls: {
-        sizeMultiplier: dice3dSize,
-        forceMultiplier: dice3dRollForce,
-        torqueMultiplier: dice3dTorque,
-        scaleMultiplier: dice3dScaleMultiplier,
-        worldSizeMultiplier: dice3dWorldSizeMultiplier,
-        startingHeightMultiplier: dice3dStartingHeightMultiplier,
-        restitutionMultiplier: dice3dRestitutionMultiplier,
-        frictionMultiplier: dice3dFrictionMultiplier,
-        lightIntensityMultiplier: dice3dLightIntensityMultiplier,
-        shadowTransparencyMultiplier: dice3dShadowTransparencyMultiplier,
-        torqueThrowCoupling: dice3dTorqueThrowCoupling,
-        directionMode: dice3dRollDirectionMode,
-        directionDegrees: dice3dRollDirectionDegrees,
-      },
-    });
-
-    if (effectiveStartingHeight <= 4.2) {
-      console.warn('[dice3d][diagnose] low-spawn-height', {
-        reason,
-        startingHeight: effectiveStartingHeight,
-        size: effectiveSize,
-        area: dice3dRollArea,
-        note: 'Low startingHeight can make dice appear to spawn on/near table and instantly collide.',
-      });
-    }
   };
 
   const parsedNotation = useMemo<DiceSpec[] | null>(() => {
@@ -533,7 +469,6 @@ export function Dice3DOverlay() {
   useEffect(() => {
     // Reinitialize if theme changed
     if (diceBoxRef.current && previousThemeRef.current !== null && previousThemeRef.current !== dice3dTheme) {
-      console.info('[dice3d] theme changed, reinitializing', { oldTheme: previousThemeRef.current, newTheme: dice3dTheme });
       diceBoxRef.current.clear();
       diceBoxRef.current = null;
       initializingRef.current = null;
@@ -578,7 +513,6 @@ export function Dice3DOverlay() {
         onThemeLoaded: () => {
           // Theme and all its assets are now loaded
           themeReadyRef.current = true;
-          console.info('[dice3d] theme loaded callback', { theme });
         },
       });
 
@@ -586,7 +520,6 @@ export function Dice3DOverlay() {
       diceBoxRef.current = box;
       previousThemeRef.current = theme;
       // Theme will be marked ready via onThemeLoaded callback
-      console.info('[dice3d] init complete, waiting for theme load', { theme });
       syncCanvasLayout();
       applyAreaPhysicsConfig('init');
     })().finally(() => {
@@ -607,7 +540,6 @@ export function Dice3DOverlay() {
       }
       // Wait for theme to be ready (models loaded)
       if (!themeReadyRef.current) {
-        console.info('[dice3d] waiting for theme to be ready');
         // Wait a bit for theme to load
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -627,17 +559,6 @@ export function Dice3DOverlay() {
         diceBoxRef.current.clear();
         diceBoxRef.current.show?.();
 
-        console.info('[dice3d] bridge-roll spawn', {
-          requestId,
-          formula,
-          notationSpecs,
-          area: dice3dRollArea,
-          directionMode: dice3dRollDirectionMode,
-          directionDegrees: dice3dRollDirectionDegrees,
-          newStartPoint: dice3dRollDirectionMode === 'random',
-          diagnosisHint: 'If spawn looks too low, inspect latest physics-config-applied.startingHeight',
-        });
-
         visualResult = await diceBoxRef.current.roll(notationSpecs.length > 0 ? notationSpecs : formula, {
           newStartPoint: dice3dRollDirectionMode === 'random',
           theme: dice3dTheme,
@@ -651,14 +572,6 @@ export function Dice3DOverlay() {
 
       const animationMs = Math.max(0, Math.round(performance.now() - startedAt));
       const visualMapped = buildClientResultFromVisual(visualResult, formula);
-
-      console.info('[dice3d] authoritative-from-visual', {
-        requestId,
-        formula,
-        visualResult,
-        visualMapped,
-        animationMs,
-      });
 
       const plannedDiceCount = notationSpecs.reduce((sum, die) => sum + (die.qty ?? 1), 0);
       scheduleDissolve({ requestId, diceCount: plannedDiceCount });
@@ -683,35 +596,6 @@ export function Dice3DOverlay() {
     const containerRect = container?.getBoundingClientRect();
     const canvasRect = canvas?.getBoundingClientRect();
 
-    console.info('[dice3d] roll-area geometry', {
-      enabled: dice3dEnabled,
-      area: dice3dRollArea,
-      containerRect: containerRect
-        ? {
-            x: containerRect.x,
-            y: containerRect.y,
-            width: containerRect.width,
-            height: containerRect.height,
-          }
-        : null,
-      canvasRect: canvasRect
-        ? {
-            x: canvasRect.x,
-            y: canvasRect.y,
-            width: canvasRect.width,
-            height: canvasRect.height,
-          }
-        : null,
-      canvasBuffer: canvas
-        ? {
-            width: canvas.width,
-            height: canvas.height,
-          }
-        : null,
-      colliderWalls: {
-        thickness: colliderWallStyle.wallThickness,
-      },
-    });
   }, [dice3dEnabled, dice3dRollArea, colliderWallStyle.wallThickness]);
 
   useEffect(() => {
@@ -731,7 +615,6 @@ export function Dice3DOverlay() {
       
       // Wait for theme to be ready (models loaded)
       if (!themeReadyRef.current) {
-        console.info('[dice3d] waiting for theme to be ready (authoritative)');
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
@@ -739,19 +622,6 @@ export function Dice3DOverlay() {
 
       applyAreaPhysicsConfig('authoritative-roll');
       resetDissolve();
-
-      console.info('[dice3d] roll start', {
-        requestId: lastAuthoritativeDiceRoll.requestId,
-        formula: lastAuthoritativeDiceRoll.formula,
-        total: lastAuthoritativeDiceRoll.total,
-        dice: lastAuthoritativeDiceRoll.dice,
-        notation: parsedNotation,
-        area: dice3dRollArea,
-        directionMode: dice3dRollDirectionMode,
-        directionDegrees: dice3dRollDirectionDegrees,
-        newStartPoint: dice3dRollDirectionMode === 'random',
-        diagnosisHint: 'If spawn looks too low, inspect latest physics-config-applied.startingHeight',
-      });
 
       diceBoxRef.current.clear();
       diceBoxRef.current.show?.();
@@ -767,28 +637,7 @@ export function Dice3DOverlay() {
         setAuthoritativeSummary(settledSummary);
         setPendingAuthoritativeSummary(null);
         pendingSummaryByRequestIdRef.current.delete(lastAuthoritativeDiceRoll.requestId);
-        console.info('[dice3d] authoritative-summary', {
-          requestId: settledSummary.requestId,
-          total: settledSummary.total,
-          dice: settledSummary.dice,
-          gatedUntil: 'roll visual-complete',
-        });
       }
-
-      console.info('[dice3d] roll visual-complete', {
-        requestId: lastAuthoritativeDiceRoll.requestId,
-        visualResult,
-        visualMapped,
-        authoritativeExpected: {
-          total: lastAuthoritativeDiceRoll.total,
-          dice: lastAuthoritativeDiceRoll.dice,
-        },
-        visualVsAuthoritativeMatch:
-          !!visualMapped
-          && visualMapped.total === lastAuthoritativeDiceRoll.total
-          && JSON.stringify(visualMapped.dice) === JSON.stringify(lastAuthoritativeDiceRoll.dice),
-        area: dice3dRollArea,
-      });
 
       scheduleDissolve({
         requestId: lastAuthoritativeDiceRoll.requestId,
@@ -823,13 +672,6 @@ export function Dice3DOverlay() {
     };
     setPendingAuthoritativeSummary(queuedSummary);
     pendingSummaryByRequestIdRef.current.set(lastAuthoritativeDiceRoll.requestId, queuedSummary);
-
-    console.info('[dice3d] authoritative-summary-queued', {
-      requestId: lastAuthoritativeDiceRoll.requestId,
-      total: lastAuthoritativeDiceRoll.total,
-      dice,
-      waitingFor: 'roll visual-complete',
-    });
 
     return () => {
       // no-op cleanup

@@ -280,7 +280,7 @@ function Modal({ title, onClose, children, position }: { title: string; onClose:
   } : { ...styles.modal, pointerEvents: 'auto' as const };
   
   return (
-    <div style={{...styles.modalOverlay, pointerEvents: 'auto'}} onClick={onClose}>
+    <div style={{...styles.modalOverlay, pointerEvents: 'none'}} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ color: colors.text.primary, margin: 0, fontSize: '16px' }}>{title}</h3>
@@ -744,8 +744,38 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
     </label>
   );
 
+  // Render without Modal wrapper - directly like Display Settings panel to fix slider drag issue
+  const panelStyle = position ? {
+    position: 'absolute' as const,
+    left: position.x,
+    top: position.y,
+    zIndex: 2000,
+    background: colors.surface.base,
+    padding: '16px',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+    minWidth: '300px',
+    maxWidth: '380px',
+  } : {};
+
   return (
-    <Modal title="Enchantment Aura" onClose={onClose} position={position}>
+    <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h3 style={{ color: colors.text.primary, margin: 0, fontSize: '16px' }}>Enchantment Aura</h3>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: colors.text.muted,
+            cursor: 'pointer',
+            padding: '4px',
+            fontSize: '18px',
+          }}
+        >
+          <Icon name="times" />
+        </button>
+      </div>
       {/* Preset Selection */}
       <CollapsibleSection sectionKey="aura" title="Aura Presets">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
@@ -798,8 +828,9 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
               max="200"
               value={auraRadius}
               onMouseDown={(e) => e.stopPropagation()}
-              onChange={(e) => { e.stopPropagation(); updateAuraProp('auraRadius', parseInt(e.target.value)); }}
-              style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onChange={(e) => updateAuraProp('auraRadius', parseInt(e.target.value))}
+              style={{ width: '100%', cursor: 'pointer', touchAction: 'none', pointerEvents: 'auto' }}
             />
           </div>
 
@@ -812,8 +843,9 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
               max="100"
               value={auraOpacity * 100}
               onMouseDown={(e) => e.stopPropagation()}
-              onChange={(e) => { e.stopPropagation(); updateAuraProp('auraOpacity', parseInt(e.target.value) / 100); }}
-              style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onChange={(e) => updateAuraProp('auraOpacity', parseInt(e.target.value) / 100)}
+              style={{ width: '100%', cursor: 'pointer', touchAction: 'none', pointerEvents: 'auto' }}
             />
           </div>
 
@@ -892,6 +924,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 max="50"
                 value={particleCount}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleCount', parseInt(e.target.value)); }}
                 style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
               />
@@ -906,6 +939,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 max="50"
                 value={(tokenProps.particleSize as number) || 10}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleSize', parseInt(e.target.value)); }}
                 style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
               />
@@ -920,6 +954,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 max="20"
                 value={(tokenProps.particleRate as number) || 5}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleRate', parseInt(e.target.value)); }}
                 style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
               />
@@ -934,6 +969,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 max="10"
                 value={(tokenProps.particleLifetime as number) || 3}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleLifetime', parseInt(e.target.value)); }}
                 style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
               />
@@ -1202,7 +1238,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
           Clear All Enchantments
         </button>
       </div>
-    </Modal>
+    </div>
   );
 }
 
