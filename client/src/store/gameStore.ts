@@ -353,6 +353,18 @@ const saveDice3DSettingsToStorage = (settings: Dice3DSettingsPersisted): void =>
 // LocalStorage key for tween settings
 const TWEEN_SETTINGS_STORAGE_KEY = 'vtt-tween-settings';
 const SCREEN_SHAKE_SETTINGS_STORAGE_KEY = 'vtt-screen-shake-settings';
+const TOKEN_SELECTION_SETTINGS_STORAGE_KEY = 'vtt-token-selection-settings';
+
+// Token Selection Style type
+export type TokenSelectionStyle = 'circle' | 'square' | 'L4Corners' | 'twoSquares' | 'twoSquaresRotated';
+
+// Token Selection Settings interface
+export interface TokenSelectionSettings {
+  lineThickness: number;
+  cornerRadius: number;
+  size: number;
+  style: TokenSelectionStyle;
+}
 
 // Default tween settings (matching TOKEN_ANIMATION_DEFAULTS in TokenAnimationManager)
 const DEFAULT_TWEEN_SETTINGS: TweenAnimationSettings = {
@@ -507,6 +519,37 @@ const saveScreenShakeSettingsToStorage = (settings: ScreenShakeSettings): void =
     localStorage.setItem(SCREEN_SHAKE_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
   } catch (e) {
     console.warn('Failed to save screen shake settings:', e);
+  }
+};
+
+// Default token selection settings
+const DEFAULT_TOKEN_SELECTION_SETTINGS: TokenSelectionSettings = {
+  lineThickness: 3,
+  cornerRadius: 6,
+  size: 1.0,
+  style: 'circle',
+};
+
+// Helper to load token selection settings from localStorage
+const loadSavedTokenSelectionSettings = (): TokenSelectionSettings => {
+  try {
+    const saved = localStorage.getItem(TOKEN_SELECTION_SETTINGS_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_TOKEN_SELECTION_SETTINGS, ...parsed };
+    }
+  } catch (e) {
+    console.warn('Failed to load token selection settings:', e);
+  }
+  return DEFAULT_TOKEN_SELECTION_SETTINGS;
+};
+
+// Helper to save token selection settings to localStorage
+const saveTokenSelectionSettingsToStorage = (settings: TokenSelectionSettings): void => {
+  try {
+    localStorage.setItem(TOKEN_SELECTION_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.warn('Failed to save token selection settings:', e);
   }
 };
 
@@ -1203,6 +1246,10 @@ interface GameState {
   // Screen Shake Settings (persisted to localStorage)
   screenShakeSettings: ScreenShakeSettings;
   setScreenShakeSettings: (settings: Partial<ScreenShakeSettings>) => void;
+
+  // Token Selection Settings (persisted to localStorage)
+  tokenSelectionSettings: TokenSelectionSettings;
+  setTokenSelectionSettings: (settings: Partial<TokenSelectionSettings>) => void;
 
   // GM and selection state
   isGM: boolean;
@@ -1934,6 +1981,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
     saveScreenShakeSettingsToStorage(next);
     set({ screenShakeSettings: next });
+  },
+  tokenSelectionSettings: loadSavedTokenSelectionSettings(),
+  setTokenSelectionSettings: (settings: Partial<TokenSelectionSettings>) => {
+    const current = get().tokenSelectionSettings;
+    const newSettings = { ...current, ...settings };
+    saveTokenSelectionSettingsToStorage(newSettings);
+    set({ tokenSelectionSettings: newSettings });
   },
 
   // Panel focus state - tracks which panel is at the front

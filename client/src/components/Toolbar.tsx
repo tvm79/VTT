@@ -248,6 +248,8 @@ export const Toolbar = memo(function Toolbar() {
     setTweenSettings,
     screenShakeSettings,
     setScreenShakeSettings,
+    tokenSelectionSettings,
+    setTokenSelectionSettings,
     pencilSmoothness,
     setPencilSmoothness,
     pencilDrawRate,
@@ -363,8 +365,11 @@ export const Toolbar = memo(function Toolbar() {
   const [themeExpanded, setThemeExpanded] = useState(false);
   const [tweenExpanded, setTweenExpanded] = useState(false);
   const [screenShakeExpanded, setScreenShakeExpanded] = useState(false);
+  const [tokenSelectionExpanded, setTokenSelectionExpanded] = useState(false);
   const [showDice3dAdvancedModal, setShowDice3dAdvancedModal] = useState(false);
   const [showTokenDefaultsAdvancedModal, setShowTokenDefaultsAdvancedModal] = useState(false);
+  const dice3dAdvancedButtonRef = useRef<HTMLButtonElement>(null);
+  const tokenAdvancedButtonRef = useRef<HTMLButtonElement>(null);
   const [selectedWeatherEffectId, setSelectedWeatherEffectId] = useState<string | null>(null);
   const [expandedWeatherEffectId, setExpandedWeatherEffectId] = useState<string | null>(null);
   const [weatherFilterExpanded, setWeatherFilterExpanded] = useState<Partial<Record<WeatherFilterType, boolean>>>({});
@@ -591,27 +596,50 @@ export const Toolbar = memo(function Toolbar() {
   };
 
   // Advanced Settings Modal Component
-  function AdvancedModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  function AdvancedModal({ title, onClose, children, anchorRef, defaultPosition }: { title: string; onClose: () => void; children: React.ReactNode; anchorRef?: React.RefObject<HTMLElement>; defaultPosition?: { x: number; y: number } }) {
     const modalRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState({ x: 360, y: 80 });
+    // Initialize with defaultPosition to avoid flash on first render
+    const [position, setPosition] = useState<{ x: number; y: number } | null>(defaultPosition || null);
     const [isDragging, setIsDragging] = useState(false);
-    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const positionRef = useRef<{ x: number; y: number } | null>(null);
+    const dragOffsetRef = useRef({ x: 0, y: 0 });
 
-    const isCustomTheme = colorScheme && (colorScheme.id.includes('-custom-') || colorScheme.id === 'custom');
-    const modalBackground = isCustomTheme ? colorScheme.surface : '#1a1a2e';
-    const modalText = isCustomTheme ? colorScheme.text : '#e0e0e0';
-    const modalBorder = isCustomTheme ? `1px solid ${colorScheme.accent}` : '1px solid #444';
+    // Sync ref with state for drag calculations
+    useEffect(() => {
+      positionRef.current = position;
+    }, [position]);
+
+    // Calculate initial position based on anchor (Advanced button) or default position or center
+    useEffect(() => {
+      if (position !== null) return; // Don't recalculate if already positioned
+      
+      if (defaultPosition) {
+        setPosition(defaultPosition);
+      } else if (anchorRef?.current) {
+        const anchorRect = anchorRef.current.getBoundingClientRect();
+        // Position to the right of the anchor button
+        const newPos = { x: anchorRect.right + 10, y: anchorRect.top };
+        setPosition(newPos);
+      }
+    }, [anchorRef, position, defaultPosition]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
-      if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('.slider') || (e.target as HTMLElement).closest('select')) return;
+      if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input') || (e.target as HTMLElement).closest('.ui-slider') || (e.target as HTMLElement).closest('select')) return;
+      
+      const rect = modalRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      // Use the current position state for offset calculation
+      const currentPos = positionRef.current || { x: rect.left, y: rect.top };
+      
       setIsDragging(true);
-      setDragOffset({ x: e.clientX - position.x, y: e.clientY - position.y });
+      dragOffsetRef.current = { x: e.clientX - currentPos.x, y: e.clientY - currentPos.y };
     };
 
     useEffect(() => {
       if (!isDragging) return;
       const handleMouseMove = (e: MouseEvent) => {
-        setPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
+        setPosition({ x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y });
       };
       const handleMouseUp = () => setIsDragging(false);
       window.addEventListener('mousemove', handleMouseMove);
@@ -620,38 +648,32 @@ export const Toolbar = memo(function Toolbar() {
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
       };
-    }, [isDragging, dragOffset]);
+    }, [isDragging]);
 
     return (
       <div 
-        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647, pointerEvents: 'none' }} 
+        className="modal-overlay"
         onClick={onClose}
+        style={{
+          
+        }}
       >
         <div
           ref={modalRef}
+          className="advanced-modal-panel"
           style={{
-            position: 'absolute',
-            left: position.x,
-            top: position.y,
-            background: modalBackground,
-            padding: spacing[5],
-            borderRadius: radius.lg,
-            border: modalBorder,
-            width: '380px',
-            maxHeight: 'calc(100vh - 100px)',
-            overflowY: 'auto',
-            boxShadow: shadows.md,
-            cursor: isDragging ? 'grabbing' : 'default',
-            pointerEvents: 'auto',
+            ...(position ? { position: 'fixed' as const, left: `${position.x}px`, top: `${position.y}px`, transform: 'none' } : undefined),
+            backdropFilter: `blur(${colorScheme?.panelBlur || 0}px)`,
+            WebkitBackdropFilter: `blur(${colorScheme?.panelBlur || 0}px)`,
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <div
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', cursor: 'grab' }}
+            className="advanced-modal-header"
             onMouseDown={handleMouseDown}
           >
-            <h3 style={{ color: modalText, margin: 0, fontSize: '16px' }}>{title}</h3>
-            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: modalText, opacity: 0.6, cursor: 'pointer', padding: '4px', fontSize: '18px' }}>
+            <h3 className="advanced-modal-title">{title}</h3>
+            <button onClick={onClose} className="advanced-modal-close">
               <Icon name="times" />
             </button>
           </div>
@@ -665,7 +687,12 @@ export const Toolbar = memo(function Toolbar() {
     <>
       {/* 3D Dice Advanced Modal */}
       {showDice3dAdvancedModal && (
-        <AdvancedModal title="3D Dice Advanced Settings" onClose={() => setShowDice3dAdvancedModal(false)}>
+        <AdvancedModal 
+          title="3D Dice Advanced Settings" 
+          onClose={() => setShowDice3dAdvancedModal(false)} 
+          anchorRef={dice3dAdvancedButtonRef}
+          defaultPosition={{ x: 480, y: 58 }}
+        >
           <div className="toolbar-settings-stack">
             <div className="toolbar-settings-card toolbar-settings-card-stack">
               <Slider label={`Size: ${dice3dSize.toFixed(2)}x`} min="0.6" max="1.4" step="0.01" value={dice3dSize} onChange={(e) => setDice3dSize(parseFloat(e.target.value))} />
@@ -717,7 +744,12 @@ export const Toolbar = memo(function Toolbar() {
 
       {/* Token Display Defaults Advanced Modal */}
       {showTokenDefaultsAdvancedModal && (
-        <AdvancedModal title="Token Display Advanced Settings" onClose={() => setShowTokenDefaultsAdvancedModal(false)}>
+        <AdvancedModal 
+          title="Token Display Advanced Settings" 
+          onClose={() => setShowTokenDefaultsAdvancedModal(false)} 
+          anchorRef={tokenAdvancedButtonRef}
+          defaultPosition={{ x: 480, y: 58 }}
+        >
           <button onClick={() => setTweenExpanded(!tweenExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }} aria-pressed={tweenExpanded}>
             <span className="toolbar-settings-title">Tween Settings</span>
             <span className="toolbar-settings-title">{tweenExpanded ? '▾' : '▸'}</span>
@@ -851,6 +883,57 @@ export const Toolbar = memo(function Toolbar() {
                   </div>
                 ))}
                 <Button onClick={() => setScreenShakeSettings({ enabled: false, durationMs: 260, damage: { enabled: false, intensity: 0.6 }, heal: { enabled: false, intensity: 0.35 }, downed: { enabled: false, intensity: 1 }, attack: { enabled: false, intensity: 0.3 }, miss: { enabled: false, intensity: 0.2 } })} variant="secondary" className="toolbar-full-width-button">Reset Shake Defaults</Button>
+              </div>
+            </div>
+          )}
+          
+          {/* Token Selection Settings - Separate top-level section */}
+          <button onClick={() => setTokenSelectionExpanded(!tokenSelectionExpanded)} className="toolbar-settings-section-toggle" style={{ marginTop: '16px' }} aria-pressed={tokenSelectionExpanded}>
+            <span className="toolbar-settings-title">Token Selection</span>
+            <span className="toolbar-settings-title">{tokenSelectionExpanded ? '▾' : '▸'}</span>
+          </button>
+          {tokenSelectionExpanded && (
+            <div className="toolbar-settings-block">
+              <div className="toolbar-settings-card toolbar-settings-card-stack">
+                <Slider 
+                  label={`Line Thickness: ${tokenSelectionSettings.lineThickness}px`} 
+                  min="1" 
+                  max="10" 
+                  step="1" 
+                  value={tokenSelectionSettings.lineThickness} 
+                  onChange={(e) => setTokenSelectionSettings({ ...tokenSelectionSettings, lineThickness: parseInt(e.target.value) })} 
+                />
+                <Slider 
+                  label={`Corner Radius: ${tokenSelectionSettings.cornerRadius}px`} 
+                  min="0" 
+                  max="20" 
+                  step="1" 
+                  value={tokenSelectionSettings.cornerRadius} 
+                  onChange={(e) => setTokenSelectionSettings({ ...tokenSelectionSettings, cornerRadius: parseInt(e.target.value) })} 
+                />
+                <Slider 
+                  label={`Size: ${tokenSelectionSettings.size.toFixed(1)}x`} 
+                  min="0.5" 
+                  max="2.0" 
+                  step="0.1" 
+                  value={tokenSelectionSettings.size} 
+                  onChange={(e) => setTokenSelectionSettings({ ...tokenSelectionSettings, size: parseFloat(e.target.value) })} 
+                />
+                <div className="toolbar-select-wrapper">
+                  <label className="toolbar-select-label">Style</label>
+                  <select 
+                    className="toolbar-select"
+                    value={tokenSelectionSettings.style}
+                    onChange={(e) => setTokenSelectionSettings({ ...tokenSelectionSettings, style: e.target.value as any })}
+                  >
+                    <option value="circle">Circle</option>
+                    <option value="square">Square</option>
+                    <option value="L4Corners">4 L-shaped corners</option>
+                    <option value="twoSquares">Two squares</option>
+                    <option value="twoSquaresRotated">Two squares (rotated 90°)</option>
+                  </select>
+                </div>
+                <Button onClick={() => setTokenSelectionSettings({ lineThickness: 3, cornerRadius: 6, size: 1.0, style: 'circle' })} variant="secondary" className="toolbar-full-width-button">Reset Selection Defaults</Button>
               </div>
             </div>
           )}
@@ -1305,6 +1388,11 @@ export const Toolbar = memo(function Toolbar() {
             onClick={() => {
               const newShowSettings = !showSettings;
               setShowSettings(newShowSettings);
+              // Close advanced modals when closing Board Settings
+              if (newShowSettings === false) {
+                setShowDice3dAdvancedModal(false);
+                setShowTokenDefaultsAdvancedModal(false);
+              }
               // Turn off grid edit mode when closing settings
               if (newShowSettings === false && gridEditMode) {
                 setGridEditMode(false);
@@ -1701,6 +1789,7 @@ export const Toolbar = memo(function Toolbar() {
 
               <div className="toolbar-settings-card">
                 <Button
+                  ref={dice3dAdvancedButtonRef}
                   onClick={() => setShowDice3dAdvancedModal(true)}
                   variant="secondary"
                   size="sm"
@@ -1966,6 +2055,7 @@ export const Toolbar = memo(function Toolbar() {
             {/* Advanced Settings */}
             <div className="toolbar-settings-card">
               <Button
+                ref={tokenAdvancedButtonRef}
                 onClick={() => setShowTokenDefaultsAdvancedModal(true)}
                 variant="secondary"
                 size="sm"

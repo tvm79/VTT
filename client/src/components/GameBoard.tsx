@@ -1407,6 +1407,7 @@ export function GameBoard() {
     tokenDisplayMode,
     tweenSettings,
     screenShakeSettings,
+    tokenSelectionSettings,
     fogDrawMode,
     setFogDrawMode,
     gmFogOpacity,
@@ -4641,6 +4642,12 @@ export function GameBoard() {
       tokenSelection.clear();
       // Draw selection rectangles for all selected tokens
       const allSelectedIds = selectedTokenId ? [...selectedTokenIds, selectedTokenId] : selectedTokenIds;
+      const settings = tokenSelectionSettings || { lineThickness: 3, cornerRadius: 6, size: 1.0, style: 'circle' };
+      const lineWidth = settings.lineThickness;
+      const cornerRadius = settings.cornerRadius;
+      const size = settings.size;
+      const style = settings.style;
+      
       for (const tokenId of allSelectedIds) {
         const token = tokens.find(t => t.id === tokenId);
         const visuals = tokenVisualsRef.current.get(tokenId);
@@ -4650,10 +4657,116 @@ export function GameBoard() {
           const height = effectiveGridSize * footprint;
           // Get border color based on token disposition
           const borderColor = getTokenBorderColor(token.properties);
-          // Draw selection rectangle at token's world position (with rounded corners)
-          const selectionRadius = 6;
-          tokenSelection.roundRect(token.x - 2, token.y - 2, width + 4, height + 4, selectionRadius);
-          tokenSelection.stroke({ width: 3, color: borderColor, alpha: 1 }); // Disposition-based color outline
+          
+          // Draw selection based on style - apply size multiplier from center
+          const baseW = width + 4;
+          const baseH = height + 4;
+          const scaledW = baseW * size;
+          const scaledH = baseH * size;
+          // Calculate center position and offset to top-left
+          const cx = token.x + width / 2;
+          const cy = token.y + height / 2;
+          const x = cx - scaledW / 2;
+          const y = cy - scaledH / 2;
+          const w = scaledW;
+          const h = scaledH;
+          const cornerSize = Math.min(w, h) * 0.25; // Size of L-corners
+          
+          if (style === 'circle') {
+            // Circle outline
+            tokenSelection.circle(x + w / 2, y + h / 2, Math.min(w, h) / 2);
+            tokenSelection.stroke({ width: lineWidth, color: borderColor, alpha: 1 });
+          } else if (style === 'square') {
+            // Square outline with rounded corners
+            tokenSelection.roundRect(x, y, w, h, cornerRadius);
+            tokenSelection.stroke({ width: lineWidth, color: borderColor, alpha: 1 });
+          } else if (style === 'L4Corners') {
+            // 4 L-shaped corners (corner brackets) with corner radius
+            const strokeOptions = { width: lineWidth, color: borderColor, alpha: 1 };
+            const r = Math.min(cornerRadius, cornerSize * 0.5); // Limit radius to half corner size
+            
+            if (r > 0) {
+              // Top-left corner with rounded outer edge
+              tokenSelection.moveTo(x, y + cornerSize - r);
+              tokenSelection.lineTo(x, y + r);
+              tokenSelection.arc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+              tokenSelection.lineTo(x + cornerSize - r, y);
+              
+              // Top-right corner with rounded outer edge
+              tokenSelection.moveTo(x + w - cornerSize + r, y);
+              tokenSelection.lineTo(x + w - r, y);
+              tokenSelection.arc(x + w - r, y + r, r, Math.PI * 1.5, 0, false);
+              tokenSelection.lineTo(x + w, y + cornerSize - r);
+              
+              // Bottom-right corner with rounded outer edge
+              tokenSelection.moveTo(x + w, y + h - cornerSize + r);
+              tokenSelection.lineTo(x + w, y + h - r);
+              tokenSelection.arc(x + w - r, y + h - r, r, 0, Math.PI * 0.5, false);
+              tokenSelection.lineTo(x + w - cornerSize + r, y + h);
+              
+              // Bottom-left corner with rounded outer edge
+              tokenSelection.moveTo(x + cornerSize - r, y + h);
+              tokenSelection.lineTo(x + r, y + h);
+              tokenSelection.arc(x + r, y + h - r, r, Math.PI * 0.5, Math.PI, false);
+              tokenSelection.lineTo(x, y + h - cornerSize + r);
+            } else {
+              // Sharp corners (no radius)
+              tokenSelection.moveTo(x, y + cornerSize);
+              tokenSelection.lineTo(x, y);
+              tokenSelection.lineTo(x + cornerSize, y);
+              // Top-right corner
+              tokenSelection.moveTo(x + w - cornerSize, y);
+              tokenSelection.lineTo(x + w, y);
+              tokenSelection.lineTo(x + w, y + cornerSize);
+              // Bottom-right corner
+              tokenSelection.moveTo(x + w, y + h - cornerSize);
+              tokenSelection.lineTo(x + w, y + h);
+              tokenSelection.lineTo(x + w - cornerSize, y + h);
+              // Bottom-left corner
+              tokenSelection.moveTo(x + cornerSize, y + h);
+              tokenSelection.lineTo(x, y + h);
+              tokenSelection.lineTo(x, y + h - cornerSize);
+            }
+            tokenSelection.stroke(strokeOptions);
+          } else if (style === 'twoSquares') {
+            // Two squares (inner and outer)
+            // Outer square with rounded corners
+            tokenSelection.roundRect(x, y, w, h, cornerRadius);
+            tokenSelection.stroke({ width: lineWidth, color: borderColor, alpha: 1 });
+            // Inner square
+            const innerInset = lineWidth + 3;
+            const innerX = x + innerInset;
+            const innerY = y + innerInset;
+            const innerW = w - innerInset * 2;
+            const innerH = h - innerInset * 2;
+            if (innerW > 0 && innerH > 0) {
+              tokenSelection.roundRect(innerX, innerY, innerW, innerH, Math.max(2, cornerRadius - innerInset));
+              tokenSelection.stroke({ width: lineWidth, color: borderColor, alpha: 1 });
+            }
+          } else if (style === 'twoSquaresRotated') {
+            // Two squares of equal physical size, rotated 45° relative to each other
+            // The rotated square has the same dimensions as the outer square but is rotated
+            const cx = x + w / 2;
+            const cy = y + h / 2;
+            const strokeOptions = { width: lineWidth, color: borderColor, alpha: 1 };
+            
+            // Draw outer square (normal orientation)
+            tokenSelection.roundRect(x, y, w, h, cornerRadius);
+            tokenSelection.stroke(strokeOptions);
+            
+            // Draw rotated square (45°) with same physical size as outer square
+            // For a square of side L rotated 45°, the bounding box is L*sqrt(2)
+            const diag = Math.sqrt(w * w + h * h);
+            const halfDiag = diag / 2;
+            
+            // Simple sharp diamond (no corner radius - looks better)
+            tokenSelection.moveTo(cx, cy - halfDiag);
+            tokenSelection.lineTo(cx + halfDiag, cy);
+            tokenSelection.lineTo(cx, cy + halfDiag);
+            tokenSelection.lineTo(cx - halfDiag, cy);
+            tokenSelection.closePath();
+            tokenSelection.stroke(strokeOptions);
+          }
         }
       }
     }
@@ -4669,6 +4782,7 @@ export function GameBoard() {
     combatants,
     currentTurnIndex,
     turnTokenImageUrl,
+    tokenSelectionSettings,
   ]);
 
   // Light rendering is now handled by useLightRenderer hook (see above)

@@ -17,14 +17,17 @@ export function Panel({ className = '', header, footer, style, children, ...prop
   );
 }
 
+import { forwardRef } from 'react';
+
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'icon';
 };
 
-export function Button({ className = '', variant = 'secondary', size = 'md', type = 'button', ...props }: ButtonProps) {
-  return <button type={type} className={`ui-button ui-button--${variant} ui-button--${size} ${className}`.trim()} {...props} />;
-}
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({ className = '', variant = 'secondary', size = 'md', type = 'button', ...props }, ref) => {
+  return <button ref={ref} type={type} className={`ui-button ui-button--${variant} ui-button--${size} ${className}`.trim()} {...props} />;
+});
+Button.displayName = 'Button';
 
 export function IconButton({ className = '', children, ...props }: ButtonProps) {
   return (

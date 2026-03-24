@@ -175,8 +175,12 @@ export function PlayerListPanel() {
         top: playerListPanelPosition.y,
         width: playerListPanelSize.width,
         height: 'fit-content',
-        background: colorScheme?.id === 'custom' ? colorScheme.surface : undefined,
-        borderColor: colorScheme?.id === 'custom' ? colorScheme.accent : undefined,
+        background: colorScheme?.id === 'custom' 
+          ? `rgba(${parseInt(colorScheme.surface.slice(1, 3), 16)}, ${parseInt(colorScheme.surface.slice(3, 5), 16)}, ${parseInt(colorScheme.surface.slice(5, 7), 16)}, ${colorScheme.surfaceAlpha ?? 0.9})` 
+          : undefined,
+        borderColor: colorScheme?.id === 'custom'
+          ? `rgba(${parseInt(colorScheme.accent.slice(1, 3), 16)}, ${parseInt(colorScheme.accent.slice(3, 5), 16)}, ${parseInt(colorScheme.accent.slice(5, 7), 16)}, ${colorScheme.surfaceAlpha ?? 0.9})`
+          : undefined,
 
         '--player-list-z-index': panelFocus === 'playerList' ? 5000 : 50,
       } as React.CSSProperties}

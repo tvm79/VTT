@@ -317,7 +317,9 @@ button.tool-btn i {
 .scene-manager,
 .dnd-manager,
 .token-panel,
-.header {
+.toolbar,
+.game-toolbar,
+.player-list-panel {
   backdrop-filter: blur(var(--panel-blur));
   -webkit-backdrop-filter: blur(var(--panel-blur));
 }
@@ -840,8 +842,6 @@ button.tool-btn i {
   overflow: visible;
   position: relative;
   z-index: var(--z-index-overlay);
-  backdrop-filter: blur(var(--panel-blur));
-  -webkit-backdrop-filter: blur(var(--panel-blur));
 }
 
 .header-left {
@@ -1525,6 +1525,8 @@ canvas {
   box-shadow: var(--shadow-sm);
   --toolbar-settings-width: 320px;
   z-index: var(--z-index-popover);
+  backdrop-filter: blur(var(--panel-blur));
+  -webkit-backdrop-filter: blur(var(--panel-blur));
 }
 
 .toolbar-anchor {
@@ -1782,6 +1784,78 @@ canvas {
   top: 72px;
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* Advanced Settings Modal Panel */
+.advanced-modal-panel {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 380px;
+  max-height: calc(100vh - 100px);
+  background: var(--surface, var(--color-surface-overlay)) !important;
+  padding: var(--space-3);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  border: 1px solid var(--accent);
+  z-index: 99999;
+  min-width: 180px;
+  backdrop-filter: blur(var(--panel-blur));
+  -webkit-backdrop-filter: blur(var(--panel-blur));
+  pointer-events: auto;
+}
+
+.advanced-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.advanced-modal-header:active {
+  cursor: grabbing;
+}
+
+.advanced-modal-title {
+  color: var(--text-primary, var(--color-text));
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  pointer-events: none;
+}
+
+.advanced-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, var(--color-text));
+  opacity: 0.6;
+  cursor: pointer;
+  padding: var(--space-1);
+  font-size: var(--font-size-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--motion-duration-fast) var(--motion-easing-standard);
+  pointer-events: auto;
+}
+
+.advanced-modal-close:hover {
+  opacity: 1;
+  background: var(--state-hover, rgba(255, 255, 255, 0.05));
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99998;
+  pointer-events: none;
 }
 
 /* Weather Panel - from Toolbar dropdown */
