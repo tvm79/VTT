@@ -3031,18 +3031,18 @@ export function GameBoard() {
     // Aura animation ticker - continuously animates aura pulse effect
     const updateAuraPulse = (ticker: PIXI.Ticker) => {
       const time = Date.now();
-      // Get tokens from the game store
+      // Get ALL tokens from the game store (don't filter by board - process all tokens)
       const allTokens = useGameStore.getState().tokens;
-      const currentBoard = useGameStore.getState().currentBoard;
-      const boardId = currentBoard?.id;
-      const boardTokens = boardId ? allTokens.filter(t => t.boardId === boardId) : allTokens;
+      
+      // DEBUG: Log token visuals
+      // console.log('[DEBUG AURA] Token visuals count:', tokenVisualsRef.current.size);
       
       tokenVisualsRef.current.forEach((visuals, tokenId) => {
         const { auraContainer, root } = visuals;
         if (!auraContainer) return;
         
-        // Get token properties for aura settings
-        const token = boardTokens.find(t => t.id === tokenId);
+        // Get token properties from ALL tokens (not filtered by board)
+        const token = allTokens.find(t => t.id === tokenId);
         if (!token) return;
         const auraProps = (token.properties || {}) as Record<string, unknown>;
         const auraEnabled = auraProps.auraEnabled === true;
@@ -3074,16 +3074,11 @@ export function GameBoard() {
         const auraRotation = auraProps.auraRotation === true;
         const auraRadius = typeof auraProps.auraRadius === 'number' ? auraProps.auraRadius : 60;
         const auraOpacity = typeof auraProps.auraOpacity === 'number' ? auraProps.auraOpacity : 0.5;
-        
-        // DEBUG: Log aura color parsing
         const auraColorRaw = auraProps.auraColor;
         let auraColor = DEFAULT_AURA_COLOR;
         if (auraColorRaw) {
           const colorStr = String(auraColorRaw).replace('#', '');
           auraColor = parseInt(colorStr, 16);
-          console.log('[DEBUG AURA] Color parsed:', auraColorRaw, '->', auraColor);
-        } else {
-          console.log('[DEBUG AURA] No auraColor, using default:', DEFAULT_AURA_COLOR);
         }
         
         // Get or create stored aura graphics references
@@ -3710,7 +3705,7 @@ export function GameBoard() {
           sprite.on('rightclick', handleContextMenu);
 
           auraContainer.eventMode = 'none';
-          auraContainer.zIndex = 10; // Render on top of everything
+          auraContainer.zIndex = -1; // Render behind the token
           shadowSprite.zIndex = 0;
           turnMarkerContainer.zIndex = 1;
           effectContainer.zIndex = 2;
@@ -6087,25 +6082,13 @@ export function GameBoard() {
           dragSelectStart.current = { x: pos.x, y: pos.y };
           dragSelectCurrent.current = { x: pos.x, y: pos.y };
           // Don't set isDragSelecting.current = true yet - wait for drag threshold
-        } else if (clickedTokenCenter && clickedTokenId) {
-          // DEBUG: Log when we hit this code path
-          console.log('[DEBUG] Token click handler reached, tool:', currentTool, 'tokenId:', clickedTokenId, 'click detail:', e.detail);
-          
+        } else if (clickedTokenCenter && clickedTokenId) {          
           // Check for double-click on token using time-based detection
           const currentTime = Date.now();
           const lastClick = lastTokenClickInfo;
           const timeDiff = currentTime - lastClick.time;
           const isSameToken = lastClick.tokenId === clickedTokenId;
           const isDoubleClick = isSameToken && timeDiff < DOUBLE_CLICK_THRESHOLD;
-          
-          console.log('[DEBUG] Double-click check:', { 
-            lastClickTokenId: lastClick.tokenId, 
-            clickedTokenId, 
-            isSameToken, 
-            timeDiff, 
-            threshold: DOUBLE_CLICK_THRESHOLD,
-            isDoubleClick 
-          });
           
           if (isDoubleClick) {
             if (pendingSingleTokenClickTimeoutRef.current !== null) {
@@ -6158,17 +6141,10 @@ export function GameBoard() {
             }
 
             pendingSingleTokenClickTimeoutRef.current = window.setTimeout(() => {
-              console.log('[DEBUG] Single click on token, tokenId:', clickedTokenId);
-
               const freshTokens = useGameStore.getState().tokens;
-              console.log('[DEBUG] Fresh tokens array length:', freshTokens.length);
-              console.log('[DEBUG] Fresh token ids:', freshTokens.map(t => t.id));
-
               useGameStore.getState().setSelectedToken(clickedTokenId);
               useGameStore.getState().setSelectedTokenIds([clickedTokenId]);
-
               const token = freshTokens.find(t => t.id === clickedTokenId);
-              console.log('[DEBUG] Token found:', token);
               pendingSingleTokenClickTimeoutRef.current = null;
             }, DOUBLE_CLICK_THRESHOLD);
 
@@ -8735,42 +8711,85 @@ export function GameBoard() {
               const tokenCenterX = token.x + size / 2;
               const tokenCenterY = token.y + size / 2;
               
-              // Calculate menu position offset from button position
-              // Default to centering on token if no button position provided
-              let menuX = tokenCenterX;
-              let menuY = tokenCenterY;
+              // Calculate menu position using smart positioning algorithm
+              // Rules: never center on token, never intersect token, always grow away from token
+              const tokenRadius = size / 2;
+              const margin = 10; // gap between token edge and panel
+              const gap = tokenRadius + margin;
               
-              if (buttonPosition) {
-                // Use button position but offset it away from token center
-                const dx = buttonPosition.x - tokenCenterX;
-                const dy = buttonPosition.y - tokenCenterY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance > 0) {
-                  // Normalize direction and add offset
-                  const offset = 60;
-                  menuX = buttonPosition.x + (dx / distance) * offset;
-                  menuY = buttonPosition.y + (dy / distance) * offset;
-                } else {
-                  menuX = buttonPosition.x + 60;
-                  menuY = buttonPosition.y + 60;
+              // Get button position or use default position to the right of token
+              const buttonX = buttonPosition ? buttonPosition.x : tokenCenterX + gap;
+              const buttonY = buttonPosition ? buttonPosition.y : tokenCenterY;
+              
+              // Compute direction from token center to button
+              const dirX = buttonX - tokenCenterX;
+              const dirY = buttonY - tokenCenterY;
+              const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
+              
+              // Normalize direction (handle zero case)
+              const normDirX = dirLen > 0 ? dirX / dirLen : 1;
+              const normDirY = dirLen > 0 ? dirY / dirLen : 0;
+              
+              // Compute anchor point = buttonPos + dir * gap
+              const anchorX = buttonX + normDirX * gap;
+              const anchorY = buttonY + normDirY * gap;
+              
+              // Determine panel dimensions for each modal type
+              const getPanelDimensions = (modal: string) => {
+                switch (modal) {
+                  case 'bars': return { w: 200, h: 350 };
+                  case 'status': return { w: 250, h: 350 };
+                  case 'display': return { w: 250, h: 300 };
+                  case 'aura': return { w: 320, h: 500 };
+                  case 'ownership': return { w: 250, h: 200 };
+                  case 'layer': return { w: 200, h: 200 };
+                  case 'delete': return { w: 200, h: 150 };
+                  case 'combat': return { w: 200, h: 150 };
+                  default: return { w: 200, h: 200 };
                 }
+              };
+              
+              // Determine which side to place panel based on direction
+              // right: dir.x > 0.5, left: dir.x < -0.5, down: dir.y > 0.5, up: dir.y < -0.5, else: diagonal
+              const panelW = getPanelDimensions(modal).w;
+              const panelH = getPanelDimensions(modal).h;
+              
+              let panelX: number, panelY: number;
+              
+              if (normDirX > 0.5) {
+                // Right side: panel.x = anchor.x, panel.y = anchor.y - h/2
+                panelX = anchorX;
+                panelY = anchorY - panelH / 2;
+              } else if (normDirX < -0.5) {
+                // Left side: panel.x = anchor.x - w, panel.y = anchor.y - h/2
+                panelX = anchorX - panelW;
+                panelY = anchorY - panelH / 2;
+              } else if (normDirY > 0.5) {
+                // Down side: panel.x = anchor.x - w/2, panel.y = anchor.y
+                panelX = anchorX - panelW / 2;
+                panelY = anchorY;
+              } else if (normDirY < -0.5) {
+                // Up side: panel.x = anchor.x - w/2, panel.y = anchor.y - h
+                panelX = anchorX - panelW / 2;
+                panelY = anchorY - panelH;
+              } else {
+                // Diagonal: use direction to determine placement
+                panelX = anchorX - (normDirX < 0 ? panelW : 0);
+                panelY = anchorY - (normDirY < 0 ? panelH : 0);
               }
               
-              // Clamp menu position to stay within viewport bounds
-              // Account for header (approximately 60px) and other UI elements
-              const clampToBounds = (x: number, y: number, menuWidth: number, menuHeight: number) => {
-                const headerOffset = 70; // Account for top header
-                const sidebarWidth = 300; // Approximate sidebar width
-                const minX = 10;
-                const maxX = window.innerWidth - menuWidth - 10;
-                const minY = headerOffset;
-                const maxY = window.innerHeight - menuHeight - 10;
-                
-                return {
-                  x: Math.max(minX, Math.min(x, maxX)),
-                  y: Math.max(minY, Math.min(y, maxY))
-                };
-              };
+              // Clamp to viewport
+              const headerOffset = 70;
+              const minX = 10;
+              const maxX = window.innerWidth - panelW - 10;
+              const minY = headerOffset;
+              const maxY = window.innerHeight - panelH - 10;
+              
+              // Clamp values but don't flip - flip can cause panel to point back at token
+              const finalX = Math.max(minX, Math.min(panelX, maxX));
+              const finalY = Math.max(minY, Math.min(panelY, maxY));
+              
+              const pos = { x: finalX, y: finalY };
               
               switch (modal) {
                 case 'bars': {
@@ -8779,7 +8798,6 @@ export function GameBoard() {
                   
                   // Always show the "Add New Bar" panel when clicking the Bars icon
                   // (regardless of whether bars already exist)
-                  const pos = clampToBounds(menuX - 100, menuY - 90, 200, 350);
                   setBarEditorState({
                     tokenId: token.id,
                     barName: '',  // Empty barName shows "Add New Bar" panel
@@ -8793,7 +8811,6 @@ export function GameBoard() {
                 case 'status':
                   // Open status editor
                   {
-                    const pos = clampToBounds(menuX - 125, menuY - 150, 250, 350);
                     setStatusEditorState({
                       tokenId: token.id,
                       position: pos,
@@ -8803,7 +8820,6 @@ export function GameBoard() {
                 case 'display':
                   // Open display editor
                   {
-                    const pos = clampToBounds(menuX - 125, menuY - 100, 250, 300);
                     setDisplayEditorState({
                       tokenId: token.id,
                       position: pos,
@@ -8813,8 +8829,6 @@ export function GameBoard() {
                 case 'aura':
                   // Open aura/enchantment editor
                   {
-                    // Place the panel to the right of the token (beside it)
-                    const pos = clampToBounds(menuX + 20, menuY - 50, 320, 500);
                     setAuraEditorState({
                       tokenId: token.id,
                       position: pos,
@@ -8824,7 +8838,6 @@ export function GameBoard() {
                 case 'ownership':
                   // Open ownership editor
                   {
-                    const pos = clampToBounds(menuX - 125, menuY - 100, 250, 200);
                     setOwnershipEditorState({
                       tokenId: token.id,
                       position: pos,
@@ -8834,7 +8847,6 @@ export function GameBoard() {
                 case 'layer':
                   // Open layer editor
                   {
-                    const pos = clampToBounds(menuX - 100, menuY - 60, 200, 200);
                     setLayerEditorState({
                       tokenId: token.id,
                       position: pos,
@@ -8844,7 +8856,6 @@ export function GameBoard() {
                 case 'delete':
                   // Open delete confirmation
                   {
-                    const pos = clampToBounds(menuX - 100, menuY - 60, 200, 150);
                     setDeleteEditorState({
                       tokenId: token.id,
                       position: pos,
@@ -8854,7 +8865,6 @@ export function GameBoard() {
                 case 'combat':
                   // Toggle combatant
                   {
-                    const pos = clampToBounds(menuX - 100, menuY - 60, 200, 150);
                     setCombatEditorState({
                       tokenId: token.id,
                       position: pos,

@@ -104,6 +104,50 @@ const styles = {
     boxShadow: shadows.md,
     fontFamily: typography.family.sans,
   },
+  panelTopLeft: {
+    position: 'absolute' as const,
+    zIndex: zIndex.modal,
+    background: colors.surface.overlay,
+    borderRadius: radius.lg,
+    padding: spacing[3],
+    minWidth: '240px',
+    maxWidth: '280px',
+    boxShadow: shadows.md,
+    fontFamily: typography.family.sans,
+  },
+  panelTopRight: {
+    position: 'absolute' as const,
+    zIndex: zIndex.modal,
+    background: colors.surface.overlay,
+    borderRadius: radius.lg,
+    padding: spacing[3],
+    minWidth: '240px',
+    maxWidth: '280px',
+    boxShadow: shadows.md,
+    fontFamily: typography.family.sans,
+  },
+  panelBottomLeft: {
+    position: 'absolute' as const,
+    zIndex: zIndex.modal,
+    background: colors.surface.overlay,
+    borderRadius: radius.lg,
+    padding: spacing[3],
+    minWidth: '240px',
+    maxWidth: '280px',
+    boxShadow: shadows.md,
+    fontFamily: typography.family.sans,
+  },
+  panelBottomRight: {
+    position: 'absolute' as const,
+    zIndex: zIndex.modal,
+    background: colors.surface.overlay,
+    borderRadius: radius.lg,
+    padding: spacing[3],
+    minWidth: '240px',
+    maxWidth: '280px',
+    boxShadow: shadows.md,
+    fontFamily: typography.family.sans,
+  },
   modalOverlay: {
     position: 'fixed' as const,
     top: 0,
@@ -636,15 +680,19 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
   const particlePresetId = (tokenProps.particlePresetId as string) || '';
 
   const updateAuraProp = (key: string, value: unknown) => {
-    const newProps = { ...tokenProps, [key]: value };
+    // Keep the token's existing properties except boardId, only update the specific property
+    const { boardId, ...restTokenProps } = tokenProps as Record<string, unknown>;
+    const newProps = { ...restTokenProps, [key]: value };
     socketService.updateToken(token.id, { properties: newProps });
   };
 
   const applyPreset = (presetId: string) => {
     const preset = auraPresets.find(p => p.id === presetId);
     if (preset) {
+      // Keep the token's existing properties except boardId, only update aura-related properties
+      const { boardId, ...restTokenProps } = tokenProps as Record<string, unknown>;
       const newProps = {
-        ...tokenProps,
+        ...restTokenProps,
         auraEnabled: presetId !== 'none',
         auraPreset: presetId,
         auraColor: preset.color,
