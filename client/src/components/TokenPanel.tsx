@@ -780,7 +780,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
           <Icon name="times" />
         </button>
       </div>
-      {/* Preset Selection */}
+      {/* Preset Selection - Collapsible */}
       <CollapsibleSection sectionKey="aura" title="Aura Presets">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
           {auraPresets.slice(0, 18).map((preset) => (
@@ -804,8 +804,9 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
         </div>
       </CollapsibleSection>
 
-      {/* Enable Aura Toggle */}
-      <CollapsibleSection sectionKey="auraSettings" title="Aura Settings">
+      {/* Aura Settings - Static (always visible) */}
+      <div style={{ marginBottom: '12px', borderTop: `1px solid ${colors.border.subtle}`, paddingTop: '12px' }}>
+        <div style={{ color: colors.text.primary, fontWeight: 500, fontSize: '13px', marginBottom: '8px' }}>Aura Settings</div>
         <div style={{ marginBottom: '12px' }}>
           <ToggleSwitch checked={auraEnabled} onChange={(v) => updateAuraProp('auraEnabled', v)} section="auraSettings" label={auraEnabled ? 'Enabled' : 'Disabled'} />
         </div>
@@ -831,8 +832,6 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
               min="20"
               max="200"
               value={auraRadius}
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => updateAuraProp('auraRadius', parseInt(e.target.value))}
               className="gameboard-editor-range"
             />
@@ -846,8 +845,6 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
               min="10"
               max="100"
               value={auraOpacity * 100}
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => updateAuraProp('auraOpacity', parseInt(e.target.value) / 100)}
               className="gameboard-editor-range"
             />
@@ -872,10 +869,11 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
           </div>
         </>
       )}
-      </CollapsibleSection>
+      </div>
 
-      {/* Particle Effects Section - Independent of Aura */}
-      <CollapsibleSection sectionKey="particles" title="Particle Effects">
+      {/* Particle Effects Section - Static (always visible) */}
+      <div style={{ marginBottom: '12px', borderTop: `1px solid ${colors.border.subtle}`, paddingTop: '12px' }}>
+        <div style={{ color: colors.text.primary, fontWeight: 500, fontSize: '13px', marginBottom: '8px' }}>Particle Effects</div>
         <div style={{ marginBottom: '12px' }}>
           <ToggleSwitch checked={particleEnabled} onChange={(v) => updateAuraProp('particleEnabled', v)} section="particles" label={particleEnabled ? 'Enabled' : 'Disabled'} />
         </div>
@@ -971,10 +969,11 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             </div>
           </>
         )}
-      </CollapsibleSection>
+      </div>
 
-      {/* Filter Effects Section */}
-      <CollapsibleSection sectionKey="filters" title="Filter Effects">
+      {/* Filter Effects Section - Static (always visible) */}
+      <div style={{ marginBottom: '12px', borderTop: `1px solid ${colors.border.subtle}`, paddingTop: '12px' }}>
+        <div style={{ color: colors.text.primary, fontWeight: 500, fontSize: '13px', marginBottom: '8px' }}>Filter Effects</div>
         {/* Filter Type */}
         <div style={{ marginBottom: '12px' }}>
           <label className="gameboard-editor-label">Filter Type</label>
@@ -1083,10 +1082,11 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             </button>
           </div>
         </div>
-      </CollapsibleSection>
+      </div>
 
-      {/* Tint & Color Section */}
-      <CollapsibleSection sectionKey="tint" title="Tint & Color">
+      {/* Tint & Color Section - Static (always visible) */}
+      <div style={{ marginBottom: '12px', borderTop: `1px solid ${colors.border.subtle}`, paddingTop: '12px' }}>
+        <div style={{ color: colors.text.primary, fontWeight: 500, fontSize: '13px', marginBottom: '8px' }}>Tint & Color</div>
         {/* Enable Tint */}
         <div style={{ marginBottom: '12px' }}>
           <ToggleSwitch checked={Boolean(tokenProps.tokenTintEnabled)} onChange={(v) => updateAuraProp('tokenTintEnabled', v)} section="tint" label="Enable Tint" />
@@ -1139,10 +1139,11 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             </div>
           </>
         )}
-      </CollapsibleSection>
+      </div>
 
-      {/* Mesh Effects Section */}
-      <CollapsibleSection sectionKey="mesh" title="Mesh Effects">
+      {/* Mesh Effects Section - Static (always visible) */}
+      <div style={{ marginBottom: '12px', borderTop: `1px solid ${colors.border.subtle}`, paddingTop: '12px' }}>
+        <div style={{ color: colors.text.primary, fontWeight: 500, fontSize: '13px', marginBottom: '8px' }}>Mesh Effects</div>
         {/* Mesh Type */}
         <div style={{ marginBottom: '12px' }}>
           <label className="gameboard-editor-label">Effect Type</label>
@@ -1191,7 +1192,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
             </div>
           </>
         )}
-      </CollapsibleSection>
+      </div>
 
       {/* Clear All */}
       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.border.subtle}` }}>

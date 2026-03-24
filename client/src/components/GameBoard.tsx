@@ -3039,21 +3039,52 @@ export function GameBoard() {
       
       tokenVisualsRef.current.forEach((visuals, tokenId) => {
         const { auraContainer, root } = visuals;
-        if (!auraContainer || !auraContainer.visible) return;
+        if (!auraContainer) return;
         
         // Get token properties for aura settings
         const token = boardTokens.find(t => t.id === tokenId);
         if (!token) return;
         const auraProps = (token.properties || {}) as Record<string, unknown>;
         const auraEnabled = auraProps.auraEnabled === true;
+        
+        // Handle visibility directly in ticker - this ensures aura shows even if useEffect doesn't re-run
+        if (auraEnabled) {
+          if (!auraContainer.visible) {
+            auraContainer.visible = true;
+          }
+        } else {
+          if (auraContainer.visible) {
+            // Clear the aura graphics when disabled
+            if (visuals.auraGlows) {
+              visuals.auraGlows.forEach(g => g.destroy());
+              visuals.auraGlows = undefined;
+            }
+            if (visuals.auraRing) {
+              visuals.auraRing.destroy();
+              visuals.auraRing = undefined;
+            }
+            auraContainer.removeChildren();
+            auraContainer.visible = false;
+          }
+          return;
+        }
+        
         const auraPulse = auraProps.auraPulse !== false;
         const auraAlphaFade = auraProps.auraAlphaFade !== false;
         const auraRotation = auraProps.auraRotation === true;
         const auraRadius = typeof auraProps.auraRadius === 'number' ? auraProps.auraRadius : 60;
         const auraOpacity = typeof auraProps.auraOpacity === 'number' ? auraProps.auraOpacity : 0.5;
-        const auraColor = auraProps.auraColor ? parseInt(String(auraProps.auraColor).replace('#', ''), 16) : DEFAULT_AURA_COLOR;
         
-        if (!auraEnabled) return;
+        // DEBUG: Log aura color parsing
+        const auraColorRaw = auraProps.auraColor;
+        let auraColor = DEFAULT_AURA_COLOR;
+        if (auraColorRaw) {
+          const colorStr = String(auraColorRaw).replace('#', '');
+          auraColor = parseInt(colorStr, 16);
+          console.log('[DEBUG AURA] Color parsed:', auraColorRaw, '->', auraColor);
+        } else {
+          console.log('[DEBUG AURA] No auraColor, using default:', DEFAULT_AURA_COLOR);
+        }
         
         // Get or create stored aura graphics references
         let auraGlows = visuals.auraGlows as PIXI.Graphics[] | undefined;
@@ -3679,7 +3710,7 @@ export function GameBoard() {
           sprite.on('rightclick', handleContextMenu);
 
           auraContainer.eventMode = 'none';
-          auraContainer.zIndex = 0;
+          auraContainer.zIndex = 10; // Render on top of everything
           shadowSprite.zIndex = 0;
           turnMarkerContainer.zIndex = 1;
           effectContainer.zIndex = 2;
@@ -4305,26 +4336,8 @@ export function GameBoard() {
           statusContainer.visible = false;
         }
 
-        const auraProps = (token.properties || {}) as Record<string, unknown>;
-        const auraEnabled = auraProps.auraEnabled === true;
-        
-        // Aura animation is now handled by the ticker (updateAuraPulse)
-        // Just toggle visibility here - the ticker creates/animates the graphics
-        if (auraEnabled) {
-          auraContainer.visible = true;
-        } else {
-          // Clear the aura graphics when disabled
-          if (visuals.auraGlows) {
-            visuals.auraGlows.forEach(g => g.destroy());
-            visuals.auraGlows = undefined;
-          }
-          if (visuals.auraRing) {
-            visuals.auraRing.destroy();
-            visuals.auraRing = undefined;
-          }
-          auraContainer.removeChildren();
-          auraContainer.visible = false;
-        }
+        // Aura visibility is now handled directly by the ticker (updateAuraPulse)
+        // No need to set visibility here - the ticker will handle it on the next frame
 
         const showLabel = token.showLabel ?? false;
         const labelText = token.label || token.name || '';

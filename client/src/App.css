@@ -6861,6 +6861,13 @@ canvas {
   min-width: 0;
 }
 
+.token-panel-input-row .token-panel-button {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+}
+
 /* Range input */
 .token-panel-range {
   flex: 1;
