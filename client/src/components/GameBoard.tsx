@@ -3342,7 +3342,6 @@ export function GameBoard() {
 
   // Draw grid - using shader-based infinite grid
   useEffect(() => {
-    console.log('Grid effect check: appReady:', appReady, 'currentBoard:', !!currentBoard);
     if (!appReady || !currentBoard) {
       return;
     }
@@ -3590,22 +3589,7 @@ export function GameBoard() {
       
       if (!visuals && token.imageUrl) {
         const resolvedTokenImageUrl = toBoardSafeImageUrl(token.imageUrl);
-        console.debug('[TokenLoad] loading token texture', {
-          tokenId: token.id,
-          tokenName: token.name,
-          originalUrl: token.imageUrl,
-          resolvedUrl: resolvedTokenImageUrl,
-        });
         PIXI.Assets.load<PIXI.Texture>(resolvedTokenImageUrl).then((texture) => {
-          console.debug('[TokenLoad] texture load resolved', {
-            tokenId: token.id,
-            hasTexture: Boolean(texture),
-            textureDestroyed: Boolean((texture as any)?.destroyed),
-            sourceExists: Boolean((texture as any)?.source),
-            sourceResourceExists: Boolean((texture as any)?.source?.resource),
-            sourceWidth: (texture as any)?.source?.pixelWidth,
-            sourceHeight: (texture as any)?.source?.pixelHeight,
-          });
           if (!appRef.current) return;
           if (tokenVisualsRef.current.has(token.id)) return;
 
@@ -3620,12 +3604,6 @@ export function GameBoard() {
               );
 
           if (!resolvedTexture || !(resolvedTexture as any).source) {
-            console.error('[TokenLoad] no usable texture for token; skipping render', {
-              tokenId: token.id,
-              tokenName: token.name,
-              originalUrl: token.imageUrl,
-              resolvedUrl: resolvedTokenImageUrl,
-            });
             return;
           }
 

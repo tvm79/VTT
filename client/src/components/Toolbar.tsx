@@ -623,7 +623,10 @@ export const Toolbar = memo(function Toolbar() {
     }, [isDragging, dragOffset]);
 
     return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647 }} onClick={onClose}>
+      <div 
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647, pointerEvents: 'none' }} 
+        onClick={onClose}
+      >
         <div
           ref={modalRef}
           style={{
@@ -640,6 +643,7 @@ export const Toolbar = memo(function Toolbar() {
             boxShadow: shadows.md,
             cursor: isDragging ? 'grabbing' : 'default',
             userSelect: 'none',
+            pointerEvents: 'auto',
           }}
           onClick={(e) => e.stopPropagation()}
         >
