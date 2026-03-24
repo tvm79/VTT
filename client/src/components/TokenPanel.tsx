@@ -280,7 +280,7 @@ function Modal({ title, onClose, children, position }: { title: string; onClose:
   } : { ...styles.modal, pointerEvents: 'auto' as const };
   
   return (
-    <div style={{...styles.modalOverlay, pointerEvents: 'none'}} onClick={onClose}>
+    <div style={{...styles.modalOverlay, pointerEvents: 'auto'}} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ color: colors.text.primary, margin: 0, fontSize: '16px' }}>{title}</h3>
@@ -749,19 +749,23 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
     position: 'absolute' as const,
     left: position.x,
     top: position.y,
-    zIndex: 2000,
-    background: colors.surface.base,
-    padding: '16px',
-    borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-    minWidth: '300px',
-    maxWidth: '380px',
+    zIndex: 99999,
+    pointerEvents: 'auto' as const,
   } : {};
 
   return (
-    <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+    <div
+      className="light-editor-panel gameboard-aura-editor-panel"
+      style={panelStyle}
+      onMouseDownCapture={(e) => e.stopPropagation()}
+      onPointerDownCapture={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ color: colors.text.primary, margin: 0, fontSize: '16px' }}>Enchantment Aura</h3>
+        <div className="gameboard-editor-heading" style={{ marginBottom: 0 }}>
+          <Icon name="wand-magic-sparkles" />
+          Enchantment Aura
+        </div>
         <button
           onClick={onClose}
           style={{
@@ -810,18 +814,18 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
       {auraEnabled && (
         <>
           <div style={{ marginBottom: '12px' }}>
-            <label style={styles.label}>Aura Color</label>
+            <label className="gameboard-editor-label">Aura Color</label>
             <input
               type="color"
               value={auraColor}
               onChange={(e) => updateAuraProp('auraColor', e.target.value)}
-              style={{ width: '100%', height: '36px', cursor: 'pointer', border: 'none', borderRadius: '6px' }}
+              className="light-editor-panel-color"
             />
           </div>
 
           {/* Aura Radius */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={styles.label}>Aura Radius: {auraRadius}px</label>
+            <label className="gameboard-editor-label">Aura Radius: {auraRadius}px</label>
             <input
               type="range"
               min="20"
@@ -830,13 +834,13 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
               onMouseDown={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => updateAuraProp('auraRadius', parseInt(e.target.value))}
-              style={{ width: '100%', cursor: 'pointer', touchAction: 'none', pointerEvents: 'auto' }}
+              className="gameboard-editor-range"
             />
           </div>
 
           {/* Aura Opacity */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={styles.label}>Aura Opacity: {Math.round(auraOpacity * 100)}%</label>
+            <label className="gameboard-editor-label">Aura Opacity: {Math.round(auraOpacity * 100)}%</label>
             <input
               type="range"
               min="10"
@@ -845,25 +849,25 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
               onMouseDown={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => updateAuraProp('auraOpacity', parseInt(e.target.value) / 100)}
-              style={{ width: '100%', cursor: 'pointer', touchAction: 'none', pointerEvents: 'auto' }}
+              className="gameboard-editor-range"
             />
           </div>
 
           {/* Aura Pulse */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={styles.label}>Pulse Animation</label>
+            <label className="gameboard-editor-label">Pulse Animation</label>
             <ToggleSwitch checked={auraPulse} onChange={(v) => updateAuraProp('auraPulse', v)} section="auraSettings" />
           </div>
 
           {/* Aura Alpha Fade */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={styles.label}>Alpha Fade</label>
+            <label className="gameboard-editor-label">Alpha Fade</label>
             <ToggleSwitch checked={(tokenProps.auraAlphaFade !== false)} onChange={(v) => updateAuraProp('auraAlphaFade', v)} section="auraSettings" />
           </div>
 
           {/* Aura Rotation */}
           <div style={{ marginBottom: '12px' }}>
-            <label style={styles.label}>Rotation</label>
+            <label className="gameboard-editor-label">Rotation</label>
             <ToggleSwitch checked={tokenProps.auraRotation === true} onChange={(v) => updateAuraProp('auraRotation', v)} section="auraSettings" />
           </div>
         </>
@@ -880,20 +884,11 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
           <>
             {/* Particle Preset */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Particle Preset</label>
+              <label className="gameboard-editor-label">Particle Preset</label>
               <select
                 value={particlePresetId}
                 onChange={(e) => updateAuraProp('particlePresetId', e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  background: colors.state.hover,
-                  border: `1px solid ${colors.border.subtle}`,
-                  borderRadius: '4px',
-                  color: colors.text.primary,
-                  fontSize: '12px',
-                  cursor: 'pointer',
-                }}
+                className="light-editor-panel-select"
               >
                 <option value="">-- Select a Preset --</option>
                 {particlePresets.map((preset) => (
@@ -906,18 +901,18 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
 
             {/* Particle Color */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Particle Color</label>
+              <label className="gameboard-editor-label">Particle Color</label>
               <input
                 type="color"
                 value={particleColor}
                 onChange={(e) => updateAuraProp('particleColor', e.target.value)}
-                style={{ width: '100%', height: '36px', cursor: 'pointer', border: 'none', borderRadius: '6px' }}
+                className="light-editor-panel-color"
               />
             </div>
 
             {/* Particle Count */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Particle Count: {particleCount}</label>
+              <label className="gameboard-editor-label">Particle Count: {particleCount}</label>
               <input
                 type="range"
                 min="5"
@@ -926,13 +921,13 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleCount', parseInt(e.target.value)); }}
-                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+                className="gameboard-editor-range"
               />
             </div>
 
             {/* Particle Size */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Particle Size: {(tokenProps.particleSize as number) || 10}px</label>
+              <label className="gameboard-editor-label">Particle Size: {(tokenProps.particleSize as number) || 10}px</label>
               <input
                 type="range"
                 min="2"
@@ -941,13 +936,13 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleSize', parseInt(e.target.value)); }}
-                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+                className="gameboard-editor-range"
               />
             </div>
 
             {/* Particle Rate */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Spawn Rate: {(tokenProps.particleRate as number) || 5}/s</label>
+              <label className="gameboard-editor-label">Spawn Rate: {(tokenProps.particleRate as number) || 5}/s</label>
               <input
                 type="range"
                 min="1"
@@ -956,13 +951,13 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleRate', parseInt(e.target.value)); }}
-                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+                className="gameboard-editor-range"
               />
             </div>
 
             {/* Particle Lifetime */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Lifetime: {(tokenProps.particleLifetime as number) || 3}s</label>
+              <label className="gameboard-editor-label">Lifetime: {(tokenProps.particleLifetime as number) || 3}s</label>
               <input
                 type="range"
                 min="1"
@@ -971,7 +966,7 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('particleLifetime', parseInt(e.target.value)); }}
-                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+                className="gameboard-editor-range"
               />
             </div>
           </>
@@ -982,11 +977,11 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
       <CollapsibleSection sectionKey="filters" title="Filter Effects">
         {/* Filter Type */}
         <div style={{ marginBottom: '12px' }}>
-          <label style={styles.label}>Filter Type</label>
+          <label className="gameboard-editor-label">Filter Type</label>
           <select
             value={(tokenProps.tokenEffectFilter as string) || 'none'}
             onChange={(e) => updateAuraProp('tokenEffectFilter', e.target.value)}
-            style={styles.select}
+            className="light-editor-panel-select"
           >
             <option value="none">None</option>
             <option value="blur">Blur</option>
@@ -1000,15 +995,16 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
         {/* Filter Intensity */}
         {Boolean(tokenProps.tokenEffectFilter) && tokenProps.tokenEffectFilter !== 'none' && (
           <div style={{ marginBottom: '12px' }}>
-            <label style={styles.label}>Filter Intensity: {((tokenProps.tokenFilterIntensity as number) || 50)}%</label>
+            <label className="gameboard-editor-label">Filter Intensity: {((tokenProps.tokenFilterIntensity as number) || 50)}%</label>
             <input
               type="range"
               min="0"
               max="100"
               value={(tokenProps.tokenFilterIntensity as number) || 50}
               onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenFilterIntensity', parseInt(e.target.value)); }}
-              style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+              className="gameboard-editor-range"
             />
           </div>
         )}
@@ -1100,36 +1096,37 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
         {Boolean(tokenProps.tokenTintEnabled) && (
           <>
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Tint Color</label>
+              <label className="gameboard-editor-label">Tint Color</label>
               <input
                 type="color"
                 value={(tokenProps.tokenTintColor as string) || '#ffffff'}
                 onChange={(e) => updateAuraProp('tokenTintColor', e.target.value)}
-                style={{ width: '100%', height: '36px', cursor: 'pointer', border: 'none', borderRadius: '6px' }}
+                className="light-editor-panel-color"
               />
             </div>
 
             {/* Alpha */}
-            <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Alpha: {((tokenProps.tokenAlpha as number) ?? 100)}%</label>
+            <div className="gameboard-editor-field">
+              <label className="gameboard-editor-label">Alpha: {((tokenProps.tokenAlpha as number) ?? 100)}%</label>
               <input
                 type="range"
                 min="0"
                 max="100"
                 value={(tokenProps.tokenAlpha as number) ?? 100}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenAlpha', parseInt(e.target.value)); }}
-                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+                className="gameboard-editor-range"
               />
             </div>
 
             {/* Blend Mode */}
             <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Blend Mode</label>
+              <label className="gameboard-editor-label">Blend Mode</label>
               <select
                 value={(tokenProps.tokenBlendMode as string) || 'normal'}
                 onChange={(e) => updateAuraProp('tokenBlendMode', e.target.value)}
-                style={styles.select}
+                className="light-editor-panel-select"
               >
                 <option value="normal">Normal</option>
                 <option value="add">Add</option>
@@ -1148,11 +1145,11 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
       <CollapsibleSection sectionKey="mesh" title="Mesh Effects">
         {/* Mesh Type */}
         <div style={{ marginBottom: '12px' }}>
-          <label style={styles.label}>Effect Type</label>
+          <label className="gameboard-editor-label">Effect Type</label>
           <select
             value={(tokenProps.tokenMeshEffect as string) || 'none'}
             onChange={(e) => updateAuraProp('tokenMeshEffect', e.target.value)}
-            style={styles.select}
+            className="light-editor-panel-select"
           >
             <option value="none">None</option>
             <option value="wave">Wave</option>
@@ -1164,30 +1161,32 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
         {/* Mesh Intensity */}
         {Boolean(tokenProps.tokenMeshEffect) && tokenProps.tokenMeshEffect !== 'none' && (
           <>
-            <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Intensity: {((tokenProps.tokenMeshIntensity as number) || 50)}%</label>
+            <div className="gameboard-editor-field">
+              <label className="gameboard-editor-label">Intensity: {((tokenProps.tokenMeshIntensity as number) || 50)}%</label>
               <input
                 type="range"
                 min="0"
                 max="100"
                 value={(tokenProps.tokenMeshIntensity as number) || 50}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenMeshIntensity', parseInt(e.target.value)); }}
-                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+                className="gameboard-editor-range"
               />
             </div>
 
             {/* Mesh Speed */}
-            <div style={{ marginBottom: '12px' }}>
-              <label style={styles.label}>Animation Speed: {((tokenProps.tokenMeshSpeed as number) || 50)}%</label>
+            <div className="gameboard-editor-field">
+              <label className="gameboard-editor-label">Animation Speed: {((tokenProps.tokenMeshSpeed as number) || 50)}%</label>
               <input
                 type="range"
                 min="0"
                 max="100"
                 value={(tokenProps.tokenMeshSpeed as number) || 50}
                 onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => { e.stopPropagation(); updateAuraProp('tokenMeshSpeed', parseInt(e.target.value)); }}
-                style={{ width: '100%', cursor: 'pointer', pointerEvents: 'auto' }}
+                className="gameboard-editor-range"
               />
             </div>
           </>
