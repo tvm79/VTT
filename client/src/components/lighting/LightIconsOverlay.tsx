@@ -713,6 +713,9 @@ export function LightIconsOverlay({
     }
     
     lights.forEach(light => {
+      if (light.id.startsWith('token-light-')) {
+        return;
+      }
       const isSelected = selectedLightIds.includes(light.id);
       let icon = iconsRef.current.get(light.id);
 

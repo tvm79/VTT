@@ -2060,14 +2060,15 @@ interface OpenPanel {
       // Also try both types to handle both normalized and non-normalized imports
       const apiTypes = type === 'race' ? ['species', 'race'] : [type];
       
+      // Use /compendium/search endpoint which supports all filters including equipmentType
+      const paramsWithType = new URLSearchParams(params.toString());
+      paramsWithType.set('type', type);
+      
+      const res = await fetch(`/api/data/compendium/search?${paramsWithType}`);
       let allItems: any[] = [];
-      for (const apiType of apiTypes) {
-        const res = await fetch(`/api/data/compendium/${apiType}?${params}`);
-        if (res.ok) {
-          const data = await res.json();
-          const items = (data.data || []).map((entry: any) => normalizeViewerItem(entry));
-          allItems = [...allItems, ...items];
-        }
+      if (res.ok) {
+        const data = await res.json();
+        allItems = (data.data || []).map((entry: any) => normalizeViewerItem(entry));
       }
       setTypeItems(allItems);
     } catch (error) {

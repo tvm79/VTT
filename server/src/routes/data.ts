@@ -159,24 +159,127 @@ function getItemTypeLabel(code: string): string {
   return ITEM_TYPE_LABELS[normalized] || normalized || 'Item';
 }
 
-// Equipment type filter mapping - simple type-based matching
+// Equipment type filter mapping - match raw/system/property metadata explicitly
+// Based on actual database structure: raw.type = 'g' for general gear, raw.system.wondrous for wondrous items
 const EQUIPMENT_TYPE_FILTERS: Record<string, any> = {
-  'Clothing': { raw: { path: ['type'], equals: 'G' } },
-  'Heavy Armor': { raw: { path: ['type'], equals: 'HA' } },
-  'Light Armor': { raw: { path: ['type'], equals: 'LA' } },
-  'Medium Armor': { raw: { path: ['type'], equals: 'MA' } },
-  'Natural Armor': { raw: { path: ['system', 'naturalArmor'], not: null } },
-  'Ring': { raw: { path: ['type'], equals: 'RG' } },
-  'Rod': { raw: { path: ['type'], equals: 'RD' } },
-  'Shield': { raw: { path: ['type'], equals: 'S' } },
-  'Trinket': { raw: { path: ['type'], equals: 'TR' } },
-  'Vehicle Equipment': { raw: { path: ['type'], equals: 'VEH' } },
-  'Wand': { raw: { path: ['type'], equals: 'WD' } },
-  'Wondrous Item': { raw: { path: ['type'], equals: 'W' } },
+  Clothing: {
+    OR: [
+      // General gear type code (from actual data)
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+      // Check for equipment flag
+      { raw: { path: ['equipment'], equals: true } },
+      { raw: { path: ['system', 'equipment'], equals: true } },
+    ],
+  },
+  'Heavy Armor': {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'ha' } },
+      { raw: { path: ['itemType'], equals: 'ha' } },
+      { raw: { path: ['system', 'type'], equals: 'ha' } },
+      // Check for armor value (numeric armor class)
+      { raw: { path: ['system', 'armor'], not: null } },
+    ],
+  },
+  'Light Armor': {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'la' } },
+      { raw: { path: ['itemType'], equals: 'la' } },
+      { raw: { path: ['system', 'type'], equals: 'la' } },
+      // Check for armor value (numeric armor class)
+      { raw: { path: ['system', 'armor'], not: null } },
+    ],
+  },
+  'Medium Armor': {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'ma' } },
+      { raw: { path: ['itemType'], equals: 'ma' } },
+      { raw: { path: ['system', 'type'], equals: 'ma' } },
+      // Check for armor value (numeric armor class)
+      { raw: { path: ['system', 'armor'], not: null } },
+    ],
+  },
+  Ring: {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'rg' } },
+      { raw: { path: ['itemType'], equals: 'rg' } },
+      { raw: { path: ['system', 'type'], equals: 'rg' } },
+    ],
+  },
+  Rod: {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'rd' } },
+      { raw: { path: ['itemType'], equals: 'rd' } },
+      { raw: { path: ['system', 'type'], equals: 'rd' } },
+    ],
+  },
+  Shield: {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 's' } },
+      { raw: { path: ['itemType'], equals: 's' } },
+      { raw: { path: ['system', 'type'], equals: 's' } },
+      // Check for shield flag
+      { raw: { path: ['system', 'shield'], not: null } },
+    ],
+  },
+  Trinket: {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'tr' } },
+      { raw: { path: ['itemType'], equals: 'tr' } },
+      { raw: { path: ['system', 'type'], equals: 'tr' } },
+    ],
+  },
+  'Vehicle Equipment': {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'veh' } },
+      { raw: { path: ['itemType'], equals: 'veh' } },
+      { raw: { path: ['system', 'type'], equals: 'veh' } },
+    ],
+  },
+  Wand: {
+    OR: [
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'wd' } },
+      { raw: { path: ['itemType'], equals: 'wd' } },
+      { raw: { path: ['system', 'type'], equals: 'wd' } },
+    ],
+  },
+  'Wondrous Item': {
+    OR: [
+      // Check for wondrous flag (from actual data: raw.system.wondrous = true)
+      { raw: { path: ['system', 'wondrous'], equals: true } },
+      // Legacy type codes (lowercase in database)
+      { raw: { path: ['type'], equals: 'w' } },
+      { raw: { path: ['itemType'], equals: 'w' } },
+      { raw: { path: ['system', 'type'], equals: 'w' } },
+    ],
+  },
+  'Natural Armor': {
+    OR: [
+      // Check for naturalArmor flag
+      { raw: { path: ['naturalArmor'], not: null } },
+      { raw: { path: ['system', 'naturalArmor'], not: null } },
+    ],
+  },
 };
 
 function getEquipmentTypeFilter(equipmentType: string): any {
-  return EQUIPMENT_TYPE_FILTERS[equipmentType] || null;
+  const filter = EQUIPMENT_TYPE_FILTERS[equipmentType];
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[Equipment Filter] selected=${equipmentType} resolved=${filter ? JSON.stringify(filter) : 'null'}`
+    );
+  }
+  return filter || null;
 }
 
 function getItemRarityLabel(value: string): string {
@@ -2227,6 +2330,70 @@ function getSchoolValue(value: string): string {
   return value;
 }
 
+// DEBUG: Get sample item raw data - returns first item with type 'item'
+router.get('/compendium/debug/sample-item', async (req, res) => {
+  try {
+    const item = await prisma.compendiumEntry.findFirst({
+      where: { type: 'item' },
+      select: { id: true, name: true, raw: true },
+      take: 1
+    });
+    res.json(item);
+  } catch (error: any) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DEBUG: Count items by type
+router.get('/compendium/debug/counts', async (req, res) => {
+  try {
+    const counts = await prisma.compendiumEntry.groupBy({
+      by: ['type'],
+      _count: true
+    });
+    res.json({ counts });
+  } catch (error: any) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DEBUG: Get items with any raw data that might be equipment
+router.get('/compendium/debug/sample-equipment', async (req, res) => {
+  try {
+    // Try to find items with equipment-related data - just get first 5 items with type='item'
+    const items = await prisma.compendiumEntry.findMany({
+      where: { type: 'item' },
+      select: { id: true, name: true, raw: true },
+      take: 5
+    });
+    res.json({ items, count: items.length });
+  } catch (error: any) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DEBUG: Get sample armor item
+router.get('/compendium/debug/sample-armor', async (req, res) => {
+  try {
+    // Get first item with armor in the name
+    const items = await prisma.compendiumEntry.findMany({
+      where: { 
+        type: 'item',
+        name: { contains: 'armor', mode: 'insensitive' }
+      },
+      select: { id: true, name: true, raw: true },
+      take: 3
+    });
+    res.json({ items, count: items.length });
+  } catch (error: any) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get available filter options for a given type
 router.get('/compendium/filters/:type', async (req, res) => {
   const requestedType = String(req.params.type || '').toLowerCase();
@@ -2406,10 +2573,9 @@ router.get('/compendium/filters/:type', async (req, res) => {
   }
 });
 
-// Get compendium entries by type (normalized)
-router.get('/compendium/:type', async (req, res) => {
-  const { type } = req.params;
-  const { q, limit = '100', offset = '0', system } = req.query;
+// Search compendium entries (must be before /compendium/:type to avoid being caught by it)
+router.get('/compendium/search', async (req, res) => {
+  const { q, type, system, limit = '50', offset = '0' } = req.query;
   
   // Spell filters
   const level = req.query.level as string | undefined;
@@ -2553,41 +2719,66 @@ router.get('/compendium/:type', async (req, res) => {
             ]
           });
         } else if (itemType === 'EQP') {
-          // For Equipment, match items with any equipment flag (armor, shield, ring, rod, wand, wondrous, trinket, vehicle, naturalArmor, equipment)
-          itemFilters.push({
-            OR: [
-              // Armor
-              { raw: { path: ['system', 'armor'], not: null } },
-              { raw: { path: ['armor'], not: null } },
-              // Shield
-              { raw: { path: ['system', 'shield'], not: null } },
-              { raw: { path: ['shield'], not: null } },
-              // Ring
-              { raw: { path: ['system', 'ring'], not: null } },
-              { raw: { path: ['ring'], not: null } },
-              // Rod
-              { raw: { path: ['system', 'rod'], not: null } },
-              { raw: { path: ['rod'], not: null } },
-              // Wand
-              { raw: { path: ['system', 'wand'], not: null } },
-              { raw: { path: ['wand'], not: null } },
-              // Wondrous Item
-              { raw: { path: ['system', 'wondrous'], not: null } },
-              { raw: { path: ['wondrous'], not: null } },
-              // Trinket
-              { raw: { path: ['system', 'trinket'], not: null } },
-              { raw: { path: ['trinket'], not: null } },
-              // Vehicle Equipment
-              { raw: { path: ['system', 'vehicle'], not: null } },
-              { raw: { path: ['vehicle'], not: null } },
-              // Natural Armor
-              { raw: { path: ['system', 'naturalArmor'], not: null } },
-              { raw: { path: ['naturalArmor'], not: null } },
-              // General Equipment
-              { raw: { path: ['system', 'equipment'], not: null } },
-              { raw: { path: ['equipment'], not: null } },
-            ]
-          });
+          // If equipmentType is specified, skip the parent filter and rely on the specific equipmentType filter
+          // If no equipmentType is specified, add the parent filter to match all equipment
+          if (!equipmentType) {
+            // For Equipment without specific type, match items that have equipment-related properties
+            // Also include wondrous items which are a major category of equipment
+            itemFilters.push({
+              OR: [
+                // Armor types (legacy codes - lowercase in database)
+                { raw: { path: ['type'], equals: 'ha' } },
+                { raw: { path: ['type'], equals: 'la' } },
+                { raw: { path: ['type'], equals: 'ma' } },
+                { raw: { path: ['type'], equals: 's' } },
+                // Equipment types (legacy codes - lowercase in database)
+                { raw: { path: ['type'], equals: 'g' } },
+                { raw: { path: ['type'], equals: 'rg' } },
+                { raw: { path: ['type'], equals: 'rd' } },
+                { raw: { path: ['type'], equals: 'wd' } },
+                { raw: { path: ['type'], equals: 'w' } },
+                { raw: { path: ['type'], equals: 'tr' } },
+                { raw: { path: ['type'], equals: 'veh' } },
+                // Same at itemType root
+                { raw: { path: ['itemType'], equals: 'ha' } },
+                { raw: { path: ['itemType'], equals: 'la' } },
+                { raw: { path: ['itemType'], equals: 'ma' } },
+                { raw: { path: ['itemType'], equals: 's' } },
+                { raw: { path: ['itemType'], equals: 'g' } },
+                { raw: { path: ['itemType'], equals: 'rg' } },
+                { raw: { path: ['itemType'], equals: 'rd' } },
+                { raw: { path: ['itemType'], equals: 'wd' } },
+                { raw: { path: ['itemType'], equals: 'w' } },
+                { raw: { path: ['itemType'], equals: 'tr' } },
+                { raw: { path: ['itemType'], equals: 'veh' } },
+                // system.type (lowercase)
+                { raw: { path: ['system', 'type'], equals: 'ha' } },
+                { raw: { path: ['system', 'type'], equals: 'la' } },
+                { raw: { path: ['system', 'type'], equals: 'ma' } },
+                { raw: { path: ['system', 'type'], equals: 's' } },
+                { raw: { path: ['system', 'type'], equals: 'g' } },
+                { raw: { path: ['system', 'type'], equals: 'rg' } },
+                { raw: { path: ['system', 'type'], equals: 'rd' } },
+                { raw: { path: ['system', 'type'], equals: 'wd' } },
+                { raw: { path: ['system', 'type'], equals: 'w' } },
+                { raw: { path: ['system', 'type'], equals: 'tr' } },
+                { raw: { path: ['system', 'type'], equals: 'veh' } },
+                // Wondrous items - check system.wondrous flag
+                { raw: { path: ['system', 'wondrous'], equals: true } },
+                // Armor property
+                { raw: { path: ['system', 'armor'], not: null } },
+                // Shield property
+                { raw: { path: ['system', 'shield'], not: null } },
+              ]
+            });
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Equipment Filter] Parent EQP filter applied (no specific type), itemFilters count:', itemFilters.length);
+            }
+          } else {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Equipment Filter] Skipping parent EQP filter, using specific equipmentType filter instead');
+            }
+          }
         } else {
           itemFilters.push({ OR: getItemTypeFilterCandidates(itemType) });
         }
@@ -2634,6 +2825,7 @@ router.get('/compendium/:type', async (req, res) => {
         const equipmentTypeFilter = getEquipmentTypeFilter(equipmentType);
         if (equipmentTypeFilter) {
           itemFilters.push(equipmentTypeFilter);
+
         }
       }
 
@@ -2644,6 +2836,11 @@ router.get('/compendium/:type', async (req, res) => {
 
     if (sharedFilters.length > 0 && !where.AND) {
       where.AND = sharedFilters;
+    }
+
+    // Debug: log the final where clause
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Filter Debug] Final where clause:', JSON.stringify(where, null, 2));
     }
 
     const include: any = {
@@ -2694,6 +2891,56 @@ router.get('/compendium/:type', async (req, res) => {
     res.json({ data: transformedData, total, limit: limitNum, offset: offsetNum });
   } catch (error: any) {
     console.error('Error fetching compendium entries:', error);
+    res.status(500).json({ error: 'Failed to fetch compendium entries', message: error.message });
+  }
+});
+
+// Get compendium entries by type (normalized) - must be AFTER /compendium/search
+router.get('/compendium/:type', async (req, res) => {
+  const { type } = req.params;
+  const { q, limit = '100', offset = '0', system } = req.query;
+  
+  const limitNum = Math.min(parseInt(limit as string) || 100, 500);
+  const offsetNum = parseInt(offset as string) || 0;
+  
+  try {
+    const where: any = { type };
+    if (q) {
+      where.name = { contains: String(q), mode: 'insensitive' };
+    }
+    if (system) {
+      where.system = String(system);
+    }
+    
+    const entries = await prisma.compendiumEntry.findMany({
+      where,
+      include: {
+        module: {
+          select: { name: true, system: true, version: true },
+        },
+      },
+      take: limitNum,
+      skip: offsetNum,
+      orderBy: [{ name: 'asc' }, { createdAt: 'desc' }],
+    });
+    
+    const total = await prisma.compendiumEntry.count({ where });
+    
+    // Transform entries
+    const results = entries.map((entry: any) => ({
+      id: entry.id,
+      name: entry.name,
+      type: entry.type,
+      system: entry.system,
+      description: entry.description,
+      img: entry.img,
+      thumbnail: entry.thumbnail,
+      module: entry.module,
+    }));
+    
+    res.json({ data: results, total, limit: limitNum, offset: offsetNum });
+  } catch (error: any) {
+    console.error('Error fetching compendium entries by type:', error);
     res.status(500).json({ error: 'Failed to fetch compendium entries', message: error.message });
   }
 });
@@ -3131,6 +3378,9 @@ router.get('/compendium/search', async (req, res) => {
               break;
             case 'T':
               itemFilters.push({ raw: { path: ['system', 'tool'], equals: true } });
+              break;
+            case 'EQP':
+              // Equipment - don't add filter here, equipmentType filter will handle it
               break;
             default:
               itemFilters.push({ raw: { path: ['system', 'type'], equals: itemType } });

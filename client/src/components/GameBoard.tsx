@@ -27,10 +27,11 @@ import { requestAuthoritativeRoll } from '../dice/rollOrchestrator';
 import { triggerParticleEffect, getParticleEventForPreset } from '../utils/particleEffectHelpers';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
+import {
   faBug, faVirus, faEyeSlash, faHeart, faGhost, faBolt, faBed, faTired, faLightbulb
 } from '@fortawesome/free-solid-svg-icons';
-import type { Light } from '../../../shared/src/index';
+import type { Light, Token } from '../../../shared/src/index';
+import { buildTokenLightPayload, getTokenLightCenter } from '../utils/tokenLight';
 import { TimeOverlaySystem, getTimeOverlaySystem } from '../systems/timeOverlaySystem';
 import { getAtmosphericFogSystem } from '../systems/AtmosphericFogSystem';
 import { getLightTexture, getRadianceTexture } from './lighting/LightTextureGenerator';
@@ -38,15 +39,15 @@ import { useLightRenderer, LightIconsOverlay } from './lighting';
 import { ParticleEmitterIconsOverlay } from './particles/ParticleEmitterIconsOverlay';
 import { AudioSourceIconsOverlay } from './audio/AudioSourceIconsOverlay';
 import { MeasurementPanel } from './MeasurementPanel';
-import { 
-  calculateDistance, 
-  calculateRectangleBounds, 
-  calculateConeVertices, 
+import {
+  calculateDistance,
+  calculateRectangleBounds,
+  calculateConeVertices,
   calculateDirection,
   formatRectangleDistance,
   formatCircleDistance,
   formatConeDistance,
-  getMidpoint 
+  getMidpoint
 } from './measurement/MeasurementUtils';
 import { useSpatialAudio } from './audio/useSpatialAudio';
 import { VISUAL_OPTIONS, setFogEnabled, setFogIntensity, setFogSpeed, setFogShift, setFogDirection, setFogColor1, setFogColor2 } from '../utils/gameTime';
@@ -2004,6 +2005,25 @@ export function GameBoard() {
     };
   }, [appReady]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return () => {};
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ lightId: string; position: { x: number; y: number } }>;
+      const detail = customEvent.detail;
+      if (!detail?.lightId) return;
+      const light = lights.find(l => l.id === detail.lightId);
+      if (!light) return;
+      setLightEditorState({
+        lightId: detail.lightId,
+        position: detail.position || { x: 0, y: 0 },
+      });
+    };
+    window.addEventListener('openTokenLightEditor', handler as EventListener);
+    return () => {
+      window.removeEventListener('openTokenLightEditor', handler as EventListener);
+    };
+  }, [lights]);
+
   const handleTokenRightClick = (tokenId: string, clientX: number, clientY: number) => {
     if (!isGM) return;
     // Only open the menu if it's not already open for this token
@@ -2057,6 +2077,68 @@ export function GameBoard() {
     effectiveGridType,
   ]);
 
+  const handleTokenLightToggle = useCallback((token: Token) => {
+    const tokenProps = (token.properties || {}) as Record<string, unknown>;
+    const existingLightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+
+    if (existingLightId) {
+      socketService.deleteLight(existingLightId);
+      removeLight(existingLightId);
+      const cleanedProps = { ...tokenProps };
+      delete cleanedProps.tokenLightId;
+      delete cleanedProps.tokenLightEnabled;
+      socketService.updateToken(token.id, { properties: cleanedProps });
+      return;
+    }
+
+    if (!currentBoard) return;
+
+    const newLight = buildTokenLightPayload(token, currentBoard.id, effectiveGridSize);
+    addLight(newLight);
+    socketService.createLight(currentBoard.id, newLight as unknown as Record<string, unknown>);
+
+    const updatedProps = {
+      ...tokenProps,
+      tokenLightId: newLight.id,
+      tokenLightEnabled: true,
+    };
+    socketService.updateToken(token.id, { properties: updatedProps });
+  }, [addLight, removeLight, currentBoard, effectiveGridSize]);
+
+  const handleDisplayTokenLightEdit = useCallback((e: React.MouseEvent<HTMLButtonElement>, tokenId: string) => {
+    const token = tokens.find(t => t.id === tokenId);
+    if (!token) return;
+    const tokenProps = (token.properties || {}) as Record<string, unknown>;
+    const existingLightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+    if (!existingLightId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const position = { x: rect.right + 12, y: rect.top };
+    const detail = { lightId: existingLightId, position };
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('openTokenLightEditor', { detail }));
+    }
+  }, [tokens]);
+
+  useEffect(() => {
+    if (!currentBoard) return;
+
+    for (const token of tokens) {
+      const tokenProps = (token.properties || {}) as Record<string, unknown>;
+      const lightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+      if (!lightId) continue;
+
+      const light = lights.find(l => l.id === lightId);
+      if (!light) continue;
+
+      const center = getTokenLightCenter(token, effectiveGridSize);
+      if (light.x === center.x && light.y === center.y) continue;
+
+      updateLight(lightId, { x: center.x, y: center.y });
+      socketService.updateLight(lightId, { x: center.x, y: center.y });
+    }
+  }, [tokens, lights, currentBoard, effectiveGridSize, updateLight]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem('vtt_gm_fog_opacity', String(gmFogOpacity));
@@ -2082,6 +2164,16 @@ export function GameBoard() {
       if (tokensToDelete.length > 0) {
         e.preventDefault();
         for (const tokenId of tokensToDelete) {
+          // Find and delete associated token light
+          const token = tokens.find(t => t.id === tokenId);
+          if (token) {
+            const tokenProps = (token.properties || {}) as Record<string, unknown>;
+            const lightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+            if (lightId) {
+              socketService.deleteLight(lightId);
+              removeLight(lightId);
+            }
+          }
           socketService.deleteToken(tokenId);
         }
         state.setSelectedTokenIds([]);
@@ -9131,6 +9223,7 @@ export function GameBoard() {
         if (!token) return null;
         const tokenData = (token.properties || {}) as Record<string, unknown>;
         const currentDisposition = (tokenData.disposition as string) || null;
+        const tokenLightActive = typeof tokenData.tokenLightId === 'string';
         
         return (
           <div
@@ -9193,6 +9286,38 @@ export function GameBoard() {
                   title={token.showLabel ? 'Hide Label' : 'Show Label'}
                 >
                   <Icon name="eye" />
+                </button>
+              </div>
+            </div>
+
+            <div className="token-panel-section">
+              <label className="token-panel-label">Token Light</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => handleTokenLightToggle(token)}
+                  className={`token-panel-button ${tokenLightActive ? 'is-active' : ''}`}
+                  style={{
+                    flex: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Icon name="lightbulb" />
+                  {tokenLightActive ? 'Disable Light' : 'Enable Light'}
+                </button>
+                <button
+                  onClick={(e) => handleDisplayTokenLightEdit(e, token.id)}
+                  className="token-panel-button"
+                  disabled={!tokenLightActive}
+                  style={{
+                    flex: 1,
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                  }}
+                >
+                  Edit Light
                 </button>
               </div>
             </div>
@@ -9535,6 +9660,13 @@ export function GameBoard() {
             <div className="token-panel-flex-row gameboard-token-panel-actions">
               <button
                 onClick={() => {
+                  // Delete associated token light
+                  const tokenProps = (token.properties || {}) as Record<string, unknown>;
+                  const lightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+                  if (lightId) {
+                    socketService.deleteLight(lightId);
+                    removeLight(lightId);
+                  }
                   socketService.deleteToken(token.id);
                   setDeleteEditorState(null);
                 }}

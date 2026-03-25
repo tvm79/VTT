@@ -6,6 +6,7 @@ import { socketService } from '../services/socket';
 import { TOKEN_DISPOSITIONS, type TokenDisposition } from '../utils/colorUtils';
 import { colors, radius, shadows, spacing, typography, zIndex } from '../ui/tokens';
 import { getParticlePresets, subscribeParticlePresets } from '../particles/editor/particlePresetStore';
+import { buildTokenLightPayload } from '../utils/tokenLight';
 
 interface TokenPanelProps {
   token: Token;
@@ -1293,8 +1294,49 @@ export function AuraSettingsModal({ token, onClose, position }: { token: Token; 
 // Display Settings Modal
 function DisplaySettingsModal({ token, onClose }: { token: Token; onClose: () => void }) {
   const tokenProps = (token.properties || {}) as Record<string, unknown>;
+  const { currentBoard, gridSize, addLight, removeLight } = useGameStore();
+  const effectiveGridSize = gridSize || currentBoard?.gridSize || 50;
   const isHidden = tokenProps.hiddenFromPlayers === true;
   const currentDisposition = (tokenProps.disposition as TokenDisposition) || null;
+  const tokenLightActive = typeof tokenProps.tokenLightId === 'string';
+  const handleTokenLightToggle = useCallback(() => {
+    const tokenProps = (token.properties || {}) as Record<string, unknown>;
+    const existingLightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+    if (existingLightId) {
+      socketService.deleteLight(existingLightId);
+      removeLight(existingLightId);
+      const cleanedProps = { ...tokenProps };
+      delete cleanedProps.tokenLightId;
+      delete cleanedProps.tokenLightEnabled;
+      socketService.updateToken(token.id, { properties: cleanedProps });
+      return;
+    }
+
+    if (!currentBoard) return;
+
+    const newLight = buildTokenLightPayload(token, currentBoard.id, effectiveGridSize);
+    addLight(newLight);
+    socketService.createLight(currentBoard.id, newLight as unknown as Record<string, unknown>);
+    const updatedProps = {
+      ...tokenProps,
+      tokenLightId: newLight.id,
+      tokenLightEnabled: true,
+    };
+    socketService.updateToken(token.id, { properties: updatedProps });
+  }, [token, currentBoard, effectiveGridSize, addLight, removeLight]);
+
+  const handleDisplayTokenLightEdit = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const tokenProps = (token.properties || {}) as Record<string, unknown>;
+    const existingLightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+    if (!existingLightId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const position = { x: rect.right + 12, y: rect.top };
+    const detail = { lightId: existingLightId, position };
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('openTokenLightEditor', { detail }));
+    }
+  }, [token]);
 
   const dispositionOptions: TokenDisposition[] = ['neutral', 'friendly', 'secret', 'hostile'];
 
@@ -1378,6 +1420,40 @@ function DisplaySettingsModal({ token, onClose }: { token: Token; onClose: () =>
             }}
           >
             Hidden
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <label style={styles.label}>Token Light</label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleTokenLightToggle}
+            className="token-panel-button"
+            style={{
+              flex: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              background: tokenLightActive ? 'rgba(72, 187, 120, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: tokenLightActive ? '1px solid rgba(72, 187, 120, 0.5)' : '1px solid rgba(255, 255, 255, 0.15)',
+            }}
+          >
+            <Icon name="lightbulb" />
+            {tokenLightActive ? 'Disable Light' : 'Enable Light'}
+          </button>
+          <button
+            onClick={handleDisplayTokenLightEdit}
+            className="token-panel-button"
+            disabled={!tokenLightActive}
+            style={{
+              flex: 1,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+            }}
+          >
+            Edit Light
           </button>
         </div>
       </div>
@@ -1624,7 +1700,7 @@ function DeleteModal({ token, onClose }: { token: Token; onClose: () => void }) 
 
 // Main TokenPanel Component
 export function TokenPanel({ token, position, onClose }: TokenPanelProps) {
-  const { isGM, addCombatant, removeCombatant, isTokenInCombat } = useGameStore();
+  const { isGM, addCombatant, removeCombatant, isTokenInCombat, addLight, removeLight, currentBoard, gridSize } = useGameStore();
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const tokenProps = (token.properties || {}) as Record<string, unknown>;
@@ -1634,6 +1710,7 @@ export function TokenPanel({ token, position, onClose }: TokenPanelProps) {
   const manaBar = bars.find(b => b.name === 'Mana');
   const inCombat = isTokenInCombat(token.id);
   const isHidden = tokenProps.hiddenFromPlayers === true;
+  const effectiveGridSize = gridSize || currentBoard?.gridSize || 50;
 
   // Memoized handlers for performance
   const handleToggleStatus = useCallback((status: string) => {
@@ -1653,6 +1730,45 @@ export function TokenPanel({ token, position, onClose }: TokenPanelProps) {
     const newProps = { ...tokenProps, hiddenFromPlayers: !isHidden };
     socketService.updateToken(token.id, { properties: newProps });
   }, [token.id, tokenProps, isHidden]);
+
+  const handleTokenLightToggle = useCallback(() => {
+    const tokenProps = (token.properties || {}) as Record<string, unknown>;
+    const existingLightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+    if (existingLightId) {
+      socketService.deleteLight(existingLightId);
+      removeLight(existingLightId);
+      const cleanedProps = { ...tokenProps };
+      delete cleanedProps.tokenLightId;
+      delete cleanedProps.tokenLightEnabled;
+      socketService.updateToken(token.id, { properties: cleanedProps });
+      return;
+    }
+
+    if (!currentBoard) return;
+
+    const newLight = buildTokenLightPayload(token, currentBoard.id, effectiveGridSize);
+    addLight(newLight);
+    socketService.createLight(currentBoard.id, newLight as unknown as Record<string, unknown>);
+    const updatedProps = {
+      ...tokenProps,
+      tokenLightId: newLight.id,
+      tokenLightEnabled: true,
+    };
+    socketService.updateToken(token.id, { properties: updatedProps });
+  }, [token, currentBoard, effectiveGridSize, addLight, removeLight]);
+
+  const handleTokenLightEdit = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const tokenProps = (token.properties || {}) as Record<string, unknown>;
+    const existingLightId = typeof tokenProps.tokenLightId === 'string' ? tokenProps.tokenLightId : null;
+    if (!existingLightId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const position = { x: rect.right + 12, y: rect.top };
+    const detail = { lightId: existingLightId, position };
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('openTokenLightEditor', { detail }));
+    }
+  }, [token]);
 
   const handleCombatToggle = useCallback(() => {
     const tokenName = token.label || token.name || 'Unknown';
