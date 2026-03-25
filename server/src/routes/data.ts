@@ -47,6 +47,7 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   SHP: 'Vehicle (Water)',
   AIR: 'Vehicle (Air)',
   WD: 'Wand',
+  EQP: 'Equipment',
 };
 const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE_LABELS));
 
@@ -131,26 +132,51 @@ function getItemTypeCode(raw: any): string {
     if (normalizedType === 'weapon') return 'WPN';
   }
   if (raw?.armor || raw?.system?.armor) {
-    const armor = raw?.armor || raw?.system?.armor || {};
-    if (armor.stealthDisadvantage || armor.type === 'heavy') return 'HA';
-    if (armor.type === 'medium') return 'MA';
-    return 'LA';
+    return 'EQP';
   }
-  if (raw?.shield || raw?.system?.shield) return 'S';
+  if (raw?.shield || raw?.system?.shield) return 'EQP';
   if (raw?.potion || raw?.system?.potion) return 'P';
   if (raw?.tool || raw?.system?.tool) return 'T';
   if (raw?.scroll || raw?.system?.scroll) return 'SC';
-  if (raw?.ring || raw?.system?.ring) return 'RG';
-  if (raw?.wand || raw?.system?.wand) return 'WD';
+  if (raw?.ring || raw?.system?.ring) return 'EQP';
+  if (raw?.wand || raw?.system?.wand) return 'EQP';
   if (raw?.staff || raw?.system?.staff) return 'ST';
-  if (raw?.rod || raw?.system?.rod) return 'RD';
-  if (raw?.wondrous || raw?.system?.wondrous) return 'W';
+  if (raw?.rod || raw?.system?.rod) return 'EQP';
+  if (raw?.wondrous || raw?.system?.wondrous) return 'EQP';
+  // Check for trinkets
+  if (raw?.trinket || raw?.system?.trinket) return 'EQP';
+  // Check for vehicle equipment
+  if (raw?.vehicle || raw?.system?.vehicle) return 'EQP';
+  // Check for natural armor
+  if (raw?.naturalArmor || raw?.system?.naturalArmor) return 'EQP';
+  // Check for clothing/general equipment
+  if (raw?.equipment || raw?.system?.equipment) return 'EQP';
   return 'G';
 }
 
 function getItemTypeLabel(code: string): string {
   const normalized = String(code || '').trim().toUpperCase();
   return ITEM_TYPE_LABELS[normalized] || normalized || 'Item';
+}
+
+// Equipment type filter mapping - simple type-based matching
+const EQUIPMENT_TYPE_FILTERS: Record<string, any> = {
+  'Clothing': { raw: { path: ['type'], equals: 'G' } },
+  'Heavy Armor': { raw: { path: ['type'], equals: 'HA' } },
+  'Light Armor': { raw: { path: ['type'], equals: 'LA' } },
+  'Medium Armor': { raw: { path: ['type'], equals: 'MA' } },
+  'Natural Armor': { raw: { path: ['system', 'naturalArmor'], not: null } },
+  'Ring': { raw: { path: ['type'], equals: 'RG' } },
+  'Rod': { raw: { path: ['type'], equals: 'RD' } },
+  'Shield': { raw: { path: ['type'], equals: 'S' } },
+  'Trinket': { raw: { path: ['type'], equals: 'TR' } },
+  'Vehicle Equipment': { raw: { path: ['type'], equals: 'VEH' } },
+  'Wand': { raw: { path: ['type'], equals: 'WD' } },
+  'Wondrous Item': { raw: { path: ['type'], equals: 'W' } },
+};
+
+function getEquipmentTypeFilter(equipmentType: string): any {
+  return EQUIPMENT_TYPE_FILTERS[equipmentType] || null;
 }
 
 function getItemRarityLabel(value: string): string {
@@ -2324,7 +2350,22 @@ router.get('/compendium/filters/:type', async (req, res) => {
         }
       });
 
-      options.itemTypes = Array.from(typeSet).sort().map((value) => ({
+      // Filter the type set: replace equipment types (HA, LA, MA, S, RG, RD, WD, W) with 'EQP'
+      const equipmentTypeCodes = new Set(['HA', 'LA', 'MA', 'S', 'RG', 'RD', 'WD', 'W']);
+      let hasEquipment = false;
+      const filteredTypeSet = new Set<string>();
+      for (const t of typeSet) {
+        if (equipmentTypeCodes.has(t)) {
+          hasEquipment = true;
+        } else {
+          filteredTypeSet.add(t);
+        }
+      }
+      if (hasEquipment) {
+        filteredTypeSet.add('EQP');
+      }
+
+      options.itemTypes = Array.from(filteredTypeSet).sort().map((value) => ({
         value,
         label: getItemTypeLabel(value),
       }));
@@ -2340,6 +2381,22 @@ router.get('/compendium/filters/:type', async (req, res) => {
         value,
         label: value.charAt(0).toUpperCase() + value.slice(1),
       }));
+
+      // Add equipment types for EQP item type
+      options.equipmentTypes = [
+        { value: 'Clothing', label: 'Clothing' },
+        { value: 'Heavy Armor', label: 'Heavy Armor' },
+        { value: 'Light Armor', label: 'Light Armor' },
+        { value: 'Medium Armor', label: 'Medium Armor' },
+        { value: 'Natural Armor', label: 'Natural Armor' },
+        { value: 'Ring', label: 'Ring' },
+        { value: 'Rod', label: 'Rod' },
+        { value: 'Shield', label: 'Shield' },
+        { value: 'Trinket', label: 'Trinket' },
+        { value: 'Vehicle Equipment', label: 'Vehicle Equipment' },
+        { value: 'Wand', label: 'Wand' },
+        { value: 'Wondrous Item', label: 'Wondrous Item' },
+      ];
     }
 
     res.json(options);
@@ -2381,6 +2438,7 @@ router.get('/compendium/:type', async (req, res) => {
   const magical = req.query.magical as string | undefined;
   const attunement = req.query.attunement as string | undefined;
   const weaponCategory = req.query.weaponCategory as string | undefined;
+  const equipmentType = req.query.equipmentType as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 100, 500);
   const offsetNum = parseInt(offset as string) || 0;
@@ -2494,6 +2552,42 @@ router.get('/compendium/:type', async (req, res) => {
               { raw: { path: ['weapon'], not: null } },
             ]
           });
+        } else if (itemType === 'EQP') {
+          // For Equipment, match items with any equipment flag (armor, shield, ring, rod, wand, wondrous, trinket, vehicle, naturalArmor, equipment)
+          itemFilters.push({
+            OR: [
+              // Armor
+              { raw: { path: ['system', 'armor'], not: null } },
+              { raw: { path: ['armor'], not: null } },
+              // Shield
+              { raw: { path: ['system', 'shield'], not: null } },
+              { raw: { path: ['shield'], not: null } },
+              // Ring
+              { raw: { path: ['system', 'ring'], not: null } },
+              { raw: { path: ['ring'], not: null } },
+              // Rod
+              { raw: { path: ['system', 'rod'], not: null } },
+              { raw: { path: ['rod'], not: null } },
+              // Wand
+              { raw: { path: ['system', 'wand'], not: null } },
+              { raw: { path: ['wand'], not: null } },
+              // Wondrous Item
+              { raw: { path: ['system', 'wondrous'], not: null } },
+              { raw: { path: ['wondrous'], not: null } },
+              // Trinket
+              { raw: { path: ['system', 'trinket'], not: null } },
+              { raw: { path: ['trinket'], not: null } },
+              // Vehicle Equipment
+              { raw: { path: ['system', 'vehicle'], not: null } },
+              { raw: { path: ['vehicle'], not: null } },
+              // Natural Armor
+              { raw: { path: ['system', 'naturalArmor'], not: null } },
+              { raw: { path: ['naturalArmor'], not: null } },
+              // General Equipment
+              { raw: { path: ['system', 'equipment'], not: null } },
+              { raw: { path: ['equipment'], not: null } },
+            ]
+          });
         } else {
           itemFilters.push({ OR: getItemTypeFilterCandidates(itemType) });
         }
@@ -2533,6 +2627,14 @@ router.get('/compendium/:type', async (req, res) => {
             { raw: { path: ['weaponCategory'], equals: weaponCategory } }
           ]
         });
+      }
+
+      // Filter by equipment type - only applies when itemType is 'EQP'
+      if (equipmentType && itemType === 'EQP') {
+        const equipmentTypeFilter = getEquipmentTypeFilter(equipmentType);
+        if (equipmentTypeFilter) {
+          itemFilters.push(equipmentTypeFilter);
+        }
       }
 
       if (itemFilters.length > 0) {
@@ -2881,6 +2983,7 @@ router.get('/compendium/search', async (req, res) => {
   const magical = req.query.magical as string | undefined;
   const attunement = req.query.attunement as string | undefined;
   const weaponCategory = req.query.weaponCategory as string | undefined;
+  const equipmentType = req.query.equipmentType as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 50, 200);
   const offsetNum = parseInt(offset as string) || 0;
@@ -3067,6 +3170,14 @@ router.get('/compendium/search', async (req, res) => {
             { raw: { path: ['weaponCategory'], equals: weaponCategory } }
           ]
         });
+      }
+
+      // Filter by equipment type - only applies when itemType is 'EQP'
+      if (equipmentType && itemType === 'EQP') {
+        const equipmentTypeFilter = getEquipmentTypeFilter(equipmentType);
+        if (equipmentTypeFilter) {
+          itemFilters.push(equipmentTypeFilter);
+        }
       }
 
       if (itemFilters.length > 0) {

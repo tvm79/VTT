@@ -2042,6 +2042,7 @@ interface OpenPanel {
       // Item filters
       if (activeFilters.itemType) params.append('itemType', activeFilters.itemType);
       if (activeFilters.weaponCategory) params.append('weaponCategory', activeFilters.weaponCategory);
+      if (activeFilters.equipmentType) params.append('equipmentType', activeFilters.equipmentType);
       if (activeFilters.rarity) params.append('rarity', activeFilters.rarity);
       if (activeFilters.attunement) params.append('attunement', activeFilters.attunement);
       if (activeFilters.tattooType) params.append('tattooType', activeFilters.tattooType);

@@ -25,6 +25,7 @@ export interface FilterState {
   // Item filters
   itemType?: string;
   weaponCategory?: string;
+  equipmentType?: string;
   rarity?: string;
   magical?: boolean;
   attunement?: string;
@@ -51,6 +52,7 @@ export interface FilterOptions {
   challengeRatings?: { value: string; label: string }[];
   itemTypes?: { value: string; label: string }[];
   weaponCategories?: { value: string; label: string }[];
+  equipmentTypes?: { value: string; label: string }[];
   rarities?: { value: string; label: string }[];
   attunementTypes?: { value: string; label: string }[];
   tattooTypes?: { value: string; label: string }[];
@@ -93,6 +95,10 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
     // Clear weaponCategory when itemType changes from 'WPN' to something else
     if (key === 'itemType' && value !== 'WPN' && filters.weaponCategory) {
       delete newFilters.weaponCategory;
+    }
+    // Clear equipmentType when itemType changes from 'EQP' to something else
+    if (key === 'itemType' && value !== 'EQP' && filters.equipmentType) {
+      delete newFilters.equipmentType;
     }
     // Clear tattooType when itemType changes from 'tattoo' to something else
     if (key === 'itemType' && value !== 'tattoo' && (filters as any).tattooType) {
@@ -352,6 +358,22 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
             <option value="">All Categories</option>
             {options.weaponCategories?.map((w) => (
               <option key={w.value} value={w.value}>{w.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      
+      {/* Equipment Type Filter - shows when "Equipment" is selected */}
+      {filters.itemType === 'EQP' && (
+        <div className="filter-group">
+          <label>Equipment Type</label>
+          <select
+            value={filters.equipmentType || ''}
+            onChange={(e) => updateFilter('equipmentType', e.target.value)}
+          >
+            <option value="">All Equipment Types</option>
+            {options.equipmentTypes?.map((e) => (
+              <option key={e.value} value={e.value}>{e.label}</option>
             ))}
           </select>
         </div>
