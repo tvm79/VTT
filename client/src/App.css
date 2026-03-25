@@ -4003,6 +4003,8 @@ canvas {
   flex-direction: column;
   transition: transform 0.2s ease-in-out;
   z-index: var(--chat-z-index, 50);
+  backdrop-filter: blur(var(--panel-blur));
+  -webkit-backdrop-filter: blur(var(--panel-blur));
 }
 
 .chat-panel.chat-hidden {

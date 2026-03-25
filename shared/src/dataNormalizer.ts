@@ -13,9 +13,12 @@
  *       "book": "...",
  *       "publisher": "...",
  *       "description": "...",
- *       "system": {}
+ *       "system": {},
+ *       "rolls": []
  *     }
  */
+
+import { parseRolls, RollObject } from './rollParser';
 
 // ============================================================================
 // Type Definitions
@@ -47,6 +50,7 @@ export interface NormalizedEntry {
   publisher?: string;
   description?: string;
   system: Record<string, any>;
+  rolls?: RollObject[];
 }
 
 export interface ValidationResult {
@@ -696,6 +700,12 @@ export function normalizeEntry(data: any): NormalizedEntry {
   
   // Transform legacy data to system
   entry.system = transformLegacyToSystem(data, type);
+  
+  // Parse roll data from 5etools JSON
+  const parsedRolls = parseRolls(data);
+  if (parsedRolls.rolls.length > 0) {
+    entry.rolls = parsedRolls.rolls;
+  }
   
   // Remove empty system properties
   Object.keys(entry.system).forEach(key => {

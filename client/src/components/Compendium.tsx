@@ -62,9 +62,11 @@ interface CompendiumProps {
   setFiveEToolsVersion: (value: string) => void;
   fiveEToolsDescription: string;
   setFiveEToolsDescription: (value: string) => void;
+  fiveEToolsSourceOptions: Array<{ key: string; sourceLabel: string }>;
+  fiveEToolsSources: string[];
+  setFiveEToolsSources: (value: string[]) => void;
   fiveEToolsCategories: Array<{ value: string; label: string }>;
   fiveEToolsOptions: Array<{ key: string; category: string; defaultName: string }>;
-  fiveEToolsSources: Array<{ key: string; sourceLabel: string }>;
   handle5eToolsImport: () => void;
   importType: string;
   setImportType: (value: string) => void;
@@ -152,7 +154,9 @@ export function Compendium({
   setFiveEToolsDescription,
   fiveEToolsCategories,
   fiveEToolsOptions,
+  fiveEToolsSourceOptions,
   fiveEToolsSources,
+  setFiveEToolsSources,
   handle5eToolsImport,
   importType,
   setImportType,
@@ -244,11 +248,11 @@ export function Compendium({
           </div>
 
           {/* Wrapper for filter sidebar and items grid */}
-          <div className={(activeBrowseTab === 'spell' || activeBrowseTab === 'monster' || activeBrowseTab === 'item' || activeBrowseTab === 'class' || activeBrowseTab === 'feat' || activeBrowseTab === 'background' || activeBrowseTab === 'race' || activeBrowseTab === 'species') ? "compendium-with-sidebar" : ""}>
-            {(activeBrowseTab === 'spell' || activeBrowseTab === 'monster' || activeBrowseTab === 'item' || activeBrowseTab === 'class' || activeBrowseTab === 'feat' || activeBrowseTab === 'background' || activeBrowseTab === 'race' || activeBrowseTab === 'species') && (
+          <div className={(activeBrowseTab === 'spell' || activeBrowseTab === 'monster' || activeBrowseTab === 'item' || activeBrowseTab === 'class' || activeBrowseTab === 'feat' || activeBrowseTab === 'background' || activeBrowseTab === 'race' || activeBrowseTab === 'species' || activeBrowseTab === 'condition') ? "compendium-with-sidebar" : ""}>
+            {(activeBrowseTab === 'spell' || activeBrowseTab === 'monster' || activeBrowseTab === 'item' || activeBrowseTab === 'class' || activeBrowseTab === 'feat' || activeBrowseTab === 'background' || activeBrowseTab === 'race' || activeBrowseTab === 'species' || activeBrowseTab === 'condition') && (
               <div className="filter-sidebar">
                 <FilterPanel
-                  type={activeBrowseTab as 'spell' | 'monster' | 'item' | 'class' | 'feat' | 'background' | 'race' | 'species'}
+                  type={activeBrowseTab as 'spell' | 'monster' | 'item' | 'class' | 'feat' | 'background' | 'race' | 'species' | 'condition'}
                   filters={filters || {}}
                   onFiltersChange={(newFilters) => {
                     setShowFilters?.(true);
@@ -547,8 +551,10 @@ export function Compendium({
               value={fiveEToolsCategory}
               onChange={(e) => {
                 const category = e.target.value;
+                console.log('[DEBUG] Category selected:', category);
                 setFiveEToolsCategory(category);
                 const firstForCategory = fiveEToolsOptions.find((opt) => opt.category === category);
+                console.log('[DEBUG] firstForCategory:', firstForCategory);
                 if (firstForCategory) {
                   setFiveEToolsDataset(firstForCategory.key);
                   setFiveEToolsName(firstForCategory.defaultName);
@@ -565,11 +571,40 @@ export function Compendium({
           <div className="form-group">
             <label>Source Book *</label>
             <select value={fiveEToolsDataset} onChange={(e) => setFiveEToolsDataset(e.target.value)}>
-              {fiveEToolsSources.map((opt) => (
+              {fiveEToolsSourceOptions.map((opt) => (
                 <option key={opt.key} value={opt.key}>{opt.sourceLabel}</option>
               ))}
             </select>
           </div>
+          {/* Source filter for combined datasets (items, backgrounds, species) */}
+          {(fiveEToolsDataset === 'items-all' || fiveEToolsDataset === 'backgrounds-all' || fiveEToolsDataset === 'species-races') && (
+            <div className="form-group">
+              <label>Filter by Source (optional)</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
+                {['PHB', 'DMG', 'MM', 'XGE', 'TCE', 'SCAG', 'VGM', 'MTF', 'FGTC', 'GGR', 'EGW', 'MOT', 'VRGR', 'AAG', 'AI', 'BMT', 'LLK', 'SCC'].map((source) => (
+                  <label key={source} style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={fiveEToolsSources.includes(source)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFiveEToolsSources([...fiveEToolsSources, source]);
+                        } else {
+                          setFiveEToolsSources(fiveEToolsSources.filter((s) => s !== source));
+                        }
+                      }}
+                    />
+                    {source}
+                  </label>
+                ))}
+              </div>
+              <div style={{ marginTop: '4px', fontSize: '12px', color: '#888' }}>
+                {fiveEToolsSources.length > 0 
+                  ? `Selected: ${fiveEToolsSources.join(', ')}` 
+                  : 'Leave unchecked to import all sources'}
+              </div>
+            </div>
+          )}
           <div className="form-group">
             <label>Module Name *</label>
             <input type="text" value={fiveEToolsName} onChange={(e) => setFiveEToolsName(e.target.value)} placeholder="e.g., 5eTools Spells" />

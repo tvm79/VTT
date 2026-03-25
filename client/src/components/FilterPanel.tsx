@@ -24,6 +24,7 @@ export interface FilterState {
   
   // Item filters
   itemType?: string;
+  weaponCategory?: string;
   rarity?: string;
   magical?: boolean;
   attunement?: string;
@@ -49,13 +50,14 @@ export interface FilterOptions {
   sizes?: { value: string; label: string }[];
   challengeRatings?: { value: string; label: string }[];
   itemTypes?: { value: string; label: string }[];
+  weaponCategories?: { value: string; label: string }[];
   rarities?: { value: string; label: string }[];
   attunementTypes?: { value: string; label: string }[];
   tattooTypes?: { value: string; label: string }[];
 }
 
 interface FilterPanelProps {
-  type: 'spell' | 'monster' | 'item' | 'class' | 'feat' | 'background' | 'race' | 'species';
+  type: 'spell' | 'monster' | 'item' | 'class' | 'feat' | 'background' | 'race' | 'species' | 'condition';
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   onClose: () => void;
@@ -87,6 +89,14 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
       delete newFilters[key];
     } else {
       (newFilters as any)[key] = value;
+    }
+    // Clear weaponCategory when itemType changes from 'WPN' to something else
+    if (key === 'itemType' && value !== 'WPN' && filters.weaponCategory) {
+      delete newFilters.weaponCategory;
+    }
+    // Clear tattooType when itemType changes from 'tattoo' to something else
+    if (key === 'itemType' && value !== 'tattoo' && (filters as any).tattooType) {
+      delete (newFilters as any).tattooType;
     }
     onFiltersChange(newFilters);
   };
@@ -330,6 +340,22 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
           ))}
         </select>
       </div>
+      
+      {/* Weapon Category Filter - shows when "Weapons" is selected */}
+      {filters.itemType === 'WPN' && (
+        <div className="filter-group">
+          <label>Weapon Category</label>
+          <select
+            value={filters.weaponCategory || ''}
+            onChange={(e) => updateFilter('weaponCategory', e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {options.weaponCategories?.map((w) => (
+              <option key={w.value} value={w.value}>{w.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       
       {/* Rarity Filter */}
       <div className="filter-group">

@@ -26,12 +26,11 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   HA: 'Heavy Armor',
   INS: 'Instrument',
   LA: 'Light Armor',
-  M: 'Melee Weapon',
+  WPN: 'Weapons',
   MA: 'Medium Armor',
   MNT: 'Mount',
   GV: 'Generic Variant',
   P: 'Potion',
-  R: 'Ranged Weapon',
   RD: 'Rod',
   RG: 'Ring',
   ST: 'Staff',
@@ -113,8 +112,23 @@ function getItemTypeCode(raw: any): string {
     if (normalized && ITEM_TYPE_CODES.has(normalized)) return normalized;
   }
 
+  // Check for weapons - first check weapon property, then weaponCategory field
   if (raw?.weapon || raw?.system?.weapon) {
-    return raw?.weapon?.ranged || raw?.system?.weapon?.ranged ? 'R' : 'M';
+    return 'WPN';
+  }
+  // Check for 5e SRD/5etools style weaponCategory (simple/martial)
+  const weaponCategory = raw?.weaponCategory || raw?.system?.weaponCategory;
+  if (weaponCategory && typeof weaponCategory === 'string') {
+    const normalizedCategory = weaponCategory.trim().toLowerCase();
+    if (normalizedCategory === 'simple' || normalizedCategory === 'martial') {
+      return 'WPN';
+    }
+  }
+  // Check for 5e SRD/5etools style weapon type
+  const typeValue = raw?.type || raw?.system?.type;
+  if (typeValue && typeof typeValue === 'string') {
+    const normalizedType = typeValue.trim().toLowerCase();
+    if (normalizedType === 'weapon') return 'WPN';
   }
   if (raw?.armor || raw?.system?.armor) {
     const armor = raw?.armor || raw?.system?.armor || {};
@@ -154,7 +168,7 @@ function getItemTypeFilterCandidates(itemType: string): Array<Record<string, any
   const value = rawValue.toUpperCase();
   const lowerValue = value.toLowerCase();
 
-  return [
+  const baseFilters = [
     { raw: { path: ['type'], equals: value } },
     { raw: { path: ['type'], equals: lowerValue } },
     { raw: { path: ['itemType'], equals: value } },
@@ -164,6 +178,28 @@ function getItemTypeFilterCandidates(itemType: string): Array<Record<string, any
     { raw: { path: ['system', 'itemType'], equals: value } },
     { raw: { path: ['system', 'itemType'], equals: lowerValue } },
   ];
+
+  // For 'WPN' (Weapons), also match 5e SRD style 'weapon' type and weaponCategory
+  if (value === 'WPN') {
+    return [
+      ...baseFilters,
+      { raw: { path: ['type'], equals: 'weapon' } },
+      { raw: { path: ['type'], equals: 'Weapon' } },
+      { raw: { path: ['system', 'type'], equals: 'weapon' } },
+      { raw: { path: ['system', 'type'], equals: 'Weapon' } },
+      // Match by weaponCategory field (simple/martial)
+      { raw: { path: ['weaponCategory'], equals: 'simple' } },
+      { raw: { path: ['weaponCategory'], equals: 'martial' } },
+      { raw: { path: ['weaponCategory'], equals: 'Simple' } },
+      { raw: { path: ['weaponCategory'], equals: 'Martial' } },
+      { raw: { path: ['system', 'weaponCategory'], equals: 'simple' } },
+      { raw: { path: ['system', 'weaponCategory'], equals: 'martial' } },
+      { raw: { path: ['system', 'weaponCategory'], equals: 'Simple' } },
+      { raw: { path: ['system', 'weaponCategory'], equals: 'Martial' } },
+    ];
+  }
+
+  return baseFilters;
 }
 
 const LOCAL_FALLBACK_IMAGE_BY_TYPE: Record<string, string> = {
@@ -542,6 +578,102 @@ const fiveEToolsDatasetCatalog: FiveEToolsDataset[] = [
     rootKeys: ['spell'],
   },
   {
+    key: 'spells-xge',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'xge',
+    sourceLabel: 'XGE',
+    label: 'Spells (XGE)',
+    defaultName: '5eTools Spells (XGE)',
+    url: `${BASE_URL}/spells/spells-xge.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
+    key: 'spells-tce',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'tce',
+    sourceLabel: 'TCE',
+    label: 'Spells (TCE)',
+    defaultName: '5eTools Spells (TCE)',
+    url: `${BASE_URL}/spells/spells-tce.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
+    key: 'spells-scc',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'scc',
+    sourceLabel: 'SCC',
+    label: 'Spells (SCC)',
+    defaultName: '5eTools Spells (SCC)',
+    url: `${BASE_URL}/spells/spells-scc.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
+    key: 'spells-egw',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'egw',
+    sourceLabel: 'EGW',
+    label: 'Spells (EGW)',
+    defaultName: '5eTools Spells (EGW)',
+    url: `${BASE_URL}/spells/spells-egw.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
+    key: 'spells-ggr',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'ggr',
+    sourceLabel: 'GGR',
+    label: 'Spells (GGR)',
+    defaultName: '5eTools Spells (GGR)',
+    url: `${BASE_URL}/spells/spells-ggr.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
+    key: 'spells-ftd',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'ftd',
+    sourceLabel: 'FTD',
+    label: 'Spells (FTD)',
+    defaultName: '5eTools Spells (FTD)',
+    url: `${BASE_URL}/spells/spells-ftd.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
+    key: 'spells-ai',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'ai',
+    sourceLabel: 'AI',
+    label: 'Spells (AI)',
+    defaultName: '5eTools Spells (AI)',
+    url: `${BASE_URL}/spells/spells-ai.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
+    key: 'spells-bmt',
+    category: 'spells',
+    categoryLabel: 'Spells',
+    source: 'bmt',
+    sourceLabel: 'BMT',
+    label: 'Spells (BMT)',
+    defaultName: '5eTools Spells (BMT)',
+    url: `${BASE_URL}/spells/spells-bmt.json`,
+    type: 'spell',
+    rootKeys: ['spell'],
+  },
+  {
     key: 'monsters-mm',
     category: 'monsters',
     categoryLabel: 'Monsters',
@@ -566,14 +698,290 @@ const fiveEToolsDatasetCatalog: FiveEToolsDataset[] = [
     rootKeys: ['monster'],
   },
   {
+    key: 'monsters-vgm',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'vgm',
+    sourceLabel: 'VGtM',
+    label: 'Monsters (VGtM)',
+    defaultName: '5eTools Monsters (VGtM)',
+    url: `${BASE_URL}/bestiary/bestiary-vgm.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-mtf',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'mtf',
+    sourceLabel: 'MTF',
+    label: 'Monsters (MTF)',
+    defaultName: '5eTools Monsters (MTF)',
+    url: `${BASE_URL}/bestiary/bestiary-mtf.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-xge',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'xge',
+    sourceLabel: 'XGE',
+    label: 'Monsters (XGE)',
+    defaultName: '5eTools Monsters (XGE)',
+    url: `${BASE_URL}/bestiary/bestiary-xge.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-tce',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'tce',
+    sourceLabel: 'TCE',
+    label: 'Monsters (TCE)',
+    defaultName: '5eTools Monsters (TCE)',
+    url: `${BASE_URL}/bestiary/bestiary-tce.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-mot',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'mot',
+    sourceLabel: 'MotM',
+    label: 'Monsters (MotM)',
+    defaultName: '5eTools Monsters (MotM)',
+    url: `${BASE_URL}/bestiary/bestiary-mot.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-ftd',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'ftd',
+    sourceLabel: 'FTD',
+    label: 'Monsters (FTD)',
+    defaultName: '5eTools Monsters (FTD)',
+    url: `${BASE_URL}/bestiary/bestiary-ftd.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-egw',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'egw',
+    sourceLabel: 'EGW',
+    label: 'Monsters (EGW)',
+    defaultName: '5eTools Monsters (EGW)',
+    url: `${BASE_URL}/bestiary/bestiary-egw.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-ggr',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'ggr',
+    sourceLabel: 'GGR',
+    label: 'Monsters (GGR)',
+    defaultName: '5eTools Monsters (GGR)',
+    url: `${BASE_URL}/bestiary/bestiary-ggr.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-vrgr',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'vrgr',
+    sourceLabel: 'VRGR',
+    label: 'Monsters (VRGR)',
+    defaultName: '5eTools Monsters (VRGR)',
+    url: `${BASE_URL}/bestiary/bestiary-vrgr.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-scc',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'scc',
+    sourceLabel: 'SCC',
+    label: 'Monsters (SCC)',
+    defaultName: '5eTools Monsters (SCC)',
+    url: `${BASE_URL}/bestiary/bestiary-scc.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-ai',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'ai',
+    sourceLabel: 'AI',
+    label: 'Monsters (AI)',
+    defaultName: '5eTools Monsters (AI)',
+    url: `${BASE_URL}/bestiary/bestiary-ai.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-bmt',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'bmt',
+    sourceLabel: 'BMT',
+    label: 'Monsters (BMT)',
+    defaultName: '5eTools Monsters (BMT)',
+    url: `${BASE_URL}/bestiary/bestiary-bmt.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-dmg',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'dmg',
+    sourceLabel: 'DMG',
+    label: 'Monsters (DMG)',
+    defaultName: '5eTools Monsters (DMG)',
+    url: `${BASE_URL}/bestiary/bestiary-dmg.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-cos',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'cos',
+    sourceLabel: 'CoS',
+    label: 'Monsters (CoS)',
+    defaultName: '5eTools Monsters (CoS)',
+    url: `${BASE_URL}/bestiary/bestiary-cos.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-toa',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'toa',
+    sourceLabel: 'ToA',
+    label: 'Monsters (ToA)',
+    defaultName: '5eTools Monsters (ToA)',
+    url: `${BASE_URL}/bestiary/bestiary-toa.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-skT',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'skt',
+    sourceLabel: 'SkT',
+    label: 'Monsters (SkT)',
+    defaultName: '5eTools Monsters (SkT)',
+    url: `${BASE_URL}/bestiary/bestiary-skt.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-llk',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'llk',
+    sourceLabel: 'LLK',
+    label: 'Monsters (LLK)',
+    defaultName: '5eTools Monsters (LLK)',
+    url: `${BASE_URL}/bestiary/bestiary-llk.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-wdh',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'wdh',
+    sourceLabel: 'WDH',
+    label: 'Monsters (WDH)',
+    defaultName: '5eTools Monsters (WDH)',
+    url: `${BASE_URL}/bestiary/bestiary-wdh.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-wdmm',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'wdmm',
+    sourceLabel: 'WDMM',
+    label: 'Monsters (WDMM)',
+    defaultName: '5eTools Monsters (WDMM)',
+    url: `${BASE_URL}/bestiary/bestiary-wdmm.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-lmop',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'lmop',
+    sourceLabel: 'LMoP',
+    label: 'Monsters (LMoP)',
+    defaultName: '5eTools Monsters (LMoP)',
+    url: `${BASE_URL}/bestiary/bestiary-lmop.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-hotdq',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'hotdq',
+    sourceLabel: 'HoTDQ',
+    label: 'Monsters (HoTDQ)',
+    defaultName: '5eTools Monsters (HoTDQ)',
+    url: `${BASE_URL}/bestiary/bestiary-hotdq.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
+    key: 'monsters-phb',
+    category: 'monsters',
+    categoryLabel: 'Monsters',
+    source: 'phb',
+    sourceLabel: 'PHB',
+    label: 'Monsters (PHB)',
+    defaultName: '5eTools Monsters (PHB)',
+    url: `${BASE_URL}/bestiary/bestiary-phb.json`,
+    type: 'monster',
+    rootKeys: ['monster'],
+  },
+  {
     key: 'items-all',
     category: 'items',
     categoryLabel: 'Items',
     source: 'all',
     sourceLabel: 'All',
     label: 'Items (All)',
-    defaultName: '5eTools Items',
+    defaultName: '5eTools Items (All)',
     url: `${BASE_URL}/items.json`,
+    type: 'item',
+    rootKeys: ['item', 'baseitem', 'magicvariant'],
+  },
+  {
+    key: 'items-base',
+    category: 'items',
+    categoryLabel: 'Items',
+    source: 'base',
+    sourceLabel: 'Base',
+    label: 'Items (Core)',
+    defaultName: '5eTools Items (Core)',
+    url: `${BASE_URL}/items-base.json`,
     type: 'item',
     rootKeys: ['item', 'baseitem', 'magicvariant'],
   },
@@ -602,6 +1010,42 @@ const fiveEToolsDatasetCatalog: FiveEToolsDataset[] = [
     rootKeys: ['class'],
   },
   {
+    key: 'classes-artificer',
+    category: 'classes',
+    categoryLabel: 'Classes',
+    source: 'artificer',
+    sourceLabel: 'Artificer',
+    label: 'Artificer',
+    defaultName: '5eTools Artificer',
+    url: `${BASE_URL}/class/class-artificer.json`,
+    type: 'class',
+    rootKeys: ['class'],
+  },
+  {
+    key: 'classes-mystic',
+    category: 'classes',
+    categoryLabel: 'Classes',
+    source: 'mystic',
+    sourceLabel: 'Mystic',
+    label: 'Mystic',
+    defaultName: '5eTools Mystic',
+    url: `${BASE_URL}/class/class-mystic.json`,
+    type: 'class',
+    rootKeys: ['class'],
+  },
+  {
+    key: 'classes-sidekick',
+    category: 'classes',
+    categoryLabel: 'Classes',
+    source: 'sidekick',
+    sourceLabel: 'Sidekick',
+    label: 'Sidekick',
+    defaultName: '5eTools Sidekick',
+    url: `${BASE_URL}/class/class-sidekick.json`,
+    type: 'class',
+    rootKeys: ['class'],
+  },
+  {
     key: 'backgrounds-all',
     category: 'backgrounds',
     categoryLabel: 'Backgrounds',
@@ -624,6 +1068,30 @@ const fiveEToolsDatasetCatalog: FiveEToolsDataset[] = [
     url: `${BASE_URL}/races.json`,
     type: 'species',
     rootKeys: ['race'],
+  },
+  {
+    key: 'feats-all',
+    category: 'feats',
+    categoryLabel: 'Feats',
+    source: 'all',
+    sourceLabel: 'All',
+    label: 'Feats',
+    defaultName: '5eTools Feats',
+    url: `${BASE_URL}/feats.json`,
+    type: 'feat',
+    rootKeys: ['feat'],
+  },
+  {
+    key: 'conditions-all',
+    category: 'conditions',
+    categoryLabel: 'Conditions',
+    source: 'all',
+    sourceLabel: 'All',
+    label: 'Conditions & Diseases',
+    defaultName: '5eTools Conditions & Diseases',
+    url: `${BASE_URL}/conditionsdiseases.json`,
+    type: 'condition',
+    rootKeys: ['condition', 'disease'],
   },
 ];
 
@@ -716,8 +1184,9 @@ async function importFiveEToolsDataset(params: {
   description?: string | null;
   moduleId?: string | null;
   replaceExisting?: boolean;
+  allowedSources?: string[]; // Optional: filter entries by source
 }) {
-  const { dataset, name, system, version, description, moduleId, replaceExisting = false } = params;
+  const { dataset, name, system, version, description, moduleId, replaceExisting = false, allowedSources } = params;
   const preset = fiveEToolsDatasets[String(dataset)];
 
   if (!preset) {
@@ -746,6 +1215,18 @@ async function importFiveEToolsDataset(params: {
     error.statusCode = 422;
     error.url = fetchUrl;
     throw error;
+  }
+
+  // Optional: Filter items by source (for datasets without per-book JSON files)
+  let filteredItems = items;
+  if (allowedSources && allowedSources.length > 0) {
+    const allowedSet = new Set(allowedSources);
+    const totalCount = items.length;
+    filteredItems = items.filter((item: any) => {
+      const itemSource = item.source;
+      return itemSource && allowedSet.has(itemSource);
+    });
+    console.log(`[Import] Filtered ${totalCount} items by sources [${allowedSources.join(', ')}] -> kept ${filteredItems.length} of ${totalCount}`);
   }
 
   let module: any = null;
@@ -786,8 +1267,8 @@ async function importFiveEToolsDataset(params: {
 
   let createdCount = 0;
   const batchSize = 50;
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
+  for (let i = 0; i < filteredItems.length; i += batchSize) {
+    const batch = filteredItems.slice(i, i + batchSize);
     await Promise.all(
       batch.map(async (item: any) => {
         try {
@@ -817,6 +1298,9 @@ async function importFiveEToolsDataset(params: {
 }
 
 router.get('/import/5etools/datasets', async (_req, res) => {
+  console.log('[DEBUG] Serving datasets from catalog:', fiveEToolsDatasetCatalog.length);
+  const categories = fiveEToolsDatasetCatalog.map(d => d.category);
+  console.log('[DEBUG] Categories in catalog:', [...new Set(categories)]);
   res.json({
     datasets: fiveEToolsDatasetCatalog.map((dataset) => ({
       key: dataset.key,
@@ -1504,14 +1988,14 @@ router.post('/import/compendium', async (req, res) => {
 
 // Import directly from 5eTools dataset presets
 router.post('/import/5etools', async (req, res) => {
-  const { dataset, name, system, version, description } = req.body;
+  const { dataset, name, system, version, description, allowedSources } = req.body;
 
   if (!dataset || !name || !system) {
     return res.status(400).json({ error: 'Missing required fields: dataset, name, system' });
   }
 
   try {
-    const result = await importFiveEToolsDataset({ dataset, name, system, version: version || null, description: description || null });
+    const result = await importFiveEToolsDataset({ dataset, name, system, version: version || null, description: description || null, allowedSources });
     res.json(result);
   } catch (error: any) {
     console.error('Error importing 5eTools dataset:', error);
@@ -1816,6 +2300,7 @@ router.get('/compendium/filters/:type', async (req, res) => {
     } else if (effectiveType === 'item') {
       const typeSet = new Set<string>();
       const rarityMap = new Map<string, string>();
+      const weaponCategorySet = new Set<string>();
 
       entries.forEach((entry: any) => {
         const raw = entry.raw || {};
@@ -1831,6 +2316,12 @@ router.get('/compendium/filters/:type', async (req, res) => {
 
         const itemType = getItemTypeCode(raw);
         if (itemType) typeSet.add(itemType);
+
+        // Extract weapon category for weapons
+        const weaponCategory = system.weaponCategory || raw.weaponCategory;
+        if (weaponCategory && typeof weaponCategory === 'string') {
+          weaponCategorySet.add(weaponCategory.trim());
+        }
       });
 
       options.itemTypes = Array.from(typeSet).sort().map((value) => ({
@@ -1843,6 +2334,11 @@ router.get('/compendium/filters/:type', async (req, res) => {
         .map(([value, label]) => ({
         value,
         label,
+      }));
+
+      options.weaponCategories = Array.from(weaponCategorySet).sort().map((value) => ({
+        value,
+        label: value.charAt(0).toUpperCase() + value.slice(1),
       }));
     }
 
@@ -1884,6 +2380,7 @@ router.get('/compendium/:type', async (req, res) => {
   const rarity = req.query.rarity as string | undefined;
   const magical = req.query.magical as string | undefined;
   const attunement = req.query.attunement as string | undefined;
+  const weaponCategory = req.query.weaponCategory as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 100, 500);
   const offsetNum = parseInt(offset as string) || 0;
@@ -1985,6 +2482,18 @@ router.get('/compendium/:type', async (req, res) => {
         if (itemType === 'magic-item') {
           // Magic items have a rarity set
           itemFilters.push({ raw: { path: ['system', 'rarity'], not: null } });
+        } else if (itemType === 'WPN') {
+          // For weapons, match by weaponCategory field (simple/martial) OR legacy weapon flag
+          itemFilters.push({
+            OR: [
+              // Match items with weaponCategory (5e SRD/5etools style)
+              { raw: { path: ['system', 'weaponCategory'], not: null } },
+              { raw: { path: ['weaponCategory'], not: null } },
+              // Match legacy style weapons
+              { raw: { path: ['system', 'weapon'], not: null } },
+              { raw: { path: ['weapon'], not: null } },
+            ]
+          });
         } else {
           itemFilters.push({ OR: getItemTypeFilterCandidates(itemType) });
         }
@@ -2014,6 +2523,16 @@ router.get('/compendium/:type', async (req, res) => {
           { raw: { path: ['system', 'reqAttune'], equals: null } },
           { raw: { path: ['system', 'reqAttune'], not: null } }
         ]});
+      }
+
+      // Filter by weapon category (Simple/Martial) - only applies when itemType is 'WPN'
+      if (weaponCategory && itemType === 'WPN') {
+        itemFilters.push({ 
+          OR: [
+            { raw: { path: ['system', 'weaponCategory'], equals: weaponCategory } },
+            { raw: { path: ['weaponCategory'], equals: weaponCategory } }
+          ]
+        });
       }
 
       if (itemFilters.length > 0) {
@@ -2361,6 +2880,7 @@ router.get('/compendium/search', async (req, res) => {
   const rarity = req.query.rarity as string | undefined;
   const magical = req.query.magical as string | undefined;
   const attunement = req.query.attunement as string | undefined;
+  const weaponCategory = req.query.weaponCategory as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 50, 200);
   const offsetNum = parseInt(offset as string) || 0;
@@ -2473,6 +2993,18 @@ router.get('/compendium/search', async (req, res) => {
       if (itemType) {
         if (itemType === 'magic-item') {
           itemFilters.push({ raw: { path: ['system', 'rarity'], not: null } });
+        } else if (itemType === 'WPN') {
+          // For weapons, match by weaponCategory field (simple/martial) OR legacy weapon flag
+          itemFilters.push({
+            OR: [
+              // Match items with weaponCategory (5e SRD/5etools style)
+              { raw: { path: ['system', 'weaponCategory'], not: null } },
+              { raw: { path: ['weaponCategory'], not: null } },
+              // Match legacy style weapons
+              { raw: { path: ['system', 'weapon'], not: null } },
+              { raw: { path: ['weapon'], not: null } },
+            ]
+          });
         } else {
           switch (itemType) {
             case 'W':
@@ -2525,6 +3057,16 @@ router.get('/compendium/search', async (req, res) => {
           { raw: { path: ['system', 'reqAttune'], equals: null } },
           { raw: { path: ['system', 'reqAttune'], not: null } }
         ]});
+      }
+
+      // Filter by weapon category (Simple/Martial) - only applies when itemType is 'WPN'
+      if (weaponCategory && itemType === 'WPN') {
+        itemFilters.push({ 
+          OR: [
+            { raw: { path: ['system', 'weaponCategory'], equals: weaponCategory } },
+            { raw: { path: ['weaponCategory'], equals: weaponCategory } }
+          ]
+        });
       }
 
       if (itemFilters.length > 0) {

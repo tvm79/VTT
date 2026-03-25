@@ -1228,6 +1228,7 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
   const [fiveEToolsSystem, setFiveEToolsSystem] = useState<string>('dnd5e');
   const [fiveEToolsVersion, setFiveEToolsVersion] = useState<string>('5etools');
   const [fiveEToolsDescription, setFiveEToolsDescription] = useState<string>('Imported from 5eTools');
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
   
   // Journal state
   const [journals, setJournals] = useState<Journal[]>([]);
@@ -1760,17 +1761,15 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
 
   useEffect(() => {
     const load5eToolsDatasets = async () => {
-      if (activeTab !== 'import') return;
       try {
         const res = await fetch('/api/data/import/5etools/datasets');
         const data = await res.json();
         const datasets: FiveEToolsDatasetOption[] = Array.isArray(data?.datasets) ? data.datasets : [];
         setFiveEToolsOptions(datasets);
         if (datasets.length > 0 && !fiveEToolsCategory) {
-          const first = datasets[0];
-          setFiveEToolsCategory(first.category);
-          setFiveEToolsDataset(first.key);
-          setFiveEToolsName(first.defaultName);
+          setFiveEToolsCategory(datasets[0].category);
+          setFiveEToolsDataset(datasets[0].key);
+          setFiveEToolsName(datasets[0].defaultName);
         }
       } catch (error) {
         console.error('Failed to load 5eTools datasets:', error);
@@ -1778,22 +1777,29 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
     };
 
     load5eToolsDatasets();
-  }, [activeTab]);
+  }, []);
 
   const handle5eToolsImport = async () => {
     if (!fiveEToolsDataset || !fiveEToolsName || !fiveEToolsSystem) return;
     setLoading(true);
     try {
+      const body: any = {
+        dataset: fiveEToolsDataset,
+        name: fiveEToolsName,
+        system: fiveEToolsSystem,
+        version: fiveEToolsVersion || null,
+        description: fiveEToolsDescription || null,
+      };
+      
+      // Add source filter if selected (for datasets without per-book files)
+      if (selectedSources.length > 0) {
+        body.allowedSources = selectedSources;
+      }
+      
       const res = await fetch('/api/data/import/5etools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dataset: fiveEToolsDataset,
-          name: fiveEToolsName,
-          system: fiveEToolsSystem,
-          version: fiveEToolsVersion || null,
-          description: fiveEToolsDescription || null,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -2035,6 +2041,7 @@ interface OpenPanel {
       
       // Item filters
       if (activeFilters.itemType) params.append('itemType', activeFilters.itemType);
+      if (activeFilters.weaponCategory) params.append('weaponCategory', activeFilters.weaponCategory);
       if (activeFilters.rarity) params.append('rarity', activeFilters.rarity);
       if (activeFilters.attunement) params.append('attunement', activeFilters.attunement);
       if (activeFilters.tattooType) params.append('tattooType', activeFilters.tattooType);
@@ -4950,7 +4957,9 @@ interface OpenPanel {
           setFiveEToolsDescription={setFiveEToolsDescription}
           fiveEToolsCategories={fiveEToolsCategories}
           fiveEToolsOptions={fiveEToolsOptions}
-          fiveEToolsSources={fiveEToolsSources}
+          fiveEToolsSourceOptions={fiveEToolsSources as any}
+          fiveEToolsSources={selectedSources}
+          setFiveEToolsSources={setSelectedSources}
           handle5eToolsImport={handle5eToolsImport}
           importType={importType}
           setImportType={setImportType}
