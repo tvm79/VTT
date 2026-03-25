@@ -48,6 +48,7 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   AIR: 'Vehicle (Air)',
   WD: 'Wand',
   EQP: 'Equipment',
+  CON: 'Consumables',
 };
 const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE_LABELS));
 
@@ -277,6 +278,95 @@ function getEquipmentTypeFilter(equipmentType: string): any {
   if (process.env.NODE_ENV !== 'production') {
     console.log(
       `[Equipment Filter] selected=${equipmentType} resolved=${filter ? JSON.stringify(filter) : 'null'}`
+    );
+  }
+  return filter || null;
+}
+
+// Consumable type filter mappings
+const CONSUMABLE_TYPE_FILTERS: Record<string, any> = {
+  'Ammunition': {
+    OR: [
+      { raw: { path: ['type'], equals: 'a' } },
+      { raw: { path: ['itemType'], equals: 'a' } },
+      { raw: { path: ['system', 'type'], equals: 'a' } },
+    ]
+  },
+  'Food': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+      { raw: { path: ['system', 'food'], equals: true } },
+    ]
+  },
+  'Poison': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+      { raw: { path: ['system', 'poison'], equals: true } },
+    ]
+  },
+  'Potion': {
+    OR: [
+      { raw: { path: ['type'], equals: 'p' } },
+      { raw: { path: ['itemType'], equals: 'p' } },
+      { raw: { path: ['system', 'type'], equals: 'p' } },
+      { raw: { path: ['system', 'potion'], equals: true } },
+    ]
+  },
+  'Rod': {
+    OR: [
+      { raw: { path: ['type'], equals: 'rd' } },
+      { raw: { path: ['itemType'], equals: 'rd' } },
+      { raw: { path: ['system', 'type'], equals: 'rd' } },
+    ]
+  },
+  'Scroll': {
+    OR: [
+      { raw: { path: ['type'], equals: 'sc' } },
+      { raw: { path: ['itemType'], equals: 'sc' } },
+      { raw: { path: ['system', 'type'], equals: 'sc' } },
+    ]
+  },
+  'Trinket': {
+    OR: [
+      { raw: { path: ['type'], equals: 'w' } },
+      { raw: { path: ['itemType'], equals: 'w' } },
+      { raw: { path: ['system', 'type'], equals: 'w' } },
+      { raw: { path: ['system', 'wondrous'], equals: true } },
+    ]
+  },
+  'Vehicle Equipment': {
+    OR: [
+      { raw: { path: ['type'], equals: 'veh' } },
+      { raw: { path: ['itemType'], equals: 'veh' } },
+      { raw: { path: ['system', 'type'], equals: 'veh' } },
+    ]
+  },
+  'Wand': {
+    OR: [
+      { raw: { path: ['type'], equals: 'wd' } },
+      { raw: { path: ['itemType'], equals: 'wd' } },
+      { raw: { path: ['system', 'type'], equals: 'wd' } },
+    ]
+  },
+  'Wondrous Item': {
+    OR: [
+      { raw: { path: ['type'], equals: 'w' } },
+      { raw: { path: ['itemType'], equals: 'w' } },
+      { raw: { path: ['system', 'type'], equals: 'w' } },
+      { raw: { path: ['system', 'wondrous'], equals: true } },
+    ]
+  },
+};
+
+function getConsumableTypeFilter(consumableType: string): any {
+  const filter = CONSUMABLE_TYPE_FILTERS[consumableType];
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[Consumables Filter] selected=${consumableType} resolved=${filter ? JSON.stringify(filter) : 'null'}`
     );
   }
   return filter || null;
@@ -2519,17 +2609,25 @@ router.get('/compendium/filters/:type', async (req, res) => {
 
       // Filter the type set: replace equipment types (HA, LA, MA, S, RG, RD, WD, W) with 'EQP'
       const equipmentTypeCodes = new Set(['HA', 'LA', 'MA', 'S', 'RG', 'RD', 'WD', 'W']);
+      // Consumable types: A (Ammunition), P (Potion), SC (Scroll), RD (Rod), WD (Wand), W (Wondrous), G (Adventuring Gear for food/poison)
+      const consumableTypeCodes = new Set(['A', 'P', 'SC', 'RD', 'WD', 'W', 'G', 'TG']);
       let hasEquipment = false;
+      let hasConsumables = false;
       const filteredTypeSet = new Set<string>();
       for (const t of typeSet) {
         if (equipmentTypeCodes.has(t)) {
           hasEquipment = true;
+        } else if (consumableTypeCodes.has(t)) {
+          hasConsumables = true;
         } else {
           filteredTypeSet.add(t);
         }
       }
       if (hasEquipment) {
         filteredTypeSet.add('EQP');
+      }
+      if (hasConsumables) {
+        filteredTypeSet.add('CON');
       }
 
       options.itemTypes = Array.from(filteredTypeSet).sort().map((value) => ({
@@ -2559,6 +2657,20 @@ router.get('/compendium/filters/:type', async (req, res) => {
         { value: 'Ring', label: 'Ring' },
         { value: 'Rod', label: 'Rod' },
         { value: 'Shield', label: 'Shield' },
+        { value: 'Trinket', label: 'Trinket' },
+        { value: 'Vehicle Equipment', label: 'Vehicle Equipment' },
+        { value: 'Wand', label: 'Wand' },
+        { value: 'Wondrous Item', label: 'Wondrous Item' },
+      ];
+
+      // Add consumable types for CON item type
+      options.consumableTypes = [
+        { value: 'Ammunition', label: 'Ammunition' },
+        { value: 'Food', label: 'Food' },
+        { value: 'Poison', label: 'Poison' },
+        { value: 'Potion', label: 'Potion' },
+        { value: 'Rod', label: 'Rod' },
+        { value: 'Scroll', label: 'Scroll' },
         { value: 'Trinket', label: 'Trinket' },
         { value: 'Vehicle Equipment', label: 'Vehicle Equipment' },
         { value: 'Wand', label: 'Wand' },
@@ -2605,6 +2717,7 @@ router.get('/compendium/search', async (req, res) => {
   const attunement = req.query.attunement as string | undefined;
   const weaponCategory = req.query.weaponCategory as string | undefined;
   const equipmentType = req.query.equipmentType as string | undefined;
+  const consumableType = req.query.consumableType as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 100, 500);
   const offsetNum = parseInt(offset as string) || 0;
@@ -2779,6 +2892,56 @@ router.get('/compendium/search', async (req, res) => {
               console.log('[Equipment Filter] Skipping parent EQP filter, using specific equipmentType filter instead');
             }
           }
+        } else if (itemType === 'CON') {
+          // Consumables: Ammunition (A), Potion (P), Scroll (SC), Rod (RD), Wand (WD), Wondrous (W), Adventuring Gear (G), Trade Goods (TG)
+          // If equipmentType is specified, use that; otherwise match any consumable type
+          if (!equipmentType) {
+            itemFilters.push({
+              OR: [
+                // Ammunition
+                { raw: { path: ['type'], equals: 'a' } },
+                { raw: { path: ['itemType'], equals: 'a' } },
+                { raw: { path: ['system', 'type'], equals: 'a' } },
+                // Potion
+                { raw: { path: ['type'], equals: 'p' } },
+                { raw: { path: ['itemType'], equals: 'p' } },
+                { raw: { path: ['system', 'type'], equals: 'p' } },
+                { raw: { path: ['system', 'potion'], equals: true } },
+                // Scroll
+                { raw: { path: ['type'], equals: 'sc' } },
+                { raw: { path: ['itemType'], equals: 'sc' } },
+                { raw: { path: ['system', 'type'], equals: 'sc' } },
+                // Rod
+                { raw: { path: ['type'], equals: 'rd' } },
+                { raw: { path: ['itemType'], equals: 'rd' } },
+                { raw: { path: ['system', 'type'], equals: 'rd' } },
+                // Wand
+                { raw: { path: ['type'], equals: 'wd' } },
+                { raw: { path: ['itemType'], equals: 'wd' } },
+                { raw: { path: ['system', 'type'], equals: 'wd' } },
+                // Wondrous (Trinket, Wondrous Items)
+                { raw: { path: ['type'], equals: 'w' } },
+                { raw: { path: ['itemType'], equals: 'w' } },
+                { raw: { path: ['system', 'type'], equals: 'w' } },
+                { raw: { path: ['system', 'wondrous'], equals: true } },
+                // Adventuring Gear (Food, Poison, etc.)
+                { raw: { path: ['type'], equals: 'g' } },
+                { raw: { path: ['itemType'], equals: 'g' } },
+                { raw: { path: ['system', 'type'], equals: 'g' } },
+                // Trade Goods
+                { raw: { path: ['type'], equals: 'tg' } },
+                { raw: { path: ['itemType'], equals: 'tg' } },
+                { raw: { path: ['system', 'type'], equals: 'tg' } },
+              ]
+            });
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Consumables Filter] Parent CON filter applied (no specific type), itemFilters count:', itemFilters.length);
+            }
+          } else {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Consumables Filter] Skipping parent CON filter, using specific consumableType filter instead');
+            }
+          }
         } else {
           itemFilters.push({ OR: getItemTypeFilterCandidates(itemType) });
         }
@@ -2826,6 +2989,17 @@ router.get('/compendium/search', async (req, res) => {
         if (equipmentTypeFilter) {
           itemFilters.push(equipmentTypeFilter);
 
+        }
+      }
+
+      // Filter by consumable type - only applies when itemType is 'CON'
+      if (consumableType && itemType === 'CON') {
+        const consumableTypeFilter = getConsumableTypeFilter(consumableType);
+        if (consumableTypeFilter) {
+          itemFilters.push(consumableTypeFilter);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[Consumables Filter] Applied consumableType filter:', consumableType);
+          }
         }
       }
 
@@ -2885,6 +3059,8 @@ router.get('/compendium/search', async (req, res) => {
         system,
         slug: entry.slug,
         source: entry.source,
+        // Include full raw JSON for troubleshooting - all original data from 5e.tools
+        raw: entry.raw,
       };
     });
     
@@ -2985,6 +3161,8 @@ router.get('/compendium/entry/:id', async (req, res) => {
       system,
       slug: entry.slug,
       source: entry.source,
+      // Include full raw JSON for troubleshooting - all original data from 5e.tools
+      raw: entry.raw,
     });
   } catch (error: any) {
     console.error('Error fetching compendium entry:', error);

@@ -41,3 +41,52 @@ When fixing filter issues, check BOTH:
 2. Client-side - Which API endpoint is being called
 
 The client was calling the wrong endpoint (`/compendium/:type`) instead of the search endpoint (`/compendium/search`) that supports all filters.
+
+---
+
+# Consumables Type Filter - Added in Same Fix
+
+## What Was Added
+
+### 1. Server - Filter Function
+- **Location**: `server/src/routes/data.ts`
+- Added `getConsumableTypeFilter()` function that returns filters for:
+  - Ammunition (A)
+  - Food (G with food flag)
+  - Poison (G with poison flag)
+  - Potion (P)
+  - Rod (RD)
+  - Scroll (SC)
+  - Trinket (W)
+  - Vehicle Equipment (VEH)
+  - Wand (WD)
+  - Wondrous Item (W)
+
+### 2. Server - API Parameter
+- **Location**: `server/src/routes/data.ts`
+- Added `consumableType` parameter to `/compendium/search` endpoint
+- Added filter logic for when `itemType === 'CON'` and `consumableType` is specified
+
+### 3. Server - Filter Options
+- **Location**: `server/src/routes/data.ts`
+- Added `consumableTypes` to filter options (line ~2673)
+- Already had logic to add 'CON' to item types when consumable codes exist in database
+
+### 4. Client - API Call
+- **Location**: `client/src/components/DataManager.tsx`
+- Added `consumableType` parameter to API call
+
+### 5. Client - Filter UI
+- **Location**: `client/src/components/FilterPanel.tsx`
+- Added `consumableType` to FilterState interface
+- Added `consumableTypes` to FilterOptions interface
+- Added logic to clear consumableType when itemType changes from 'CON'
+- Added dropdown UI for Consumable Type (shows when 'CON' is selected)
+
+## How It Works
+1. User selects "Consumables" from Item Type dropdown
+2. "Consumable Type" dropdown appears with options
+3. When user selects a consumable type, API is called with:
+   - `itemType=CON`
+   - `consumableType=<selected type>`
+4. Server returns filtered items matching the consumable type

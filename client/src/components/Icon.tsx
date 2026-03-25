@@ -143,6 +143,7 @@ import {
   faHatWizard,        // 🎩 (wizard hat)
   faRing,
   faGauge,
+  faCode,
   faGaugeSimple,
   faDrawPolygon,
   faCircle,
@@ -189,6 +190,7 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'smile': faSmile,
   'times-circle': faTimesCircle,
   'eye': faEye,
+  'code': faCode,
   'cube': faCube,
   'filter': faFilter,
   'pen': faPen,

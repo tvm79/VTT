@@ -26,6 +26,7 @@ export interface FilterState {
   itemType?: string;
   weaponCategory?: string;
   equipmentType?: string;
+  consumableType?: string;
   rarity?: string;
   magical?: boolean;
   attunement?: string;
@@ -53,6 +54,7 @@ export interface FilterOptions {
   itemTypes?: { value: string; label: string }[];
   weaponCategories?: { value: string; label: string }[];
   equipmentTypes?: { value: string; label: string }[];
+  consumableTypes?: { value: string; label: string }[];
   rarities?: { value: string; label: string }[];
   attunementTypes?: { value: string; label: string }[];
   tattooTypes?: { value: string; label: string }[];
@@ -99,6 +101,10 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
     // Clear equipmentType when itemType changes from 'EQP' to something else
     if (key === 'itemType' && value !== 'EQP' && filters.equipmentType) {
       delete newFilters.equipmentType;
+    }
+    // Clear consumableType when itemType changes from 'CON' to something else
+    if (key === 'itemType' && value !== 'CON' && filters.consumableType) {
+      delete newFilters.consumableType;
     }
     // Clear tattooType when itemType changes from 'tattoo' to something else
     if (key === 'itemType' && value !== 'tattoo' && (filters as any).tattooType) {
@@ -374,6 +380,22 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
             <option value="">All Equipment Types</option>
             {options.equipmentTypes?.map((e) => (
               <option key={e.value} value={e.value}>{e.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      
+      {/* Consumable Type Filter - shows when "Consumables" is selected */}
+      {filters.itemType === 'CON' && (
+        <div className="filter-group">
+          <label>Consumable Type</label>
+          <select
+            value={filters.consumableType || ''}
+            onChange={(e) => updateFilter('consumableType', e.target.value)}
+          >
+            <option value="">All Consumable Types</option>
+            {options.consumableTypes?.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
         </div>
