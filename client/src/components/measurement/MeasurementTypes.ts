@@ -11,6 +11,14 @@ export interface MeasurementPoint {
   y: number;
 }
 
+export type MeasurementAnchorKind = 'intersection' | 'cellCenter';
+
+export interface MeasurementGridAnchor {
+  gridX: number;
+  gridY: number;
+  kind: MeasurementAnchorKind;
+}
+
 /**
  * Measurement data structure
  */
@@ -25,6 +33,18 @@ export interface Measurement {
   direction?: number;
   /** For cone shape, this stores the cone angle in radians (default: 60 degrees = Math.PI / 3) */
   coneAngle?: number;
+}
+
+export interface PersistedMeasurement {
+  id: string;
+  shape: MeasurementShape;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: number;
+  startAnchor?: MeasurementGridAnchor;
+  endAnchor?: MeasurementGridAnchor;
 }
 
 /**

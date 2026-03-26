@@ -16,6 +16,7 @@ import type {
 import { DEFAULT_COLOR_SCHEMES } from '../../../shared/src/index';
 import { TIME, DEFAULT_GAME_START_TIME, VISUAL_OPTIONS } from '../utils/gameTime';
 import type { Combatant } from '../types/Combatant';
+import type { PersistedMeasurement } from '../components/measurement/MeasurementTypes';
 import { damage, heal, setHP } from '../utils/hpLogic';
 import { TokenDisposition } from '../utils/colorUtils';
 import {
@@ -1258,15 +1259,7 @@ interface GameState {
   isDragging: boolean;
   tool: 'select' | 'token' | 'fog' | 'measure' | 'light' | 'audio' | 'move' | 'particle';
   measurementShape: 'ray' | 'cone' | 'circle' | 'rectangle';
-  measurements: Array<{
-    id: string;
-    shape: 'ray' | 'cone' | 'circle' | 'rectangle';
-    startX: number;
-    startY: number;
-    endX: number;
-    endY: number;
-    color: number;
-  }>;
+  measurements: PersistedMeasurement[];
   selectableTypes: ('token' | 'light' | 'audio' | 'particle')[];
   showMoveMeasure: boolean;
   squareValue: number;
@@ -1530,9 +1523,9 @@ interface GameState {
   setShowMoveMeasure: (show: boolean) => void;
   setSquareValue: (value: number) => void;
   setMeasurementShape: (shape: 'ray' | 'cone' | 'circle' | 'rectangle') => void;
-  addMeasurement: (measurement: { id: string; shape: 'ray' | 'cone' | 'circle' | 'rectangle'; startX: number; startY: number; endX: number; endY: number; color: number }) => void;
+  addMeasurement: (measurement: PersistedMeasurement) => void;
   removeMeasurement: (id: string) => void;
-  updateMeasurement: (id: string, updates: Partial<{ startX: number; startY: number; endX: number; endY: number }>) => void;
+  updateMeasurement: (id: string, updates: Partial<PersistedMeasurement>) => void;
   clearMeasurements: () => void;
   setGridEditMode: (enabled: boolean) => void;
   setBackgroundColor: (color: number) => void;
