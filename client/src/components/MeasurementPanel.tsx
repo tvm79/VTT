@@ -1,8 +1,7 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Icon } from './Icon';
-
-export type MeasurementShape = 'ray' | 'cone' | 'circle' | 'rectangle';
+import type { MeasurementShape } from './measurement/MeasurementTypes';
 
 interface MeasurementPanelProps {
   position: { top: number; left: number };
@@ -10,10 +9,11 @@ interface MeasurementPanelProps {
 }
 
 const measurementShapes: { id: MeasurementShape; icon: string; label: string }[] = [
-  { id: 'ray', icon: 'measure-ray', label: 'Ray (Line)' },
-  { id: 'circle', icon: 'measure-circle', label: 'Circle' },
-  { id: 'rectangle', icon: 'measure-rectangle', label: 'Rectangle' },
+  { id: 'line', icon: 'measure-line', label: 'Line' },
+  { id: 'sphere', icon: 'measure-sphere', label: 'Sphere' },
+  { id: 'cube', icon: 'measure-cube', label: 'Cube' },
   { id: 'cone', icon: 'measure-cone', label: 'Cone' },
+  { id: 'cylinder', icon: 'measure-cylinder', label: 'Cylinder' },
 ];
 
 export function MeasurementPanel({ position, isGM }: MeasurementPanelProps) {

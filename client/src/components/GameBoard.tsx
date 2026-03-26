@@ -40,16 +40,15 @@ import { ParticleEmitterIconsOverlay } from './particles/ParticleEmitterIconsOve
 import { AudioSourceIconsOverlay } from './audio/AudioSourceIconsOverlay';
 import { MeasurementPanel } from './MeasurementPanel';
 import {
-  calculateDistance,
-  calculateRectangleBounds,
-  calculateConeVertices,
-  calculateDirection,
-  formatRectangleDistance,
-  formatCircleDistance,
-  formatConeDistance,
-  getMidpoint
+  generateMeasurementId,
+  getCellPolygonPoints,
+  getMeasurementLabelPosition,
+  getMeasurementOutline,
+  gridCellToWorldCenter,
+  worldToGridCell,
 } from './measurement/MeasurementUtils';
-import type { MeasurementAnchorKind, MeasurementGridAnchor, PersistedMeasurement } from './measurement/MeasurementTypes';
+import { getMeasurementCells } from './measurement/MeasurementDispatcher';
+import type { GridCell, MeasurementRequest, PersistedMeasurement } from './measurement/MeasurementTypes';
 import { useSpatialAudio } from './audio/useSpatialAudio';
 import { VISUAL_OPTIONS, setFogEnabled, setFogIntensity, setFogSpeed, setFogShift, setFogDirection, setFogColor1, setFogColor2 } from '../utils/gameTime';
 import { getPixiRendererKind, initPixiApplicationWebGL2First, isPixiWebGLRenderer } from '../utils/pixiRenderer';
@@ -2585,7 +2584,7 @@ export function GameBoard() {
     }
   }, []);
 
-  const getMeasurementAnchor = useCallback((localX: number, localY: number) => {
+  const getMeasurementCell = useCallback((localX: number, localY: number): GridCell => {
     for (const [tokenId] of tokensRef.current) {
       const visualPos = getTokenVisualPosition(tokenId);
       if (!visualPos) continue;
@@ -2596,74 +2595,96 @@ export function GameBoard() {
         localY >= visualPos.y &&
         localY <= visualPos.y + visualPos.height
       ) {
-        return {
-          x: visualPos.x + visualPos.width / 2,
-          y: visualPos.y + visualPos.height / 2,
-        };
+        return worldToGridCell(
+          visualPos.x + visualPos.width / 2,
+          visualPos.y + visualPos.height / 2,
+          effectiveGridSize,
+          gridOffsetX,
+          gridOffsetY,
+          effectiveGridType,
+        );
       }
     }
 
-    return snapToGridCellCenter(localX, localY, effectiveGridSize, gridOffsetX, gridOffsetY);
-  }, [effectiveGridSize, getTokenVisualPosition, gridOffsetX, gridOffsetY]);
+    return worldToGridCell(localX, localY, effectiveGridSize, gridOffsetX, gridOffsetY, effectiveGridType);
+  }, [effectiveGridSize, effectiveGridType, getTokenVisualPosition, gridOffsetX, gridOffsetY]);
 
-  const measurementAnchorToWorld = useCallback((anchor: MeasurementGridAnchor) => {
-    const baseX = anchor.gridX * effectiveGridSize - gridOffsetX;
-    const baseY = anchor.gridY * effectiveGridSize - gridOffsetY;
+  const measurementCellToWorld = useCallback((cell: GridCell) => {
+    return gridCellToWorldCenter(cell, effectiveGridSize, gridOffsetX, gridOffsetY, effectiveGridType);
+  }, [effectiveGridSize, effectiveGridType, gridOffsetX, gridOffsetY]);
 
-    if (anchor.kind === 'cellCenter') {
+  const buildMeasurementRequest = useCallback((shape: PersistedMeasurement['shape'], origin: GridCell, target: GridCell): MeasurementRequest => {
+    const dx = target.gx - origin.gx;
+    const dy = target.gy - origin.gy;
+    const distanceCells = Math.max(1, Math.max(Math.abs(dx), Math.abs(dy)));
+
+    if (shape === 'cube') {
       return {
-        x: baseX + effectiveGridSize / 2,
-        y: baseY + effectiveGridSize / 2,
+        gridKind: effectiveGridType,
+        shape,
+        origin,
+        target,
+        rangeFt: 5,
+        sizeFt: Math.max(1, Math.abs(dy) + 1) * 5,
       };
     }
 
     return {
-      x: baseX,
-      y: baseY,
+      gridKind: effectiveGridType,
+      shape,
+      origin,
+      target,
+      rangeFt: distanceCells * 5,
     };
+  }, [effectiveGridType]);
+
+  const drawMeasurementCells = useCallback((graphics: PIXI.Graphics, cells: GridCell[], gridKind: 'square' | 'hex', color: number) => {
+    for (const cell of cells) {
+      const points = getCellPolygonPoints(cell, effectiveGridSize, gridOffsetX, gridOffsetY, gridKind);
+      if (points.length === 0) continue;
+      graphics.moveTo(points[0].x, points[0].y);
+      for (let index = 1; index < points.length; index += 1) {
+        graphics.lineTo(points[index].x, points[index].y);
+      }
+      graphics.closePath();
+      graphics.fill({ color, alpha: 0.3 });
+      graphics.stroke({ width: 2, color, alpha: 0.95 });
+    }
   }, [effectiveGridSize, gridOffsetX, gridOffsetY]);
 
-  const worldToMeasurementAnchor = useCallback((x: number, y: number, preferredKind?: MeasurementAnchorKind): MeasurementGridAnchor => {
-    const intersectionAnchor: MeasurementGridAnchor = {
-      gridX: Math.round((x + gridOffsetX) / effectiveGridSize),
-      gridY: Math.round((y + gridOffsetY) / effectiveGridSize),
-      kind: 'intersection',
-    };
-    const cellAnchor: MeasurementGridAnchor = {
-      gridX: Math.floor((x + gridOffsetX) / effectiveGridSize),
-      gridY: Math.floor((y + gridOffsetY) / effectiveGridSize),
-      kind: 'cellCenter',
-    };
+  const drawMeasurementOutline = useCallback((graphics: PIXI.Graphics, request: MeasurementRequest, color: number) => {
+    const outline = getMeasurementOutline(request, effectiveGridSize, gridOffsetX, gridOffsetY);
+    if (!outline) return;
 
-    if (preferredKind === 'intersection') return intersectionAnchor;
-    if (preferredKind === 'cellCenter') return cellAnchor;
-
-    const intersectionWorld = measurementAnchorToWorld(intersectionAnchor);
-    const cellWorld = measurementAnchorToWorld(cellAnchor);
-
-    return Math.hypot(intersectionWorld.x - x, intersectionWorld.y - y) <= Math.hypot(cellWorld.x - x, cellWorld.y - y)
-      ? intersectionAnchor
-      : cellAnchor;
-  }, [effectiveGridSize, gridOffsetX, gridOffsetY, measurementAnchorToWorld]);
-
-  const resolveMeasurementPoint = useCallback((measurement: {
-    startX?: number;
-    startY?: number;
-    endX?: number;
-    endY?: number;
-    startAnchor?: MeasurementGridAnchor;
-    endAnchor?: MeasurementGridAnchor;
-  }, key: 'start' | 'end') => {
-    const anchor = key === 'start' ? measurement.startAnchor : measurement.endAnchor;
-    if (anchor) {
-      return measurementAnchorToWorld(anchor);
+    if (outline.kind === 'line') {
+      graphics.moveTo(outline.start.x, outline.start.y);
+      graphics.lineTo(outline.end.x, outline.end.y);
+      graphics.stroke({ width: 2, color: 0x000000, alpha: 1 });
+      return;
     }
 
-    return {
-      x: key === 'start' ? measurement.startX ?? 0 : measurement.endX ?? 0,
-      y: key === 'start' ? measurement.startY ?? 0 : measurement.endY ?? 0,
-    };
-  }, [measurementAnchorToWorld]);
+    if (outline.kind === 'circle') {
+      graphics.circle(outline.center.x, outline.center.y, outline.radius);
+      graphics.stroke({ width: 2, color: 0x000000, alpha: 1 });
+      return;
+    }
+
+    if (outline.points.length > 0) {
+      graphics.moveTo(outline.points[0].x, outline.points[0].y);
+      for (let index = 1; index < outline.points.length; index += 1) {
+        graphics.lineTo(outline.points[index].x, outline.points[index].y);
+      }
+      graphics.closePath();
+      graphics.stroke({ width: 2, color: 0x000000, alpha: 1 });
+    }
+  }, [effectiveGridSize, gridOffsetX, gridOffsetY]);
+
+  const formatMeasurementText = useCallback((measurement: MeasurementRequest) => {
+    if (measurement.shape === 'cube') {
+      return `${measurement.sizeFt ?? 0} ${gridUnit}`;
+    }
+    return `${measurement.rangeFt} ${gridUnit}`;
+  }, [gridUnit]);
 
   // Initialize PixiJS
   useEffect(() => {
@@ -5981,67 +6002,36 @@ export function GameBoard() {
       measurements.forEach((measurement) => {
         const graphics = new PIXI.Graphics();
         const color = measurement.color ?? measureColorNumber;
-        const startPoint = resolveMeasurementPoint(measurement, 'start');
-        const endPoint = resolveMeasurementPoint(measurement, 'end');
-        
+        const result = getMeasurementCells(measurement);
+        const originPoint = measurementCellToWorld(measurement.origin);
+        const labelPosition = getMeasurementLabelPosition(
+          measurement.origin,
+          measurement.target,
+          effectiveGridSize,
+          gridOffsetX,
+          gridOffsetY,
+          measurement.gridKind,
+        );
+
         // Icon position - always at the origin point where measurement was placed
-        let iconX = startPoint.x;
-        let iconY = startPoint.y;
-        
-        if (measurement.shape === 'ray') {
-          graphics.moveTo(startPoint.x, startPoint.y);
-          graphics.lineTo(endPoint.x, endPoint.y);
-          graphics.stroke({ width: 3, color: color });
-        } else if (measurement.shape === 'circle') {
-          const radius = Math.sqrt(
-            Math.pow(endPoint.x - startPoint.x, 2) + 
-            Math.pow(endPoint.y - startPoint.y, 2)
-          );
-          graphics.circle(startPoint.x, startPoint.y, radius);
-          graphics.fill({ color: color, alpha: 0.3 });
-          graphics.stroke({ width: 3, color: color });
-        } else if (measurement.shape === 'rectangle') {
-          const snappedStartX = startPoint.x;
-          const snappedStartY = startPoint.y;
-          const snappedEndX = endPoint.x;
-          const snappedEndY = endPoint.y;
-          
-          const x = Math.min(snappedStartX, snappedEndX);
-          const y = Math.min(snappedStartY, snappedEndY);
-          const width = Math.abs(snappedEndX - snappedStartX);
-          const height = Math.abs(snappedEndY - snappedStartY);
-          
-          graphics.drawRect(x, y, width, height);
-          graphics.fill({ color: color, alpha: 0.3 });
-          graphics.stroke({ width: 3, color: color });
-        } else if (measurement.shape === 'cone') {
-          const dx = endPoint.x - startPoint.x;
-          const dy = endPoint.y - startPoint.y;
-          const angle = Math.atan2(dy, dx);
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          const coneAngle = Math.PI / 4; // 45 degrees half-angle for D&D cone
-          
-          const vertices = [
-            { x: startPoint.x, y: startPoint.y },
-            {
-              x: startPoint.x + distance * Math.cos(angle - coneAngle),
-              y: startPoint.y + distance * Math.sin(angle - coneAngle)
-            },
-            {
-              x: startPoint.x + distance * Math.cos(angle + coneAngle),
-              y: startPoint.y + distance * Math.sin(angle + coneAngle)
-            }
-          ];
-          
-          graphics.moveTo(vertices[0].x, vertices[0].y);
-          graphics.lineTo(vertices[1].x, vertices[1].y);
-          graphics.lineTo(vertices[2].x, vertices[2].y);
-          graphics.closePath();
-          graphics.fill({ color: color, alpha: 0.3 });
-          graphics.stroke({ width: 3, color: color });
-        }
-        
+        let iconX = originPoint.x;
+        let iconY = originPoint.y;
+
+        drawMeasurementCells(graphics, result.cells, measurement.gridKind, color);
+        drawMeasurementOutline(graphics, measurement, color);
         measurementLayer.addChild(graphics);
+
+        const label = new PIXI.Text(formatMeasurementText(measurement), {
+          fontFamily: 'Arial',
+          fontSize: 16,
+          fill: 0xffffff,
+          fontWeight: 'bold',
+          stroke: { color: 0x000000, width: 2 },
+        });
+        label.x = labelPosition.x + 5;
+        label.y = labelPosition.y + 5;
+        label.zIndex = 90;
+        measurementLayer.addChild(label);
         
         // Create delete button icon
         const iconSize = Math.max(16, gridSize * 0.4);
@@ -6101,7 +6091,7 @@ export function GameBoard() {
     const stage = app.stage;
     const uiLayer = (app as any).uiLayer as PIXI.Container;
     
-    let measureStart: { x: number; y: number } | null = null;
+    let measureStart: GridCell | null = null;
     let measureLine: PIXI.Graphics | null = null;
     let measureText: PIXI.Text | null = null;
     // Store current measurement data for persistence
@@ -6428,14 +6418,16 @@ export function GameBoard() {
         
         const isOnExistingMeasurement = existingMeasurements.some((m) => {
           // Check if click is near the start point of any measurement
+          const originPoint = measurementCellToWorld(m.origin);
           const dist = Math.sqrt(
-            Math.pow(clickX - m.startX, 2) + Math.pow(clickY - m.startY, 2)
+            Math.pow(clickX - originPoint.x, 2) + Math.pow(clickY - originPoint.y, 2)
           );
           return dist < clickThreshold;
         });
         
         if (!isOnExistingMeasurement) {
-          measureStart = { x: pos.x, y: pos.y };
+          const localPos = stage.toLocal(pos);
+          measureStart = getMeasurementCell(localPos.x, localPos.y);
         }
       } else if (currentTool === 'fog' && currentIsGM && currentBoard) {
         const fogAction = e.button === 2 ? 'add' : e.button === 0 ? 'reveal' : null;
@@ -6998,147 +6990,45 @@ export function GameBoard() {
       }
       
       if (measureStart && currentTool === 'measure') {
-        // Don't clear measureStart - just redraw the line
-        // Clear previous line and text (but keep measureStart)
+        // Don't clear measureStart - just redraw the preview
         if (measureLine) { uiLayer.removeChild(measureLine); measureLine = null; }
         if (measureText) { uiLayer.removeChild(measureText); measureText = null; }
-        
-        // Get measurement shape from store
-        const currentMeasurementShape = useGameStore.getState().measurementShape || 'ray';
-        
-        // Resolve to token centers when hovering tokens, otherwise snap to grid centers.
-        const localStart = stage.toLocal(measureStart);
+
+        const currentMeasurementShape = useGameStore.getState().measurementShape || 'line';
         const localEnd = stage.toLocal(pos);
-        const useIntersectionAnchor = currentMeasurementShape === 'rectangle';
-        const startAnchor = useIntersectionAnchor
-          ? snapToGridIntersection(localStart.x, localStart.y, gridSize, gridOffsetX || 0, gridOffsetY || 0)
-          : getMeasurementAnchor(localStart.x, localStart.y);
-        const endAnchor = useIntersectionAnchor
-          ? snapToGridIntersection(localEnd.x, localEnd.y, gridSize, gridOffsetX || 0, gridOffsetY || 0)
-          : getMeasurementAnchor(localEnd.x, localEnd.y);
-        const startX = startAnchor.x;
-        const startY = startAnchor.y;
-        const endX = endAnchor.x;
-        const endY = endAnchor.y;
-        
-        const start = { x: startX, y: startY };
-        const end = { x: endX, y: endY };
-        
-        // Store measurement data for persistence
-        currentMeasurementData = {
-          id: `measurement-${Date.now()}`,
-          shape: currentMeasurementShape,
-          startX: startX,
-          startY: startY,
-          endX: endX,
-          endY: endY,
-          color: measureColorNumber,
-          startAnchor: worldToMeasurementAnchor(startX, startY, useIntersectionAnchor ? 'intersection' : undefined),
-          endAnchor: worldToMeasurementAnchor(endX, endY, useIntersectionAnchor ? 'intersection' : undefined),
+        const targetCell = getMeasurementCell(localEnd.x, localEnd.y);
+        const request = {
+          ...buildMeasurementRequest(currentMeasurementShape, measureStart, targetCell),
+          outlineTarget: localEnd,
         };
-        
+        const result = getMeasurementCells(request);
+        const labelPosition = getMeasurementLabelPosition(
+          request.origin,
+          request.target,
+          effectiveGridSize,
+          gridOffsetX,
+          gridOffsetY,
+          request.gridKind,
+        );
+
+        currentMeasurementData = {
+          id: generateMeasurementId(),
+          ...request,
+          color: measureColorNumber,
+        };
+
         measureLine = new PIXI.Graphics();
-        
-        // Draw shape based on measurementShape
-        if (currentMeasurementShape === 'ray') {
-          // Ray (line) - existing behavior
-          measureLine.moveTo(startX, startY);
-          measureLine.lineTo(endX, endY);
-          measureLine.stroke({ width: 3, color: measureColorNumber });
-          
-          const dx = endX - startX;
-          const dy = endY - startY;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          const squares = distance / gridSize;
-          const totalValue = Math.round(squares) * squareValue;
-          
-          measureText = new PIXI.Text(`${totalValue} ${gridUnit}`, {
-            fontFamily: 'Arial', fontSize: 16, fill: 0xffffff, fontWeight: 'bold',
-          });
-          const midX = (startX + endX) / 2;
-          const midY = (startY + endY) / 2;
-          measureText.x = midX + 5;
-          measureText.y = midY + 5;
-        } else if (currentMeasurementShape === 'circle') {
-          // Circle - draw from start to end as radius
-          const radius = calculateDistance(start, end);
-          measureLine.circle(startX, startY, radius);
-          measureLine.fill({ color: measureColorNumber, alpha: 0.3 });
-          measureLine.stroke({ width: 3, color: measureColorNumber });
-          
-          const labelText = formatCircleDistance(start, end, gridSize, squareValue, gridUnit);
-          measureText = new PIXI.Text(labelText, {
-            fontFamily: 'Arial', fontSize: 16, fill: 0xffffff, fontWeight: 'bold',
-          });
-          measureText.x = startX + 5;
-          measureText.y = startY + 5;
-        } else if (currentMeasurementShape === 'rectangle') {
-          // Rectangle - draw from start to end, snapped to grid corners
-          // Snap end point to grid corner (top-left of grid cell)
-          const snappedEndX = endX;
-          const snappedEndY = endY;
-          const snappedStartX = startX;
-          const snappedStartY = startY;
-          
-          const rectStart = { x: snappedStartX, y: snappedStartY };
-          const rectEnd = { x: snappedEndX, y: snappedEndY };
-          const bounds = calculateRectangleBounds(rectStart, rectEnd);
-          
-          measureLine.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
-          measureLine.fill({ color: measureColorNumber, alpha: 0.3 });
-          measureLine.stroke({ width: 3, color: measureColorNumber });
-          
-          const labelText = formatRectangleDistance(rectStart, rectEnd, gridSize, squareValue, gridUnit);
-          measureText = new PIXI.Text(`${labelText.width} × ${labelText.height}`, {
-            fontFamily: 'Arial', fontSize: 16, fill: 0xffffff, fontWeight: 'bold',
-          });
-          const midX = bounds.x + bounds.width / 2;
-          const midY = bounds.y + bounds.height / 2;
-          measureText.x = midX + 5;
-          measureText.y = midY + 5;
-        } else if (currentMeasurementShape === 'cone') {
-          // Cone - draw triangle from start through end (D&D style - no angle snapping)
-          const dx = endX - startX;
-          const dy = endY - startY;
-          const angle = Math.atan2(dy, dx);
-          const length = Math.sqrt(dx * dx + dy * dy);
-          const coneAngle = Math.PI / 4; // 45 degrees half-angle for D&D cone
-          
-          const vertices = [
-            { x: startX, y: startY },
-            {
-              x: startX + length * Math.cos(angle - coneAngle),
-              y: startY + length * Math.sin(angle - coneAngle)
-            },
-            {
-              x: startX + length * Math.cos(angle + coneAngle),
-              y: startY + length * Math.sin(angle + coneAngle)
-            }
-          ];
-          
-          if (vertices.length >= 3) {
-            measureLine.moveTo(vertices[0].x, vertices[0].y);
-            measureLine.lineTo(vertices[1].x, vertices[1].y);
-            measureLine.lineTo(vertices[2].x, vertices[2].y);
-            measureLine.closePath();
-            measureLine.fill({ color: measureColorNumber, alpha: 0.3 });
-            measureLine.stroke({ width: 3, color: measureColorNumber });
-          }
-          
-          const labelText = formatConeDistance(start, end, gridSize, squareValue, gridUnit);
-          measureText = new PIXI.Text(labelText, {
-            fontFamily: 'Arial', fontSize: 16, fill: 0xffffff, fontWeight: 'bold',
-          });
-          const midX = (startX + endX) / 2;
-          const midY = (startY + endY) / 2;
-          measureText.x = midX + 5;
-          measureText.y = midY + 5;
-        }
-        
+        drawMeasurementCells(measureLine, result.cells, request.gridKind, measureColorNumber);
+        drawMeasurementOutline(measureLine, request, measureColorNumber);
+
+        measureText = new PIXI.Text(formatMeasurementText(request), {
+          fontFamily: 'Arial', fontSize: 16, fill: 0xffffff, fontWeight: 'bold',
+        });
+        measureText.x = labelPosition.x + 5;
+        measureText.y = labelPosition.y + 5;
+
         uiLayer.addChild(measureLine);
-        if (measureText) {
-          uiLayer.addChild(measureText);
-        }
+        uiLayer.addChild(measureText);
       }
       
       // Handle pending light creation (when user starts dragging)
@@ -7673,7 +7563,7 @@ export function GameBoard() {
       fogGridRef.current.cells.clear();
       fogGridRef.current.lastCellKey = null;
     };
-  }, [currentBoard, tool, isGM, squareValue, gridUnit, measureColorNumber, players, lights, effectiveGridSize, gridOffsetX, gridOffsetY, buildRectPolygon, clampToBoard, fogDrawMode, fogSnapToGrid, getMeasurementAnchor, particlePreset, particleEmitterSize]);
+  }, [currentBoard, tool, isGM, squareValue, gridUnit, measureColorNumber, players, lights, effectiveGridSize, gridOffsetX, gridOffsetY, buildRectPolygon, clampToBoard, fogDrawMode, fogSnapToGrid, getMeasurementCell, particlePreset, particleEmitterSize]);
 
 
   const tools: { id: 'select' | 'measure' | 'light' | 'audio' | 'fog' | 'particle'; icon: string; label: string }[] = [

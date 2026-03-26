@@ -1258,7 +1258,7 @@ interface GameState {
   selectedTokenIds: string[];
   isDragging: boolean;
   tool: 'select' | 'token' | 'fog' | 'measure' | 'light' | 'audio' | 'move' | 'particle';
-  measurementShape: 'ray' | 'cone' | 'circle' | 'rectangle';
+  measurementShape: 'line' | 'cone' | 'cube' | 'sphere' | 'cylinder';
   measurements: PersistedMeasurement[];
   selectableTypes: ('token' | 'light' | 'audio' | 'particle')[];
   showMoveMeasure: boolean;
@@ -1522,7 +1522,7 @@ interface GameState {
   toggleSelectableType: (type: 'token' | 'light' | 'audio' | 'particle') => void;
   setShowMoveMeasure: (show: boolean) => void;
   setSquareValue: (value: number) => void;
-  setMeasurementShape: (shape: 'ray' | 'cone' | 'circle' | 'rectangle') => void;
+  setMeasurementShape: (shape: 'line' | 'cone' | 'cube' | 'sphere' | 'cylinder') => void;
   addMeasurement: (measurement: PersistedMeasurement) => void;
   removeMeasurement: (id: string) => void;
   updateMeasurement: (id: string, updates: Partial<PersistedMeasurement>) => void;
@@ -1747,7 +1747,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   tool: 'select',
   selectableTypes: ['token', 'light', 'audio', 'particle'],
   showMoveMeasure: false,
-  measurementShape: 'ray',
+  measurementShape: 'line',
   measurements: [],
   squareValue: 5,
   gridEditMode: false,

@@ -1,66 +1,55 @@
-/**
- * Measurement shape types for the multi-shape measurement tool
- */
-export type MeasurementShape = 'ray' | 'cone' | 'circle' | 'rectangle';
+export type GridKind = 'square' | 'hex';
 
-/**
- * Point coordinates
- */
+export type ShapeKind = 'line' | 'cone' | 'cube' | 'sphere' | 'cylinder';
+
+export type MeasurementShape = ShapeKind;
+
+export interface GridCell {
+  gx: number;
+  gy: number;
+}
+
+export interface MeasurementRequest {
+  gridKind: GridKind;
+  shape: ShapeKind;
+  origin: GridCell;
+  target?: GridCell;
+  outlineTarget?: MeasurementPoint;
+  rangeFt: number;
+  widthFt?: number;
+  sizeFt?: number;
+  includeOrigin?: boolean;
+}
+
+export interface MeasurementResult {
+  cells: GridCell[];
+}
+
+export interface StoredMeasurement {
+  id: string;
+  gridKind: GridKind;
+  shape: ShapeKind;
+  origin: GridCell;
+  target?: GridCell;
+  outlineTarget?: MeasurementPoint;
+  rangeFt: number;
+  widthFt?: number;
+  sizeFt?: number;
+  includeOrigin?: boolean;
+  color: number;
+}
+
+export type PersistedMeasurement = StoredMeasurement;
+
+export interface MeasurementPreview extends MeasurementRequest {
+  color: number;
+}
+
 export interface MeasurementPoint {
   x: number;
   y: number;
 }
 
-export type MeasurementAnchorKind = 'intersection' | 'cellCenter';
-
-export interface MeasurementGridAnchor {
-  gridX: number;
-  gridY: number;
-  kind: MeasurementAnchorKind;
-}
-
-/**
- * Measurement data structure
- */
-export interface Measurement {
-  id: string;
-  shape: MeasurementShape;
-  start: MeasurementPoint;
-  end: MeasurementPoint;
-  color: number;
-  thickness: number;
-  /** For cone shape, this stores the direction angle in radians */
-  direction?: number;
-  /** For cone shape, this stores the cone angle in radians (default: 60 degrees = Math.PI / 3) */
-  coneAngle?: number;
-}
-
-export interface PersistedMeasurement {
-  id: string;
-  shape: MeasurementShape;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  color: number;
-  startAnchor?: MeasurementGridAnchor;
-  endAnchor?: MeasurementGridAnchor;
-}
-
-/**
- * Measurement preview state
- */
-export interface MeasurementPreview {
-  shape: MeasurementShape;
-  start: MeasurementPoint;
-  end: MeasurementPoint;
-  direction?: number;
-  coneAngle?: number;
-}
-
-/**
- * Measurement label data for HTML overlay
- */
 export interface MeasurementLabel {
   id: string;
   text: string;
@@ -69,9 +58,6 @@ export interface MeasurementLabel {
   color: number;
 }
 
-/**
- * Distance calculation result
- */
 export interface DistanceResult {
   pixels: number;
   squares: number;
@@ -79,23 +65,12 @@ export interface DistanceResult {
   unit: string;
 }
 
-/**
- * Rectangle bounds
- */
-export interface RectangleBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export interface MeasurementRenderCell {
+  cell: GridCell;
+  points: MeasurementPoint[];
 }
 
-/**
- * Cone calculation result
- */
-export interface ConeResult {
-  origin: MeasurementPoint;
-  direction: number;
-  length: number;
-  angle: number;
-  vertices: MeasurementPoint[];
-}
+export type MeasurementOutline =
+  | { kind: 'line'; start: MeasurementPoint; end: MeasurementPoint }
+  | { kind: 'polygon'; points: MeasurementPoint[] }
+  | { kind: 'circle'; center: MeasurementPoint; radius: number };
