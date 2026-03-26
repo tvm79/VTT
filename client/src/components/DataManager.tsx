@@ -112,6 +112,9 @@ function getRarityColor(rarityValue?: unknown): string | null {
   
   const rarity = String(rarityValue).toLowerCase().trim();
   
+  // Handle "None" as Common
+  if (rarity === 'none') return '#9ca3af';
+  
   // D&D 5e rarity colors
   switch (rarity) {
     case 'common':

@@ -1678,6 +1678,15 @@ async function createCompendiumEntry(
 ) {
   // Normalize the data using our new normalizer
   const normalized = normalizeEntry(data) as any;
+  
+  // Normalize rarity: "None" should become "Common"
+  if (normalized.system?.rarity === 'None' || normalized.system?.rarity === 'none') {
+    normalized.system.rarity = 'Common';
+  }
+  if (normalized.rarity === 'None' || normalized.rarity === 'none') {
+    normalized.rarity = 'Common';
+  }
+  
   const imageMeta = resolveEntryImages(type, data, normalized);
   normalized.img = imageMeta.img;
   normalized.imgToken = imageMeta.imgToken;
@@ -1903,17 +1912,25 @@ router.post('/modules/:moduleId/import', async (req, res) => {
     // Insert items
     const itemType = type || 'item';
     const createdItems = await Promise.all(
-      items.map((item: any) => 
-        prisma.dataItem.create({
+      items.map((item: any) => {
+        // Normalize rarity: "None" should become "Common"
+        const normalizedItem = { ...item };
+        if (normalizedItem.system?.rarity === 'None' || normalizedItem.system?.rarity === 'none') {
+          normalizedItem.system = { ...normalizedItem.system, rarity: 'Common' };
+        }
+        if (normalizedItem.rarity === 'None' || normalizedItem.rarity === 'none') {
+          normalizedItem.rarity = 'Common';
+        }
+        return prisma.dataItem.create({
           data: {
             moduleId,
             name: item.name || 'Unknown',
             type: itemType,
-            data: item, // Store entire item as JSON
+            data: normalizedItem, // Store entire item as JSON
             source: item.source || null,
           },
-        })
-      )
+        });
+      })
     );
     
     // Update module item count
@@ -3222,16 +3239,23 @@ router.get('/compendium/search', async (req, res) => {
       if (rarity) {
         if (rarity === 'mundane') {
           // Mundane items have rarity 'none' or no rarity
-          itemFilters.push({ raw: { path: ['system', 'rarity'], in: ['none', 'common'] } });
+          itemFilters.push({ raw: { path: ['system', 'rarity'], in: ['none', 'None', 'common', 'Common'] } });
         } else {
-          itemFilters.push({ raw: { path: ['system', 'rarity'], equals: rarity } });
+          // Handle both lowercase and capitalized rarity values
+          const normalizedRarity = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
+          itemFilters.push({ 
+            OR: [
+              { raw: { path: ['system', 'rarity'], equals: rarity } },
+              { raw: { path: ['system', 'rarity'], equals: normalizedRarity } }
+            ] 
+          });
         }
       }
 
       // Filter for magical items
       if (magical === 'true') {
-        // Items with rarity other than 'none' are magical
-        itemFilters.push({ raw: { path: ['system', 'rarity'], not: 'none' } });
+        // Items with rarity other than 'none' or 'Common' are magical
+        itemFilters.push({ raw: { path: ['system', 'rarity'], notIn: ['none', 'None', 'common', 'Common'] } });
       }
 
       // Filter by attunement
@@ -3873,15 +3897,21 @@ router.get('/compendium/search', async (req, res) => {
       // Filter by rarity - stored at system.rarity
       if (rarity) {
         if (rarity === 'mundane') {
-          itemFilters.push({ raw: { path: ['system', 'rarity'], in: ['none', 'common'] } });
+          itemFilters.push({ raw: { path: ['system', 'rarity'], in: ['none', 'None', 'common', 'Common'] } });
         } else {
-          itemFilters.push({ raw: { path: ['system', 'rarity'], equals: rarity } });
+          const normalizedRarity = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
+          itemFilters.push({ 
+            OR: [
+              { raw: { path: ['system', 'rarity'], equals: rarity } },
+              { raw: { path: ['system', 'rarity'], equals: normalizedRarity } }
+            ] 
+          });
         }
       }
 
       // Filter for magical items
       if (magical === 'true') {
-        itemFilters.push({ raw: { path: ['system', 'rarity'], not: 'none' } });
+        itemFilters.push({ raw: { path: ['system', 'rarity'], notIn: ['none', 'None', 'common', 'Common'] } });
       }
 
       // Filter by attunement
