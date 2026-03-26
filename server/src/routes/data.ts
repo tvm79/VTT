@@ -49,6 +49,9 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   WD: 'Wand',
   EQP: 'Equipment',
   CON: 'Consumables',
+  LOOT: 'Loot',
+  TOOL: 'Tool',
+  TRANSPORT: 'Transportation',
 };
 const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE_LABELS));
 
@@ -292,22 +295,6 @@ const CONSUMABLE_TYPE_FILTERS: Record<string, any> = {
       { raw: { path: ['system', 'type'], equals: 'a' } },
     ]
   },
-  'Food': {
-    OR: [
-      { raw: { path: ['type'], equals: 'g' } },
-      { raw: { path: ['itemType'], equals: 'g' } },
-      { raw: { path: ['system', 'type'], equals: 'g' } },
-      { raw: { path: ['system', 'food'], equals: true } },
-    ]
-  },
-  'Poison': {
-    OR: [
-      { raw: { path: ['type'], equals: 'g' } },
-      { raw: { path: ['itemType'], equals: 'g' } },
-      { raw: { path: ['system', 'type'], equals: 'g' } },
-      { raw: { path: ['system', 'poison'], equals: true } },
-    ]
-  },
   'Potion': {
     OR: [
       { raw: { path: ['type'], equals: 'p' } },
@@ -367,6 +354,154 @@ function getConsumableTypeFilter(consumableType: string): any {
   if (process.env.NODE_ENV !== 'production') {
     console.log(
       `[Consumables Filter] selected=${consumableType} resolved=${filter ? JSON.stringify(filter) : 'null'}`
+    );
+  }
+  return filter || null;
+}
+
+// Transportation type filter mappings
+const TRANSPORT_TYPE_FILTERS: Record<string, any> = {
+  'Mount': {
+    OR: [
+      { raw: { path: ['type'], equals: 'mnt' } },
+      { raw: { path: ['itemType'], equals: 'mnt' } },
+      { raw: { path: ['system', 'type'], equals: 'mnt' } },
+    ]
+  },
+  'Vehicle (Land)': {
+    OR: [
+      { raw: { path: ['type'], equals: 'veh' } },
+      { raw: { path: ['itemType'], equals: 'veh' } },
+      { raw: { path: ['system', 'type'], equals: 'veh' } },
+    ]
+  },
+  'Vehicle (Water)': {
+    OR: [
+      { raw: { path: ['type'], equals: 'shp' } },
+      { raw: { path: ['itemType'], equals: 'shp' } },
+      { raw: { path: ['system', 'type'], equals: 'shp' } },
+    ]
+  },
+};
+
+function getTransportationTypeFilter(transportationType: string): any {
+  const filter = TRANSPORT_TYPE_FILTERS[transportationType];
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[Transportation Filter] selected=${transportationType} resolved=${filter ? JSON.stringify(filter) : 'null'}`
+    );
+  }
+  return filter || null;
+}
+
+// Tool type filter mappings
+const TOOL_TYPE_FILTERS: Record<string, any> = {
+  "Artisan's Tools": {
+    OR: [
+      { raw: { path: ['type'], equals: 'at' } },
+      { raw: { path: ['itemType'], equals: 'at' } },
+      { raw: { path: ['system', 'type'], equals: 'at' } },
+      { raw: { path: ['type'], equals: 't' } },
+      { raw: { path: ['itemType'], equals: 't' } },
+      { raw: { path: ['system', 'type'], equals: 't' } },
+    ]
+  },
+  'Gaming Set': {
+    OR: [
+      { raw: { path: ['type'], equals: 'gs' } },
+      { raw: { path: ['itemType'], equals: 'gs' } },
+      { raw: { path: ['system', 'type'], equals: 'gs' } },
+    ]
+  },
+  'Musical Instrument': {
+    OR: [
+      { raw: { path: ['type'], equals: 'ins' } },
+      { raw: { path: ['itemType'], equals: 'ins' } },
+      { raw: { path: ['system', 'type'], equals: 'ins' } },
+    ]
+  },
+};
+
+function getToolTypeFilter(toolType: string): any {
+  const filter = TOOL_TYPE_FILTERS[toolType];
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[Tool Filter] selected=${toolType} resolved=${filter ? JSON.stringify(filter) : 'null'}`
+    );
+  }
+  return filter || null;
+}
+
+// Loot type filter mappings
+const treasureCode = '$';
+const LOOT_TYPE_FILTERS: Record<string, any> = {
+  'Art Object': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+      { raw: { path: ['system', 'art'], equals: true } },
+    ]
+  },
+  'Adventuring Gear': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+    ]
+  },
+  'Gemstone': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+      { raw: { path: ['system', 'gem'], equals: true } },
+    ]
+  },
+  'Junk': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+      { raw: { path: ['system', 'junk'], equals: true } },
+    ]
+  },
+  'Material': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+      { raw: { path: ['system', 'material'], equals: true } },
+    ]
+  },
+  'Resource': {
+    OR: [
+      { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'g' } },
+    ]
+  },
+  'Trade Good': {
+    OR: [
+      { raw: { path: ['type'], equals: 'tg' } },
+      { raw: { path: ['itemType'], equals: 'tg' } },
+      { raw: { path: ['system', 'type'], equals: 'tg' } },
+    ]
+  },
+  'Treasure': {
+    OR: [
+      { raw: { path: ['type'], equals: treasureCode } },
+      { raw: { path: ['itemType'], equals: treasureCode } },
+      { raw: { path: ['system', 'type'], equals: treasureCode } },
+    ]
+  },
+};
+
+function getLootTypeFilter(lootType: string): any {
+  const filter = LOOT_TYPE_FILTERS[lootType];
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(
+      `[Loot Filter] selected=${lootType} resolved=${filter ? JSON.stringify(filter) : 'null'}`
     );
   }
   return filter || null;
@@ -2609,16 +2744,32 @@ router.get('/compendium/filters/:type', async (req, res) => {
 
       // Filter the type set: replace equipment types (HA, LA, MA, S, RG, RD, WD, W) with 'EQP'
       const equipmentTypeCodes = new Set(['HA', 'LA', 'MA', 'S', 'RG', 'RD', 'WD', 'W']);
-      // Consumable types: A (Ammunition), P (Potion), SC (Scroll), RD (Rod), WD (Wand), W (Wondrous), G (Adventuring Gear for food/poison)
-      const consumableTypeCodes = new Set(['A', 'P', 'SC', 'RD', 'WD', 'W', 'G', 'TG']);
+      // Consumable types: A (Ammunition), P (Potion), SC (Scroll), RD (Rod), WD (Wand), W (Wondrous)
+      const consumableTypeCodes = new Set(['A', 'P', 'SC', 'RD', 'WD', 'W']);
+      // Loot types: G (Adventuring Gear), TG (Trade Goods), $ (Treasure)
+      const treasureCode = '$';
+      const lootTypeCodes = new Set(['G', 'TG', treasureCode]);
+      // Tool types: AT (Artisan Tool), GS (Gaming Set), INS (Instrument), T (Tool)
+      const toolTypeCodes = new Set(['AT', 'GS', 'INS', 'T']);
+      // Transportation types: MNT (Mount), SHP (Vehicle Water), VEH (Vehicle Land), AIR (Vehicle Air)
+      const transportTypeCodes = new Set(['MNT', 'SHP', 'VEH', 'AIR']);
       let hasEquipment = false;
       let hasConsumables = false;
+      let hasLoot = false;
+      let hasTool = false;
+      let hasTransport = false;
       const filteredTypeSet = new Set<string>();
       for (const t of typeSet) {
         if (equipmentTypeCodes.has(t)) {
           hasEquipment = true;
         } else if (consumableTypeCodes.has(t)) {
           hasConsumables = true;
+        } else if (lootTypeCodes.has(t)) {
+          hasLoot = true;
+        } else if (toolTypeCodes.has(t)) {
+          hasTool = true;
+        } else if (transportTypeCodes.has(t)) {
+          hasTransport = true;
         } else {
           filteredTypeSet.add(t);
         }
@@ -2628,6 +2779,15 @@ router.get('/compendium/filters/:type', async (req, res) => {
       }
       if (hasConsumables) {
         filteredTypeSet.add('CON');
+      }
+      if (hasLoot) {
+        filteredTypeSet.add('LOOT');
+      }
+      if (hasTool) {
+        filteredTypeSet.add('TOOL');
+      }
+      if (hasTransport) {
+        filteredTypeSet.add('TRANSPORT');
       }
 
       options.itemTypes = Array.from(filteredTypeSet).sort().map((value) => ({
@@ -2666,8 +2826,6 @@ router.get('/compendium/filters/:type', async (req, res) => {
       // Add consumable types for CON item type
       options.consumableTypes = [
         { value: 'Ammunition', label: 'Ammunition' },
-        { value: 'Food', label: 'Food' },
-        { value: 'Poison', label: 'Poison' },
         { value: 'Potion', label: 'Potion' },
         { value: 'Rod', label: 'Rod' },
         { value: 'Scroll', label: 'Scroll' },
@@ -2675,6 +2833,32 @@ router.get('/compendium/filters/:type', async (req, res) => {
         { value: 'Vehicle Equipment', label: 'Vehicle Equipment' },
         { value: 'Wand', label: 'Wand' },
         { value: 'Wondrous Item', label: 'Wondrous Item' },
+      ];
+
+      // Add loot types for LOOT item type
+      options.lootTypes = [
+        { value: 'Art Object', label: 'Art Object' },
+        { value: 'Adventuring Gear', label: 'Adventuring Gear' },
+        { value: 'Gemstone', label: 'Gemstone' },
+        { value: 'Junk', label: 'Junk' },
+        { value: 'Material', label: 'Material' },
+        { value: 'Resource', label: 'Resource' },
+        { value: 'Trade Good', label: 'Trade Good' },
+        { value: 'Treasure', label: 'Treasure' },
+      ];
+
+      // Add tool types for TOOL item type
+      options.toolTypes = [
+        { value: "Artisan's Tools", label: "Artisan's Tools" },
+        { value: 'Gaming Set', label: 'Gaming Set' },
+        { value: 'Musical Instrument', label: 'Musical Instrument' },
+      ];
+
+      // Add transportation types for TRANSPORT item type
+      options.transportationTypes = [
+        { value: 'Mount', label: 'Mount' },
+        { value: 'Vehicle (Land)', label: 'Vehicle (Land)' },
+        { value: 'Vehicle (Water)', label: 'Vehicle (Water)' },
       ];
     }
 
@@ -2718,6 +2902,9 @@ router.get('/compendium/search', async (req, res) => {
   const weaponCategory = req.query.weaponCategory as string | undefined;
   const equipmentType = req.query.equipmentType as string | undefined;
   const consumableType = req.query.consumableType as string | undefined;
+  const lootType = req.query.lootType as string | undefined;
+  const toolType = req.query.toolType as string | undefined;
+  const transportationType = req.query.transportationType as string | undefined;
   
   const limitNum = Math.min(parseInt(limit as string) || 100, 500);
   const offsetNum = parseInt(offset as string) || 0;
@@ -2893,9 +3080,9 @@ router.get('/compendium/search', async (req, res) => {
             }
           }
         } else if (itemType === 'CON') {
-          // Consumables: Ammunition (A), Potion (P), Scroll (SC), Rod (RD), Wand (WD), Wondrous (W), Adventuring Gear (G), Trade Goods (TG)
-          // If equipmentType is specified, use that; otherwise match any consumable type
-          if (!equipmentType) {
+          // Consumables: Ammunition (A), Potion (P), Scroll (SC), Rod (RD), Wand (WD), Wondrous (W)
+          // If consumableType is specified, use that; otherwise match any consumable type
+          if (!consumableType) {
             itemFilters.push({
               OR: [
                 // Ammunition
@@ -2924,14 +3111,6 @@ router.get('/compendium/search', async (req, res) => {
                 { raw: { path: ['itemType'], equals: 'w' } },
                 { raw: { path: ['system', 'type'], equals: 'w' } },
                 { raw: { path: ['system', 'wondrous'], equals: true } },
-                // Adventuring Gear (Food, Poison, etc.)
-                { raw: { path: ['type'], equals: 'g' } },
-                { raw: { path: ['itemType'], equals: 'g' } },
-                { raw: { path: ['system', 'type'], equals: 'g' } },
-                // Trade Goods
-                { raw: { path: ['type'], equals: 'tg' } },
-                { raw: { path: ['itemType'], equals: 'tg' } },
-                { raw: { path: ['system', 'type'], equals: 'tg' } },
               ]
             });
             if (process.env.NODE_ENV !== 'production') {
@@ -2940,6 +3119,98 @@ router.get('/compendium/search', async (req, res) => {
           } else {
             if (process.env.NODE_ENV !== 'production') {
               console.log('[Consumables Filter] Skipping parent CON filter, using specific consumableType filter instead');
+            }
+          }
+        } else if (itemType === 'LOOT') {
+          // Loot: G (Adventuring Gear), TG (Trade Goods), $ (Treasure)
+          // If lootType is specified, use that; otherwise match any loot type
+          const tc = '$';
+          if (!lootType) {
+            itemFilters.push({
+              OR: [
+                // Adventuring Gear
+                { raw: { path: ['type'], equals: 'g' } },
+                { raw: { path: ['itemType'], equals: 'g' } },
+                { raw: { path: ['system', 'type'], equals: 'g' } },
+                // Trade Goods
+                { raw: { path: ['type'], equals: 'tg' } },
+                { raw: { path: ['itemType'], equals: 'tg' } },
+                { raw: { path: ['system', 'type'], equals: 'tg' } },
+                // Treasure
+                { raw: { path: ['type'], equals: tc } },
+                { raw: { path: ['itemType'], equals: tc } },
+                { raw: { path: ['system', 'type'], equals: tc } },
+              ]
+            });
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Loot Filter] Parent LOOT filter applied (no specific type), itemFilters count:', itemFilters.length);
+            }
+          } else {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Loot Filter] Skipping parent LOOT filter, using specific lootType filter instead');
+            }
+          }
+        } else if (itemType === 'TOOL') {
+          // Tool: AT (Artisan Tool), GS (Gaming Set), INS (Instrument), T (Tool)
+          // If toolType is specified, use that; otherwise match any tool type
+          if (!toolType) {
+            itemFilters.push({
+              OR: [
+                // Artisan's Tools
+                { raw: { path: ['type'], equals: 'at' } },
+                { raw: { path: ['itemType'], equals: 'at' } },
+                { raw: { path: ['system', 'type'], equals: 'at' } },
+                { raw: { path: ['type'], equals: 't' } },
+                { raw: { path: ['itemType'], equals: 't' } },
+                { raw: { path: ['system', 'type'], equals: 't' } },
+                // Gaming Set
+                { raw: { path: ['type'], equals: 'gs' } },
+                { raw: { path: ['itemType'], equals: 'gs' } },
+                { raw: { path: ['system', 'type'], equals: 'gs' } },
+                // Musical Instrument
+                { raw: { path: ['type'], equals: 'ins' } },
+                { raw: { path: ['itemType'], equals: 'ins' } },
+                { raw: { path: ['system', 'type'], equals: 'ins' } },
+              ]
+            });
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Tool Filter] Parent TOOL filter applied (no specific type), itemFilters count:', itemFilters.length);
+            }
+          } else {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Tool Filter] Skipping parent TOOL filter, using specific toolType filter instead');
+            }
+          }
+        } else if (itemType === 'TRANSPORT') {
+          // Transportation: MNT (Mount), VEH (Vehicle Land), SHP (Vehicle Water), AIR (Vehicle Air)
+          // If transportationType is specified, use that; otherwise match any transportation type
+          if (!transportationType) {
+            itemFilters.push({
+              OR: [
+                // Mount
+                { raw: { path: ['type'], equals: 'mnt' } },
+                { raw: { path: ['itemType'], equals: 'mnt' } },
+                { raw: { path: ['system', 'type'], equals: 'mnt' } },
+                // Vehicle (Land)
+                { raw: { path: ['type'], equals: 'veh' } },
+                { raw: { path: ['itemType'], equals: 'veh' } },
+                { raw: { path: ['system', 'type'], equals: 'veh' } },
+                // Vehicle (Water)
+                { raw: { path: ['type'], equals: 'shp' } },
+                { raw: { path: ['itemType'], equals: 'shp' } },
+                { raw: { path: ['system', 'type'], equals: 'shp' } },
+                // Vehicle (Air)
+                { raw: { path: ['type'], equals: 'air' } },
+                { raw: { path: ['itemType'], equals: 'air' } },
+                { raw: { path: ['system', 'type'], equals: 'air' } },
+              ]
+            });
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Transportation Filter] Parent TRANSPORT filter applied (no specific type), itemFilters count:', itemFilters.length);
+            }
+          } else {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[Transportation Filter] Skipping parent TRANSPORT filter, using specific transportationType filter instead');
             }
           }
         } else {
@@ -2999,6 +3270,39 @@ router.get('/compendium/search', async (req, res) => {
           itemFilters.push(consumableTypeFilter);
           if (process.env.NODE_ENV !== 'production') {
             console.log('[Consumables Filter] Applied consumableType filter:', consumableType);
+          }
+        }
+      }
+
+      // Filter by loot type - only applies when itemType is 'LOOT'
+      if (lootType && itemType === 'LOOT') {
+        const lootTypeFilter = getLootTypeFilter(lootType);
+        if (lootTypeFilter) {
+          itemFilters.push(lootTypeFilter);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[Loot Filter] Applied lootType filter:', lootType);
+          }
+        }
+      }
+
+      // Filter by tool type - only applies when itemType is 'TOOL'
+      if (toolType && itemType === 'TOOL') {
+        const toolTypeFilter = getToolTypeFilter(toolType);
+        if (toolTypeFilter) {
+          itemFilters.push(toolTypeFilter);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[Tool Filter] Applied toolType filter:', toolType);
+          }
+        }
+      }
+
+      // Filter by transportation type - only applies when itemType is 'TRANSPORT'
+      if (transportationType && itemType === 'TRANSPORT') {
+        const transportationTypeFilter = getTransportationTypeFilter(transportationType);
+        if (transportationTypeFilter) {
+          itemFilters.push(transportationTypeFilter);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[Transportation Filter] Applied transportationType filter:', transportationType);
           }
         }
       }

@@ -2044,6 +2044,9 @@ interface OpenPanel {
       if (activeFilters.weaponCategory) params.append('weaponCategory', activeFilters.weaponCategory);
       if (activeFilters.equipmentType) params.append('equipmentType', activeFilters.equipmentType);
       if (activeFilters.consumableType) params.append('consumableType', activeFilters.consumableType);
+      if (activeFilters.lootType) params.append('lootType', activeFilters.lootType);
+      if (activeFilters.toolType) params.append('toolType', activeFilters.toolType);
+      if (activeFilters.transportationType) params.append('transportationType', activeFilters.transportationType);
       if (activeFilters.rarity) params.append('rarity', activeFilters.rarity);
       if (activeFilters.attunement) params.append('attunement', activeFilters.attunement);
       if (activeFilters.tattooType) params.append('tattooType', activeFilters.tattooType);

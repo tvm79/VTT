@@ -27,6 +27,9 @@ export interface FilterState {
   weaponCategory?: string;
   equipmentType?: string;
   consumableType?: string;
+  lootType?: string;
+  toolType?: string;
+  transportationType?: string;
   rarity?: string;
   magical?: boolean;
   attunement?: string;
@@ -55,6 +58,9 @@ export interface FilterOptions {
   weaponCategories?: { value: string; label: string }[];
   equipmentTypes?: { value: string; label: string }[];
   consumableTypes?: { value: string; label: string }[];
+  lootTypes?: { value: string; label: string }[];
+  toolTypes?: { value: string; label: string }[];
+  transportationTypes?: { value: string; label: string }[];
   rarities?: { value: string; label: string }[];
   attunementTypes?: { value: string; label: string }[];
   tattooTypes?: { value: string; label: string }[];
@@ -105,6 +111,18 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
     // Clear consumableType when itemType changes from 'CON' to something else
     if (key === 'itemType' && value !== 'CON' && filters.consumableType) {
       delete newFilters.consumableType;
+    }
+    // Clear lootType when itemType changes from 'LOOT' to something else
+    if (key === 'itemType' && value !== 'LOOT' && filters.lootType) {
+      delete newFilters.lootType;
+    }
+    // Clear toolType when itemType changes from 'TOOL' to something else
+    if (key === 'itemType' && value !== 'TOOL' && filters.toolType) {
+      delete newFilters.toolType;
+    }
+    // Clear transportationType when itemType changes from 'TRANSPORT' to something else
+    if (key === 'itemType' && value !== 'TRANSPORT' && filters.transportationType) {
+      delete newFilters.transportationType;
     }
     // Clear tattooType when itemType changes from 'tattoo' to something else
     if (key === 'itemType' && value !== 'tattoo' && (filters as any).tattooType) {
@@ -396,6 +414,54 @@ export function FilterPanel({ type, filters, onFiltersChange, onClose }: FilterP
             <option value="">All Consumable Types</option>
             {options.consumableTypes?.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      
+      {/* Loot Type Filter - shows when "Loot" is selected */}
+      {filters.itemType === 'LOOT' && (
+        <div className="filter-group">
+          <label>Loot Type</label>
+          <select
+            value={filters.lootType || ''}
+            onChange={(e) => updateFilter('lootType', e.target.value)}
+          >
+            <option value="">All Loot Types</option>
+            {options.lootTypes?.map((l) => (
+              <option key={l.value} value={l.value}>{l.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      
+      {/* Tool Type Filter - shows when "Tool" is selected */}
+      {filters.itemType === 'TOOL' && (
+        <div className="filter-group">
+          <label>Tool Type</label>
+          <select
+            value={filters.toolType || ''}
+            onChange={(e) => updateFilter('toolType', e.target.value)}
+          >
+            <option value="">All Tool Types</option>
+            {options.toolTypes?.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      
+      {/* Transportation Type Filter - shows when "Transportation" is selected */}
+      {filters.itemType === 'TRANSPORT' && (
+        <div className="filter-group">
+          <label>Transportation Type</label>
+          <select
+            value={filters.transportationType || ''}
+            onChange={(e) => updateFilter('transportationType', e.target.value)}
+          >
+            <option value="">All Transportation Types</option>
+            {options.transportationTypes?.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
         </div>
