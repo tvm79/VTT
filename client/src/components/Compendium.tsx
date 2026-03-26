@@ -32,7 +32,7 @@ interface CompendiumProps {
   duplicateItem: (item: any) => void;
   deleteItem: (item: any) => void;
   autoResolveBestImageForItem: (item: any) => void;
-  getItemCardVisual: (type?: string, crValue?: unknown, schoolValue?: unknown) => { icon: string; accent: string; schoolIcon?: string };
+  getItemCardVisual: (type?: string, crValue?: unknown, schoolValue?: unknown, rarityValue?: unknown) => { icon: string; accent: string; schoolIcon?: string };
   extractMonsterChallengeRating: (item: any) => unknown;
   extractSpellSchool: (item: any) => unknown;
   getEntryDisplayImage: (item: any, preferToken?: boolean) => string;
@@ -345,7 +345,8 @@ export function Compendium({
                 ) : typeItems.length > 0 ? (
                   cardSizeScale <= LIST_VIEW_THRESHOLD ? (
                     typeItems.map((item: any) => {
-                      const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item));
+                      const rarityValue = item?.system?.rarity || item?.rarity;
+                      const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item), rarityValue);
                       return (
                         <div
                           key={item.id}
@@ -376,7 +377,8 @@ export function Compendium({
                     })
                   ) : (
                     typeItems.map((item: any) => {
-                      const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item));
+                      const rarityValue = item?.system?.rarity || item?.rarity;
+                      const visual = getItemCardVisual(item.type, extractMonsterChallengeRating(item), extractSpellSchool(item), rarityValue);
                       const cardStyle = {
                         cursor: 'grab',
                         '--card-accent': visual.accent,

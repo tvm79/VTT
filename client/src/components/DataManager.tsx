@@ -107,26 +107,61 @@ interface ImageFetcherResolveResponse {
   bestCandidate?: ImageFetcherCandidate | null;
 }
 
-function getItemCardVisual(type?: string, crValue?: unknown, schoolValue?: unknown): { icon: string; accent: string; schoolIcon?: string } {
+function getRarityColor(rarityValue?: unknown): string | null {
+  if (!rarityValue) return null;
+  
+  const rarity = String(rarityValue).toLowerCase().trim();
+  
+  // D&D 5e rarity colors
+  switch (rarity) {
+    case 'common':
+      return '#9ca3af'; // Gray
+    case 'uncommon':
+      return '#22c55e'; // Green
+    case 'rare':
+      return '#3b82f6'; // Blue
+    case 'very rare':
+      return '#8b5cf6'; // Purple
+    case 'legendary':
+      return '#f59e0b'; // Amber/Gold
+    case 'artifact':
+      return '#ef4444'; // Red
+    default:
+      return null;
+  }
+}
+
+function getItemCardVisual(type?: string, crValue?: unknown, schoolValue?: unknown, rarityValue?: unknown): { icon: string; accent: string; schoolIcon?: string } {
   const normalized = (type || '').toLowerCase();
+
+  // Get rarity-based color for items/equipment
+  const rarityColor = getRarityColor(rarityValue);
 
   if (normalized.includes('spell')) {
     const schoolIcon = getSpellSchoolIcon(schoolValue);
-    return { icon: 'scroll', accent: getSpellSchoolColor(schoolValue, '#8b5cf6'), schoolIcon: schoolIcon || undefined };
+    const baseAccent = rarityColor || getSpellSchoolColor(schoolValue, '#8b5cf6');
+    return { icon: 'scroll', accent: baseAccent, schoolIcon: schoolIcon || undefined };
   }
   if (normalized.includes('monster') || normalized.includes('creature')) {
     return { icon: 'skull', accent: getChallengeRatingColor(crValue, '#f97316') };
   }
   if (normalized.includes('npc') || normalized.includes('character')) return { icon: 'user', accent: '#14b8a6' };
-  if (normalized.includes('weapon') || normalized.includes('attack')) return { icon: 'hand-fist', accent: '#ef4444' };
-  if (normalized.includes('armor') || normalized.includes('shield')) return { icon: 'shield', accent: '#0ea5e9' };
-  if (normalized.includes('item') || normalized.includes('equipment')) return { icon: 'shield', accent: '#22c55e' };
+  if (normalized.includes('weapon') || normalized.includes('attack')) {
+    return { icon: 'hand-fist', accent: rarityColor || '#ef4444' };
+  }
+  if (normalized.includes('armor') || normalized.includes('shield')) {
+    return { icon: 'shield', accent: rarityColor || '#0ea5e9' };
+  }
+  if (normalized.includes('item') || normalized.includes('equipment')) {
+    return { icon: 'shield', accent: rarityColor || '#22c55e' };
+  }
   if (normalized.includes('class') || normalized.includes('background')) return { icon: 'book', accent: '#3b82f6' };
   if (normalized.includes('feat') || normalized.includes('trait')) return { icon: 'star', accent: '#f59e0b' };
   if (normalized.includes('race') || normalized.includes('species')) return { icon: 'user-group', accent: '#06b6d4' };
   if (normalized.includes('map') || normalized.includes('scene')) return { icon: 'map', accent: '#84cc16' };
 
-  return { icon: 'file', accent: '#e94560' };
+  // Default case with rarity color if available
+  return { icon: 'file', accent: rarityColor || '#e94560' };
 }
 
 const LOCAL_FALLBACK_IMAGE_BY_TYPE: Record<string, string> = {
