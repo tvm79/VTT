@@ -1482,10 +1482,11 @@ interface GameState {
     activeTab?: string;
     actionSearch?: string;
     actionFilter?: string;
+    panelType?: string;
   }>;
-  setFloatingPanels: (panels: Array<{id: string; item: any; originalItem?: any; position: { x: number; y: number }; size: { width: number; height: number }; isEditing: boolean; isDirty?: boolean; isSaving?: boolean; saveError?: string | null; lastSavedAt?: number | null; collapsedSections?: Record<string, boolean>; activeTab?: string; actionSearch?: string; actionFilter?: string}>) => void;
-  addFloatingPanel: (panel: {id: string; item: any; originalItem?: any; position: { x: number; y: number }; size: { width: number; height: number }; isEditing: boolean; isDirty?: boolean; isSaving?: boolean; saveError?: string | null; lastSavedAt?: number | null; collapsedSections?: Record<string, boolean>; activeTab?: string; actionSearch?: string; actionFilter?: string}) => void;
-  updateFloatingPanel: (id: string, updates: Partial<{id: string; item: any; originalItem?: any; position: { x: number; y: number }; size: { width: number; height: number }; isEditing: boolean; isDirty?: boolean; isSaving?: boolean; saveError?: string | null; lastSavedAt?: number | null; collapsedSections?: Record<string, boolean>; activeTab?: string; actionSearch?: string; actionFilter?: string}>) => void;
+  setFloatingPanels: (panels: Array<{id: string; item: any; originalItem?: any; position: { x: number; y: number }; size: { width: number; height: number }; isEditing: boolean; isDirty?: boolean; isSaving?: boolean; saveError?: string | null; lastSavedAt?: number | null; collapsedSections?: Record<string, boolean>; activeTab?: string; actionSearch?: string; actionFilter?: string; panelType?: string}>) => void;
+  addFloatingPanel: (panel: {id: string; item: any; originalItem?: any; position: { x: number; y: number }; size: { width: number; height: number }; isEditing: boolean; isDirty?: boolean; isSaving?: boolean; saveError?: string | null; lastSavedAt?: number | null; collapsedSections?: Record<string, boolean>; activeTab?: string; actionSearch?: string; actionFilter?: string; panelType?: string}) => void;
+  updateFloatingPanel: (id: string, updates: Partial<{id: string; item: any; originalItem?: any; position: { x: number; y: number }; size: { width: number; height: number }; isEditing: boolean; isDirty?: boolean; isSaving?: boolean; saveError?: string | null; lastSavedAt?: number | null; collapsedSections?: Record<string, boolean>; activeTab?: string; actionSearch?: string; actionFilter?: string; panelType?: string}>) => void;
   removeFloatingPanel: (id: string) => void;
 
   // Actions

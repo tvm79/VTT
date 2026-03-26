@@ -3888,7 +3888,43 @@
   white-space: pre-wrap;
   word-break: break-word;
   background: var(--bg-secondary);
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
+}
+
+/* JSON Floating Panel (draggable/resizable) */
+.json-panel-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.json-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.json-panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.json-panel-pre {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-primary);
 }

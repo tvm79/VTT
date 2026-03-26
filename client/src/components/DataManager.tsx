@@ -1935,6 +1935,7 @@ interface OpenPanel {
     activeTab?: string;
     actionSearch?: string;
     actionFilter?: string;
+    panelType?: string;
   }
 
   const getPanelSectionCollapsed = (panel: typeof floatingPanels[0], sectionKey: string): boolean => {
@@ -2210,6 +2211,34 @@ interface OpenPanel {
       lastSavedAt: null,
       collapsedSections: {},
       size,
+    });
+  };
+
+  const openJsonPanel = (item: any) => {
+    if (!item?.id) return;
+
+    // Check if already open
+    const existing = floatingPanels.find(
+      (panel) => panel.item.id === item.id && panel.panelType === 'json'
+    );
+    if (existing) {
+      setPanelFocus(existing.id);
+      return;
+    }
+
+    const size = { width: 600, height: 500 };
+    addFloatingPanel({
+      id: `json-panel-${Date.now()}`,
+      item: { ...item, type: 'json' },
+      position: getFloatingPanelPosition(size.width, size.height),
+      isEditing: false,
+      isDirty: false,
+      isSaving: false,
+      saveError: null,
+      lastSavedAt: null,
+      collapsedSections: {},
+      size,
+      panelType: 'json',
     });
   };
 
@@ -4699,7 +4728,14 @@ interface OpenPanel {
             </div>
           </div>
           <div className="floating-panel-content">
-            {panel.isEditing ? (
+            {panel.panelType === 'json' ? (
+              <div className="json-panel-content">
+                <div className="json-panel-header">
+                  <h3>JSON Data: {panel.item.name}</h3>
+                </div>
+                <pre className="json-panel-pre">{JSON.stringify(panel.item, null, 2)}</pre>
+              </div>
+            ) : panel.isEditing ? (
               <div
                 className="panel-edit-hotkeys"
                 tabIndex={0}
@@ -4927,6 +4963,7 @@ interface OpenPanel {
           typeItems={typeItems}
           floatingPanels={floatingPanels}
           openItemPanel={openItemPanel}
+          openJsonPanel={openJsonPanel}
           duplicateItem={duplicateItem}
           deleteItem={deleteItem}
           autoResolveBestImageForItem={autoResolveBestImageForItem}

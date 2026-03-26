@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react';
-import { useState } from 'react';
 import { Icon } from './Icon';
 import { FilterPanel, type FilterState } from './FilterPanel';
 
@@ -29,6 +28,7 @@ interface CompendiumProps {
   typeItems: any[];
   floatingPanels: Array<{ item: any }>;
   openItemPanel: (item: any) => void;
+  openJsonPanel?: (item: any) => void;
   duplicateItem: (item: any) => void;
   deleteItem: (item: any) => void;
   autoResolveBestImageForItem: (item: any) => void;
@@ -176,9 +176,9 @@ export function Compendium({
   filters,
   setFilters,
   activeFilterCount,
+  openJsonPanel,
 }: CompendiumProps) {
-  // State for JSON viewer modal
-  const [showJsonModal, setShowJsonModal] = useState<any>(null);
+  // JSON viewer is now handled via openJsonPanel prop - floating panel in DataManager
 
   // Show filter button whenever the current tab has filters available.
   const showFilterButton = ['spell', 'monster', 'item', 'class', 'feat', 'background', 'race', 'species'].includes(activeBrowseTab);
@@ -452,7 +452,7 @@ export function Compendium({
                               </button>
                               <button
                                 className="card-action-btn"
-                                onClick={(e) => { e.stopPropagation(); setShowJsonModal(item); }}
+                                onClick={(e) => { e.stopPropagation(); openJsonPanel?.(item); }}
                                 title="View JSON"
                               >
                                 <Icon name="code" />
@@ -485,23 +485,6 @@ export function Compendium({
           </div>
           </div>{/* end compendium-with-sidebar */}
 
-        </div>
-      )}
-
-      {/* JSON Viewer Modal */}
-      {showJsonModal && (
-        <div className="json-modal-overlay" onClick={() => setShowJsonModal(null)}>
-          <div className="json-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="json-modal-header">
-              <h3>JSON Data: {showJsonModal.name}</h3>
-              <button className="json-modal-close" onClick={() => setShowJsonModal(null)}>
-                <Icon name="times" />
-              </button>
-            </div>
-            <div className="json-modal-content">
-              <pre>{JSON.stringify(showJsonModal, null, 2)}</pre>
-            </div>
-          </div>
         </div>
       )}
 
