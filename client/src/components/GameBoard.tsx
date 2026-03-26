@@ -8452,47 +8452,7 @@ export function GameBoard() {
         </div>
       )}
 
-      {/* Grid Unit Panel - Shows when measure tool is active */}
-      {isCurrentUserGM && tool === 'measure' && currentBoard && (
-        <div
-          ref={gridUnitPanelRef}
-          className="settings-panel fog-tools-panel gameboard-grid-unit-panel"
-          style={{
-            position: 'absolute',
-            top: `${gridUnitPanelPos.top}px`,
-            left: `${gridUnitPanelPos.left + 73}px`,
-            zIndex: 110,
-            minWidth: '160px',
-          }}
-        >
-          <div className="game-toolbar-buttons">
-            <button
-              onClick={() => setGridUnit('ft')}
-              title="Feet"
-              className={`tool-btn gameboard-unit-btn ${gridUnit === 'ft' ? 'active' : ''}`}
-              style={gridUnit === 'ft' ? activatedToolBtnStyle : undefined}
-            >
-              ft
-            </button>
-            <button
-              onClick={() => setGridUnit('km')}
-              title="Kilometers"
-              className={`tool-btn gameboard-unit-btn ${gridUnit === 'km' ? 'active' : ''}`}
-              style={gridUnit === 'km' ? activatedToolBtnStyle : undefined}
-            >
-              km
-            </button>
-            <button
-              onClick={() => setGridUnit('miles')}
-              title="Miles"
-              className={`tool-btn gameboard-unit-btn ${gridUnit === 'miles' ? 'active' : ''}`}
-              style={gridUnit === 'miles' ? activatedToolBtnStyle : undefined}
-            >
-              miles
-            </button>
-          </div>
-        </div>
-      )}
+      
 
       {/* Measurement Shape Panel - Shows when measure tool is active */}
       {tool === 'measure' && (

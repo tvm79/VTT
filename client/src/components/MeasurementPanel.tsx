@@ -38,7 +38,7 @@ export function MeasurementPanel({ position, isGM }: MeasurementPanelProps) {
       style={{
         position: 'absolute',
         top: `${position.top}px`,
-        left: `${position.left + 93}px`,
+        left: `${position.left + 114}px`,
         zIndex: 'var(--z-index-overlay)',
         minWidth: '200px',
       }}
