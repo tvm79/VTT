@@ -1589,6 +1589,15 @@ export function GameBoard() {
     } else if (tool === 'particle') {
       setSelectedLightIds([]);
       setSelectedAudioSourceIds([]);
+    } else if (tool === 'select') {
+      // When switching to select tool, keep selections (they work with filter panel)
+    } else {
+      // For any other tool change (including measure, fog, etc.), deselect all
+      // This ensures selections are cleared when leaving the tool where selection works
+      setSelectedLightIds([]);
+      setSelectedAudioSourceIds([]);
+      setSelectedParticleEmitterKeys([]);
+      setSelectedMeasurementIds([]);
     }
   }, [tool]);
 
@@ -6418,6 +6427,9 @@ export function GameBoard() {
         });
         
         if (!isOnExistingMeasurement) {
+          // Clear selections when clicking on empty board space in measure tool
+          setSelectedMeasurementIds([]);
+          
           const localPos = stage.toLocal(pos);
           measureStart = getMeasurementCell(localPos.x, localPos.y);
           measureStartPointer = { x: pos.x, y: pos.y };
@@ -7374,7 +7386,7 @@ export function GameBoard() {
           uiLayer.removeChild(selectionRectRef.current);
           selectionRectRef.current = null;
         }
-      } else if (dragSelectStart.current && (currentTool === 'select' || currentTool === 'audio' || currentTool === 'light')) {
+      } else if (dragSelectStart.current && (currentTool === 'select' || currentTool === 'audio' || currentTool === 'light' || currentTool === 'measure' || currentTool === 'particle')) {
         // User clicked without dragging enough - clear selection (deselect)
         // This handles the case where the user just clicked on empty space
         dragSelectStart.current = null;
@@ -7384,6 +7396,7 @@ export function GameBoard() {
         setSelectedLightIds([]);
         setSelectedAudioSourceIds([]);
         setSelectedParticleEmitterKeys([]);
+        setSelectedMeasurementIds([]);
       }
       
       if (measureStart && currentTool === 'measure') {
