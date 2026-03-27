@@ -6214,7 +6214,8 @@ export function GameBoard() {
       const pos = { x: e.global.x, y: e.global.y };
       
       // Ignore right-click - it should show context menu, not perform selection/drag
-      if (e.button === 2 && currentTool !== 'fog' && currentTool !== 'particle') {
+      // But allow right-click for measure tool (to allow cancel during drag)
+      if (e.button === 2 && currentTool !== 'fog' && currentTool !== 'particle' && currentTool !== 'measure') {
         return;
       }
       
@@ -6997,6 +6998,12 @@ export function GameBoard() {
       }
       
       if (measureStart && currentTool === 'measure') {
+        // Right-click during drag cancels measurement creation
+        if (e.button === 2) {
+          clearMeasure();
+          return;
+        }
+
         if (!measureStartPointer) return;
         const dragDistance = Math.hypot(pos.x - measureStartPointer.x, pos.y - measureStartPointer.y);
         if (dragDistance < 6) {
@@ -7241,6 +7248,21 @@ export function GameBoard() {
       if (currentTool === 'select') {
         pendingTokenDragRef.current = null;
       }
+
+      // Handle measure tool right-click cancel
+      if (measureStart && currentTool === 'measure') {
+        // Right-click during drag cancels measurement creation
+        if (_e.button === 2) {
+          clearMeasure();
+          return;
+        }
+
+        // Save measurement to store before clearing
+        if (measureHasDragged && currentMeasurementData) {
+          useGameStore.getState().addMeasurement(currentMeasurementData);
+        }
+        clearMeasure();
+      }
       
       // Handle multi-token dragging completion (both select and move tools)
       if (draggingTokenIds.length > 0 && ghostAnchors.length > 0) {
@@ -7397,14 +7419,6 @@ export function GameBoard() {
         setSelectedAudioSourceIds([]);
         setSelectedParticleEmitterKeys([]);
         setSelectedMeasurementIds([]);
-      }
-      
-      if (measureStart && currentTool === 'measure') {
-        // Save measurement to store before clearing
-        if (measureHasDragged && currentMeasurementData) {
-          useGameStore.getState().addMeasurement(currentMeasurementData);
-        }
-        clearMeasure();
       }
 
       if (
