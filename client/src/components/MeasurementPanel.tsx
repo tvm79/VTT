@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { Icon } from './Icon';
 import type { MeasurementShape } from './measurement/MeasurementTypes';
@@ -16,7 +16,7 @@ const measurementShapes: { id: MeasurementShape; icon: string; label: string }[]
   { id: 'cylinder', icon: 'measure-cylinder', label: 'Cylinder' },
 ];
 
-export function MeasurementPanel({ position, isGM }: MeasurementPanelProps) {
+export const MeasurementPanel = forwardRef<HTMLDivElement, MeasurementPanelProps>(function MeasurementPanel({ position, isGM }, ref) {
   const measurementShape = useGameStore((state) => state.measurementShape);
   const setMeasurementShape = useGameStore((state) => state.setMeasurementShape);
   const gridUnit = useGameStore((state) => state.gridUnit);
@@ -34,11 +34,12 @@ export function MeasurementPanel({ position, isGM }: MeasurementPanelProps) {
 
   return (
     <div
+      ref={ref}
       className="settings-panel"
       style={{
         position: 'absolute',
         top: `${position.top}px`,
-        left: `${position.left + 114}px`,
+        left: `${position.left + 125}px`,
         zIndex: 'var(--z-index-overlay)',
         minWidth: '200px',
       }}
@@ -95,4 +96,4 @@ export function MeasurementPanel({ position, isGM }: MeasurementPanelProps) {
       )}
     </div>
   );
-}
+});

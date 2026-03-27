@@ -39,6 +39,7 @@ import { useLightRenderer, LightIconsOverlay } from './lighting';
 import { ParticleEmitterIconsOverlay } from './particles/ParticleEmitterIconsOverlay';
 import { AudioSourceIconsOverlay } from './audio/AudioSourceIconsOverlay';
 import { MeasurementPanel } from './MeasurementPanel';
+import { MeasurementIconsOverlay } from './measurement/MeasurementIconsOverlay';
 import {
   generateMeasurementId,
   getCellPolygonPoints,
@@ -873,6 +874,24 @@ export function GameBoard() {
   // Selected audio source state
   const [selectedAudioSourceIds, setSelectedAudioSourceIds] = useState<string[]>([]);
   const [selectedParticleEmitterKeys, setSelectedParticleEmitterKeys] = useState<string[]>([]);
+  const [selectedMeasurementIds, setSelectedMeasurementIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      if (selectedMeasurementIds.length === 0) return;
+
+      event.preventDefault();
+      const { removeMeasurement } = useGameStore.getState();
+      selectedMeasurementIds.forEach((id) => removeMeasurement(id));
+      setSelectedMeasurementIds([]);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [selectedMeasurementIds]);
   
   // Audio source editor state for double-click editing
   const [audioSourceEditorState, setAudioSourceEditorState] = useState<{
@@ -1305,6 +1324,7 @@ export function GameBoard() {
     fogReveals,
     fogAdds,
     lights,
+    measurements,
     audioSources,
     tool, 
     setTool, 
@@ -1316,6 +1336,7 @@ export function GameBoard() {
     addAudioSource,
     updateAudioSource,
     removeAudioSource,
+    updateMeasurement,
     selectedTokenId, 
     selectedTokenIds,
     isGM, 
@@ -1684,10 +1705,10 @@ export function GameBoard() {
       const panelRect = panel.getBoundingClientRect();
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
-      const toolbarRight = toolbar.offsetLeft + toolbar.offsetWidth;
+      const buttonRight = toolbar.offsetLeft + btn.offsetLeft + btn.offsetWidth;
       const buttonCenterY = toolbar.offsetTop + btn.offsetTop + (btn.offsetHeight / 2);
 
-      let left = toolbarRight + panelGap;
+      let left = buttonRight + panelGap;
       let top = buttonCenterY - (panelRect.height / 2);
 
       left = Math.max(
@@ -1703,7 +1724,7 @@ export function GameBoard() {
     };
     
     const updateAllPositions = () => {
-      if (tool === 'measure' && measureBtnRef.current && currentBoard) {
+      if (tool === 'measure' && measureBtnRef.current) {
         updateAnchoredPanelPosition(measureBtnRef, gridUnitPanelRef, setGridUnitPanelPos);
       }
       if (tool === 'fog' && fogBtnRef.current && currentBoard) {
@@ -1722,7 +1743,7 @@ export function GameBoard() {
     // Add resize listener to update position when toolbar resizes
     window.addEventListener('resize', updateAllPositions);
     return () => window.removeEventListener('resize', updateAllPositions);
-  }, [tool, toolbarWidth, toolbarHeight, toolbarPosition, currentBoard, particlePanelManualPos]);
+  }, [tool, toolbarWidth, toolbarHeight, toolbarPosition, currentBoard, particlePanelManualPos, measureBtnRef, gridUnitPanelRef]);
 
   // Reset particle panel dismissed state when tool changes to 'particle'
   useEffect(() => {
@@ -2655,17 +2676,18 @@ export function GameBoard() {
   const drawMeasurementOutline = useCallback((graphics: PIXI.Graphics, request: MeasurementRequest, color: number) => {
     const outline = getMeasurementOutline(request, effectiveGridSize, gridOffsetX, gridOffsetY);
     if (!outline) return;
+    const outlineWidth = 4;
 
     if (outline.kind === 'line') {
       graphics.moveTo(outline.start.x, outline.start.y);
       graphics.lineTo(outline.end.x, outline.end.y);
-      graphics.stroke({ width: 2, color: 0x000000, alpha: 1 });
+      graphics.stroke({ width: outlineWidth, color: 0x000000, alpha: 1 });
       return;
     }
 
     if (outline.kind === 'circle') {
       graphics.circle(outline.center.x, outline.center.y, outline.radius);
-      graphics.stroke({ width: 2, color: 0x000000, alpha: 1 });
+      graphics.stroke({ width: outlineWidth, color: 0x000000, alpha: 1 });
       return;
     }
 
@@ -2675,7 +2697,7 @@ export function GameBoard() {
         graphics.lineTo(outline.points[index].x, outline.points[index].y);
       }
       graphics.closePath();
-      graphics.stroke({ width: 2, color: 0x000000, alpha: 1 });
+      graphics.stroke({ width: outlineWidth, color: 0x000000, alpha: 1 });
     }
   }, [effectiveGridSize, gridOffsetX, gridOffsetY]);
 
@@ -5993,17 +6015,20 @@ export function GameBoard() {
     // Function to render measurements
     const renderMeasurements = () => {
       const measurements = useGameStore.getState().measurements;
-      const removeMeasurement = useGameStore.getState().removeMeasurement;
       
-      // Clear existing measurements
-      measurementLayer.removeChildren();
+      // Clear existing rendered measurement shapes/labels/delete buttons
+      // but preserve draggable measurement icons managed by MeasurementIconsOverlay.
+      const childrenToClear = measurementLayer.children.filter((child) => !(child as any).__measurementIcon);
+      childrenToClear.forEach((child) => {
+        measurementLayer.removeChild(child);
+        child.destroy();
+      });
       
       // Render each persisted measurement
       measurements.forEach((measurement) => {
         const graphics = new PIXI.Graphics();
         const color = measurement.color ?? measureColorNumber;
         const result = getMeasurementCells(measurement);
-        const originPoint = measurementCellToWorld(measurement.origin);
         const labelPosition = getMeasurementLabelPosition(
           measurement.origin,
           measurement.target,
@@ -6012,10 +6037,6 @@ export function GameBoard() {
           gridOffsetY,
           measurement.gridKind,
         );
-
-        // Icon position - always at the origin point where measurement was placed
-        let iconX = originPoint.x;
-        let iconY = originPoint.y;
 
         drawMeasurementCells(graphics, result.cells, measurement.gridKind, color);
         drawMeasurementOutline(graphics, measurement, color);
@@ -6032,41 +6053,6 @@ export function GameBoard() {
         label.y = labelPosition.y + 5;
         label.zIndex = 90;
         measurementLayer.addChild(label);
-        
-        // Create delete button icon
-        const iconSize = Math.max(16, gridSize * 0.4);
-        const fontSize = Math.max(12, iconSize * 0.75);
-        
-        const deleteIcon = new PIXI.Text({
-          text: '\u2715', // X mark character
-          style: {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: fontSize,
-            fill: 0xff6b6b,
-            fontWeight: 'bold' as const,
-          },
-        });
-        deleteIcon.x = iconX;
-        deleteIcon.y = iconY;
-        deleteIcon.eventMode = 'static';
-        deleteIcon.cursor = 'pointer';
-        deleteIcon.zIndex = 100;
-        
-        // Add click handler to delete
-        deleteIcon.on('pointerdown', (e) => {
-          e.stopPropagation();
-          removeMeasurement(measurement.id);
-        });
-        
-        // Add hover effect
-        deleteIcon.on('pointerover', () => {
-          deleteIcon.style.fill = 0xff0000;
-        });
-        deleteIcon.on('pointerout', () => {
-          deleteIcon.style.fill = 0xff6b6b;
-        });
-        
-        measurementLayer.addChild(deleteIcon);
       });
     };
     
@@ -6096,6 +6082,8 @@ export function GameBoard() {
     let measureText: PIXI.Text | null = null;
     // Store current measurement data for persistence
     let currentMeasurementData: PersistedMeasurement | null = null;
+    let measureStartPointer: { x: number; y: number } | null = null;
+    let measureHasDragged = false;
     
     // Multi-token dragging variables for unified select/move tool
     let draggingTokenIds: string[] = [];
@@ -6108,6 +6096,9 @@ export function GameBoard() {
       if (measureLine) { uiLayer.removeChild(measureLine); measureLine = null; }
       if (measureText) { uiLayer.removeChild(measureText); measureText = null; }
       measureStart = null;
+      measureStartPointer = null;
+      measureHasDragged = false;
+      currentMeasurementData = null;
     };
 
     const ensureFogPolygonPreview = () => {
@@ -6419,8 +6410,9 @@ export function GameBoard() {
         const isOnExistingMeasurement = existingMeasurements.some((m) => {
           // Check if click is near the start point of any measurement
           const originPoint = measurementCellToWorld(m.origin);
+          const screenPoint = stage.toGlobal({ x: originPoint.x, y: originPoint.y });
           const dist = Math.sqrt(
-            Math.pow(clickX - originPoint.x, 2) + Math.pow(clickY - originPoint.y, 2)
+            Math.pow(clickX - screenPoint.x, 2) + Math.pow(clickY - screenPoint.y, 2)
           );
           return dist < clickThreshold;
         });
@@ -6428,6 +6420,9 @@ export function GameBoard() {
         if (!isOnExistingMeasurement) {
           const localPos = stage.toLocal(pos);
           measureStart = getMeasurementCell(localPos.x, localPos.y);
+          measureStartPointer = { x: pos.x, y: pos.y };
+          measureHasDragged = false;
+          currentMeasurementData = null;
         }
       } else if (currentTool === 'fog' && currentIsGM && currentBoard) {
         const fogAction = e.button === 2 ? 'add' : e.button === 0 ? 'reveal' : null;
@@ -6990,6 +6985,13 @@ export function GameBoard() {
       }
       
       if (measureStart && currentTool === 'measure') {
+        if (!measureStartPointer) return;
+        const dragDistance = Math.hypot(pos.x - measureStartPointer.x, pos.y - measureStartPointer.y);
+        if (dragDistance < 6) {
+          return;
+        }
+        measureHasDragged = true;
+
         // Don't clear measureStart - just redraw the preview
         if (measureLine) { uiLayer.removeChild(measureLine); measureLine = null; }
         if (measureText) { uiLayer.removeChild(measureText); measureText = null; }
@@ -7386,7 +7388,7 @@ export function GameBoard() {
       
       if (measureStart && currentTool === 'measure') {
         // Save measurement to store before clearing
-        if (currentMeasurementData) {
+        if (measureHasDragged && currentMeasurementData) {
           useGameStore.getState().addMeasurement(currentMeasurementData);
         }
         clearMeasure();
@@ -8243,6 +8245,80 @@ export function GameBoard() {
         }}
       />
       
+      {/* Measurement icons overlay - PIXI based rendering */}
+      <MeasurementIconsOverlay
+        measurements={measurements}
+        selectedMeasurementIds={selectedMeasurementIds}
+        isGM={isGM}
+        tool={tool}
+        isVisible={tool === 'measure' || (tool !== 'select' && true)}
+        gridCellPx={gridSize}
+        gridOffsetX={gridOffsetX || 0}
+        gridOffsetY={gridOffsetY || 0}
+        stagePosition={{ x: stageTransform.x, y: stageTransform.y }}
+        stageScale={stageTransform.scale}
+        pixiApp={appRef.current ?? undefined}
+        onMeasurementClick={(measurement, screenPos) => {
+          // Allow selection when in measure tool mode
+          const currentTool = useGameStore.getState().tool;
+          if (currentTool === 'measure') {
+            setSelectedMeasurementIds([measurement.id]);
+          }
+        }}
+        onMeasurementDoubleClick={(measurement, screenPos) => {
+          // Delete measurement on double-click
+          useGameStore.getState().removeMeasurement(measurement.id);
+          setSelectedMeasurementIds([]);
+        }}
+        onMeasurementDrag={(measurement, screenPos) => {
+          const stage = appRef.current?.stage;
+          if (!stage) return;
+
+          // Convert screen/global pointer position to stage-local world position
+          // using Pixi's transform pipeline (avoids drift from async transform state).
+          const localPos = stage.toLocal({ x: screenPos.x, y: screenPos.y });
+          const snappedCell = getMeasurementCell(localPos.x, localPos.y);
+
+          const deltaGx = snappedCell.gx - measurement.origin.gx;
+          const deltaGy = snappedCell.gy - measurement.origin.gy;
+          if (deltaGx === 0 && deltaGy === 0) return;
+
+          const updates: Partial<PersistedMeasurement> = {
+            origin: snappedCell,
+          };
+
+          // Move directional/anchored shapes as a whole by preserving relative origin->target offset.
+          if (measurement.target) {
+            updates.target = {
+              gx: measurement.target.gx + deltaGx,
+              gy: measurement.target.gy + deltaGy,
+            };
+          }
+
+          // Keep explicit outline target translated with the same world-space delta.
+          if (measurement.outlineTarget) {
+            const prevOriginWorld = measurementCellToWorld(measurement.origin);
+            const nextOriginWorld = measurementCellToWorld(snappedCell);
+            const dx = nextOriginWorld.x - prevOriginWorld.x;
+            const dy = nextOriginWorld.y - prevOriginWorld.y;
+            updates.outlineTarget = {
+              x: measurement.outlineTarget.x + dx,
+              y: measurement.outlineTarget.y + dy,
+            };
+          }
+
+          useGameStore.getState().updateMeasurement(measurement.id, updates);
+        }}
+        onMeasurementDragEnd={(measurement) => {
+          // Measurements are already synced via the local store update
+          // No additional socket sync needed
+        }}
+        onMeasurementDragCancel={(measurement) => {
+          useGameStore.getState().removeMeasurement(measurement.id);
+          setSelectedMeasurementIds((prev) => prev.filter((id) => id !== measurement.id));
+        }}
+      />
+      
       <div 
       ref={toolbarRef}
       className={`game-toolbar ${toolbarIsResizing ? 'resizing' : ''}`}
@@ -8456,7 +8532,7 @@ export function GameBoard() {
 
       {/* Measurement Shape Panel - Shows when measure tool is active */}
       {tool === 'measure' && (
-        <MeasurementPanel position={gridUnitPanelPos} isGM={isCurrentUserGM} />
+        <MeasurementPanel ref={gridUnitPanelRef} position={gridUnitPanelPos} isGM={isCurrentUserGM} />
       )}
 
       {/* Particle Emitter Tool Panel */}
