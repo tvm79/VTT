@@ -225,10 +225,12 @@ float squareGridAlpha(vec2 world)
         return max(vertical, horizontal);
     }
 
-    // Dotted: render circular dots repeated along each grid line.
+    // Dotted: render circular dots repeated along each grid line,
+    // with larger dots at the grid crossings (corners).
     // styleAmount increases density while reducing dot radius.
     float dotCount = mix(2.0, 14.0, styleAmount);
     float dotRadius = mix(0.090, 0.015, styleAmount);
+    float lineDotRadius = mix(0.070, 0.012, styleAmount);
 
     // Anti-aliasing width in cell-space units.
     float aaCell = max(0.002, 1.35 / max(uZoom * uGridSize, 1.0));
@@ -236,6 +238,24 @@ float squareGridAlpha(vec2 world)
     // Distances to nearest vertical/horizontal line in cell space.
     float dxLine = min(localCell.x, 1.0 - localCell.x);
     float dyLine = min(localCell.y, 1.0 - localCell.y);
+
+    // Distance to the four corners of the cell (grid crossings).
+    vec2 cellOrigin = floor(gridCoord);
+    vec2 p0 = gridCoord - cellOrigin;           // bottom-left corner (0,0)
+    vec2 p1 = gridCoord - (cellOrigin + vec2(1.0, 0.0)); // bottom-right
+    vec2 p2 = gridCoord - (cellOrigin + vec2(0.0, 1.0)); // top-left
+    vec2 p3 = gridCoord - (cellOrigin + vec2(1.0, 1.0)); // top-right
+    
+    float distToCorner0 = length(p0);
+    float distToCorner1 = length(p1);
+    float distToCorner2 = length(p2);
+    float distToCorner3 = length(p3);
+    
+    // Minimum distance to any corner (the nearest crossing).
+    float distToNearestCorner = min(min(distToCorner0, distToCorner1), min(distToCorner2, distToCorner3));
+
+    // Larger dots at the grid crossings (corners).
+    float cornerDots = 1.0 - smoothstep(dotRadius, dotRadius + aaCell, distToNearestCorner);
 
     // Along-line offsets to nearest dot center in cell-space units.
     float yPhase = fract(localCell.y * dotCount);
@@ -247,10 +267,12 @@ float squareGridAlpha(vec2 world)
     float verticalDist = length(vec2(dxLine, dyDot));
     float horizontalDist = length(vec2(dxDot, dyLine));
 
-    float verticalDots = 1.0 - smoothstep(dotRadius, dotRadius + aaCell, verticalDist);
-    float horizontalDots = 1.0 - smoothstep(dotRadius, dotRadius + aaCell, horizontalDist);
+    // Use smaller radius for line dots.
+    float verticalDots = 1.0 - smoothstep(lineDotRadius, lineDotRadius + aaCell, verticalDist);
+    float horizontalDots = 1.0 - smoothstep(lineDotRadius, lineDotRadius + aaCell, horizontalDist);
 
-    return max(verticalDots, horizontalDots);
+    // Combine: larger crossing dots + smaller line dots.
+    return max(cornerDots, max(verticalDots, horizontalDots));
 }
 
 float hexGridAlpha(vec2 world)
