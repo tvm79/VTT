@@ -3605,7 +3605,6 @@ export function GameBoard() {
       gridSprite.zIndex = 2; // Above background but below tokens
       app.stage.addChild(gridSprite);
       
-      console.log('[Grid] GridOverlay initialized');
     }
     
     // Update grid configuration
@@ -3631,7 +3630,6 @@ export function GameBoard() {
       stage.scale.x
     );
     
-    console.log('[Grid] Config updated - gridSize:', effectiveGridSize, 'gridColor:', gridColor);
   }, [appReady, currentBoard?.width, currentBoard?.height, currentBoard?.gridType, gridType, gridColor, gridOpacity, effectiveGridSize, gridOffsetX, gridOffsetY, gridStyle, gridStyleAmount]);
 
   useEffect(() => {

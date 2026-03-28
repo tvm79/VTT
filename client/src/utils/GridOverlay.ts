@@ -208,19 +208,49 @@ float squareGridAlpha(vec2 world)
         return max(vertical, horizontal);
     }
 
-    float dashCount = mix(1.0, 5.0, styleAmount);
-    float dashWidth = mix(0.42, 0.10, styleAmount);
-    float dashEdge = 0.12;
+    if (uGridStyle < 1.5) {
+        // Dashed: apply dash pattern to the lines
+        float dashCount = mix(1.0, 5.0, styleAmount);
+        float dashWidth = mix(0.42, 0.10, styleAmount);
+        float dashEdge = 0.12;
 
-    float verticalPhase = fract(localCell.y * dashCount);
-    float horizontalPhase = fract(localCell.x * dashCount);
-    float verticalMask = 1.0 - smoothstep(dashWidth, dashWidth + dashEdge, abs(verticalPhase - 0.5));
-    float horizontalMask = 1.0 - smoothstep(dashWidth, dashWidth + dashEdge, abs(horizontalPhase - 0.5));
+        float verticalPhase = fract(localCell.y * dashCount);
+        float horizontalPhase = fract(localCell.x * dashCount);
+        float verticalMask = 1.0 - smoothstep(dashWidth, dashWidth + dashEdge, abs(verticalPhase - 0.5));
+        float horizontalMask = 1.0 - smoothstep(dashWidth, dashWidth + dashEdge, abs(horizontalPhase - 0.5));
 
-    vertical *= verticalMask;
-    horizontal *= horizontalMask;
+        vertical *= verticalMask;
+        horizontal *= horizontalMask;
 
-    return max(vertical, horizontal);
+        return max(vertical, horizontal);
+    }
+
+    // Dotted: render circular dots repeated along each grid line.
+    // styleAmount increases density while reducing dot radius.
+    float dotCount = mix(2.0, 14.0, styleAmount);
+    float dotRadius = mix(0.090, 0.015, styleAmount);
+
+    // Anti-aliasing width in cell-space units.
+    float aaCell = max(0.002, 1.35 / max(uZoom * uGridSize, 1.0));
+
+    // Distances to nearest vertical/horizontal line in cell space.
+    float dxLine = min(localCell.x, 1.0 - localCell.x);
+    float dyLine = min(localCell.y, 1.0 - localCell.y);
+
+    // Along-line offsets to nearest dot center in cell-space units.
+    float yPhase = fract(localCell.y * dotCount);
+    float xPhase = fract(localCell.x * dotCount);
+    float dyDot = abs(yPhase - 0.5) / dotCount;
+    float dxDot = abs(xPhase - 0.5) / dotCount;
+
+    // Circular distance fields for vertical and horizontal dotted lines.
+    float verticalDist = length(vec2(dxLine, dyDot));
+    float horizontalDist = length(vec2(dxDot, dyLine));
+
+    float verticalDots = 1.0 - smoothstep(dotRadius, dotRadius + aaCell, verticalDist);
+    float horizontalDots = 1.0 - smoothstep(dotRadius, dotRadius + aaCell, horizontalDist);
+
+    return max(verticalDots, horizontalDots);
 }
 
 float hexGridAlpha(vec2 world)
