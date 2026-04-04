@@ -7,7 +7,6 @@ import { JournalPanel } from './JournalPanel';
 import { CharacterSheetPanel } from './CharacterSheetPanel';
 import { Compendium } from './Compendium';
 import { Characters } from './Characters';
-import { CharacterCreatorWizard } from './CharacterCreatorWizard';
 import { Journals } from './Journals';
 import { FloatingPanelsLayer } from './FloatingPanelsLayer';
 import { RollableText } from './RollableText';
@@ -843,10 +842,13 @@ function getSpellEditorSections(system: Record<string, any>): Array<{ title: str
 
 function getPanelLayoutType(type: string): string {
   const normalized = String(type || '').toLowerCase();
+  console.log('[DEBUG getPanelLayoutType] input type:', type, 'normalized:', normalized);
   if (["monster", "creature", "npc"].includes(normalized)) return 'creature';
   if (normalized === 'spell') return 'spell';
   if (normalized === 'race' || normalized === 'species') return 'species';
   if (['weapon', 'armor', 'equipment'].includes(normalized)) return 'item';
+  if (normalized === 'character') return 'character';
+  console.log('[DEBUG getPanelLayoutType] returning default for:', normalized);
   return normalized || 'item';
 }
 
@@ -1206,6 +1208,7 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
     dataManagerSelectedCreatureId,
     dataManagerSelectedCreatureSearchName,
     clearSelectedCreatureInDataManager,
+    setCharacterCreatorWizardVisible,
   } = useGameStore();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -1295,7 +1298,6 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
   // Character Sheet state
   const [characters, setCharacters] = useState<any[]>([]);
   const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
-  const [showCharacterWizard, setShowCharacterWizard] = useState(false);
   
   // Fetch characters
 
@@ -1678,7 +1680,7 @@ export function DataManager({ sheetLayerOnly = false, requestedSheet = null, onS
   };
 
   const createCharacter = () => {
-    setShowCharacterWizard(true);
+    setCharacterCreatorWizardVisible(true);
   };
 
   const updateCharacter = async (id: string, updates: any) => {
@@ -2054,7 +2056,7 @@ interface OpenPanel {
     try {
       const params = new URLSearchParams();
       if (searchQuery) params.append('q', searchQuery);
-      params.append('limit', '100');
+      params.append('limit', '5000');
       
       // Add filter parameters
       const activeFilters = filterState || filters;
@@ -5093,16 +5095,6 @@ interface OpenPanel {
         ref={resizeRef}
         className="data-manager-resize"
         onMouseDown={handleResizeStart}
-      />
-
-      <CharacterCreatorWizard
-        isOpen={showCharacterWizard}
-        onClose={() => setShowCharacterWizard(false)}
-        onCharacterCreated={(newCharacter) => {
-          setCharacters([...characters, newCharacter]);
-          openCharacterPanel(newCharacter);
-          setShowCharacterWizard(false);
-        }}
       />
     </div>
   );

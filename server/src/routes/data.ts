@@ -168,10 +168,13 @@ function getItemTypeLabel(code: string): string {
 const EQUIPMENT_TYPE_FILTERS: Record<string, any> = {
   Clothing: {
     OR: [
-      // General gear type code (from actual data)
+      // General gear type code
       { raw: { path: ['type'], equals: 'g' } },
+      { raw: { path: ['type'], equals: 'G' } },
       { raw: { path: ['itemType'], equals: 'g' } },
+      { raw: { path: ['itemType'], equals: 'G' } },
       { raw: { path: ['system', 'type'], equals: 'g' } },
+      { raw: { path: ['system', 'type'], equals: 'G' } },
       // Check for equipment flag
       { raw: { path: ['equipment'], equals: true } },
       { raw: { path: ['system', 'equipment'], equals: true } },
@@ -179,97 +182,128 @@ const EQUIPMENT_TYPE_FILTERS: Record<string, any> = {
   },
   'Heavy Armor': {
     OR: [
-      // Legacy type codes (lowercase in database)
+      // Type codes (both cases)
       { raw: { path: ['type'], equals: 'ha' } },
+      { raw: { path: ['type'], equals: 'HA' } },
       { raw: { path: ['itemType'], equals: 'ha' } },
+      { raw: { path: ['itemType'], equals: 'HA' } },
       { raw: { path: ['system', 'type'], equals: 'ha' } },
-      // Check for armor value (numeric armor class)
+      { raw: { path: ['system', 'type'], equals: 'HA' } },
+      // Check for armor value
+      { raw: { path: ['armor'], not: null } },
       { raw: { path: ['system', 'armor'], not: null } },
     ],
   },
   'Light Armor': {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'la' } },
+      { raw: { path: ['type'], equals: 'LA' } },
       { raw: { path: ['itemType'], equals: 'la' } },
+      { raw: { path: ['itemType'], equals: 'LA' } },
       { raw: { path: ['system', 'type'], equals: 'la' } },
-      // Check for armor value (numeric armor class)
+      { raw: { path: ['system', 'type'], equals: 'LA' } },
+      { raw: { path: ['armor'], not: null } },
       { raw: { path: ['system', 'armor'], not: null } },
     ],
   },
   'Medium Armor': {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'ma' } },
+      { raw: { path: ['type'], equals: 'MA' } },
       { raw: { path: ['itemType'], equals: 'ma' } },
+      { raw: { path: ['itemType'], equals: 'MA' } },
       { raw: { path: ['system', 'type'], equals: 'ma' } },
-      // Check for armor value (numeric armor class)
+      { raw: { path: ['system', 'type'], equals: 'MA' } },
+      { raw: { path: ['armor'], not: null } },
       { raw: { path: ['system', 'armor'], not: null } },
     ],
   },
   Ring: {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'rg' } },
+      { raw: { path: ['type'], equals: 'RG' } },
       { raw: { path: ['itemType'], equals: 'rg' } },
+      { raw: { path: ['itemType'], equals: 'RG' } },
       { raw: { path: ['system', 'type'], equals: 'rg' } },
+      { raw: { path: ['system', 'type'], equals: 'RG' } },
+      { raw: { path: ['ring'], equals: true } },
+      { raw: { path: ['system', 'ring'], equals: true } },
     ],
   },
   Rod: {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'rd' } },
+      { raw: { path: ['type'], equals: 'RD' } },
       { raw: { path: ['itemType'], equals: 'rd' } },
+      { raw: { path: ['itemType'], equals: 'RD' } },
       { raw: { path: ['system', 'type'], equals: 'rd' } },
+      { raw: { path: ['system', 'type'], equals: 'RD' } },
+      { raw: { path: ['rod'], equals: true } },
+      { raw: { path: ['system', 'rod'], equals: true } },
     ],
   },
   Shield: {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 's' } },
+      { raw: { path: ['type'], equals: 'S' } },
       { raw: { path: ['itemType'], equals: 's' } },
+      { raw: { path: ['itemType'], equals: 'S' } },
       { raw: { path: ['system', 'type'], equals: 's' } },
-      // Check for shield flag
+      { raw: { path: ['system', 'type'], equals: 'S' } },
+      { raw: { path: ['shield'], not: null } },
       { raw: { path: ['system', 'shield'], not: null } },
     ],
   },
   Trinket: {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'tr' } },
+      { raw: { path: ['type'], equals: 'TR' } },
       { raw: { path: ['itemType'], equals: 'tr' } },
+      { raw: { path: ['itemType'], equals: 'TR' } },
       { raw: { path: ['system', 'type'], equals: 'tr' } },
+      { raw: { path: ['system', 'type'], equals: 'TR' } },
+      { raw: { path: ['trinket'], equals: true } },
+      { raw: { path: ['system', 'trinket'], equals: true } },
     ],
   },
   'Vehicle Equipment': {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'veh' } },
+      { raw: { path: ['type'], equals: 'VEH' } },
       { raw: { path: ['itemType'], equals: 'veh' } },
+      { raw: { path: ['itemType'], equals: 'VEH' } },
       { raw: { path: ['system', 'type'], equals: 'veh' } },
+      { raw: { path: ['system', 'type'], equals: 'VEH' } },
+      { raw: { path: ['vehicle'], equals: true } },
+      { raw: { path: ['system', 'vehicle'], equals: true } },
     ],
   },
   Wand: {
     OR: [
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'wd' } },
+      { raw: { path: ['type'], equals: 'WD' } },
       { raw: { path: ['itemType'], equals: 'wd' } },
+      { raw: { path: ['itemType'], equals: 'WD' } },
       { raw: { path: ['system', 'type'], equals: 'wd' } },
+      { raw: { path: ['system', 'type'], equals: 'WD' } },
+      { raw: { path: ['wand'], equals: true } },
+      { raw: { path: ['system', 'wand'], equals: true } },
     ],
   },
   'Wondrous Item': {
     OR: [
-      // Check for wondrous flag (from actual data: raw.system.wondrous = true)
-      { raw: { path: ['system', 'wondrous'], equals: true } },
-      // Legacy type codes (lowercase in database)
       { raw: { path: ['type'], equals: 'w' } },
+      { raw: { path: ['type'], equals: 'W' } },
       { raw: { path: ['itemType'], equals: 'w' } },
+      { raw: { path: ['itemType'], equals: 'W' } },
       { raw: { path: ['system', 'type'], equals: 'w' } },
+      { raw: { path: ['system', 'type'], equals: 'W' } },
+      { raw: { path: ['wondrous'], equals: true } },
+      { raw: { path: ['system', 'wondrous'], equals: true } },
     ],
   },
   'Natural Armor': {
     OR: [
-      // Check for naturalArmor flag
       { raw: { path: ['naturalArmor'], not: null } },
       { raw: { path: ['system', 'naturalArmor'], not: null } },
     ],
@@ -815,8 +849,9 @@ router.post('/compendium/images/reject', async (req, res) => {
 
 // Helper function to fetch and combine class files
 async function fetchCombinedClassData(classKeys: string[]): Promise<any> {
-  const combined: any = { class: [] };
+  const combined: any = { class: [], classFeature: [], subclass: [], subclassFeature: [] };
   
+  // Fetch class files - each file contains class, classFeature, subclass, and subclassFeature
   for (const classKey of classKeys) {
     try {
       const response = await fetch(`${BASE_URL}/class/class-${classKey}.json`);
@@ -825,11 +860,27 @@ async function fetchCombinedClassData(classKeys: string[]): Promise<any> {
         if (data.class && Array.isArray(data.class)) {
           combined.class.push(...data.class);
         }
+        // Collect classFeature from this class file
+        if (data.classFeature && Array.isArray(data.classFeature)) {
+          console.log(`[DEBUG] Found ${data.classFeature.length} classFeatures in class-${classKey}.json`);
+          combined.classFeature.push(...data.classFeature);
+        }
+        // Collect subclass from this class file
+        if (data.subclass && Array.isArray(data.subclass)) {
+          combined.subclass.push(...data.subclass);
+        }
+        // Collect subclassFeature from this class file
+        if (data.subclassFeature && Array.isArray(data.subclassFeature)) {
+          console.log(`[DEBUG] Found ${data.subclassFeature.length} subclassFeatures in class-${classKey}.json`);
+          combined.subclassFeature.push(...data.subclassFeature);
+        }
       }
     } catch (err) {
       console.error(`Error fetching class ${classKey}:`, err);
     }
   }
+  
+  console.log(`[DEBUG] Combined data: ${combined.class.length} classes, ${combined.classFeature.length} classFeatures, ${combined.subclass.length} subclasses, ${combined.subclassFeature.length} subclassFeatures`);
   
   return combined;
 }
@@ -1349,7 +1400,7 @@ const fiveEToolsDatasetCatalog: FiveEToolsDataset[] = [
     defaultName: '5eTools Classes (PHB)',
     url: 'DYNAMIC_CLASS_URL',
     type: 'class',
-    rootKeys: ['class'],
+    rootKeys: ['class', 'classFeature', 'subclass', 'subclassFeature'],
   },
   {
     key: 'classes-xphb',
@@ -1361,7 +1412,7 @@ const fiveEToolsDatasetCatalog: FiveEToolsDataset[] = [
     defaultName: '5eTools Classes (XPHB)',
     url: 'DYNAMIC_CLASS_URL',
     type: 'class',
-    rootKeys: ['class'],
+    rootKeys: ['class', 'classFeature', 'subclass', 'subclassFeature'],
   },
   {
     key: 'classes-artificer',
@@ -1469,7 +1520,7 @@ const fiveEToolsDatasets: Record<string, { url: string; type: string; rootKeys: 
   classes: {
     url: 'DYNAMIC_CLASS_URL',
     type: 'class',
-    rootKeys: ['class'],
+    rootKeys: ['class', 'classFeature', 'subclass', 'subclassFeature'],
   },
   backgrounds: {
     url: `${BASE_URL}/backgrounds.json`,
@@ -1495,6 +1546,19 @@ function extractDatasetItems(payload: any, rootKeys: string[]): any[] {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== 'object') return [];
 
+  // For datasets with multiple root keys (like classes), extract from ALL keys and flatten
+  if (rootKeys.length > 1) {
+    const allItems: any[] = [];
+    for (const key of rootKeys) {
+      const data = (payload as any)[key];
+      if (Array.isArray(data)) {
+        allItems.push(...data);
+      }
+    }
+    if (allItems.length > 0) return allItems;
+  }
+
+  // Original behavior for single-key datasets
   for (const key of rootKeys) {
     const data = (payload as any)[key];
     if (Array.isArray(data)) return data;
@@ -1571,6 +1635,50 @@ async function importFiveEToolsDataset(params: {
     throw error;
   }
 
+  // For class imports, attach classFeature and subclassFeature data to each class entry
+  if (dataset === 'classes' || dataset === 'classes-xphb') {
+    const classFeatureMap: Record<string, any[]> = {};
+    const subclassFeatureMap: Record<string, any[]> = {};
+    
+    // Build maps: className -> classFeature entries
+    if (Array.isArray(payload.classFeature)) {
+      for (const cf of payload.classFeature) {
+        const className = cf.className || cf.classSource || '';
+        if (className) {
+          if (!classFeatureMap[className]) classFeatureMap[className] = [];
+          classFeatureMap[className].push(cf);
+        }
+      }
+    }
+    
+    // Build maps: subclass name -> subclassFeature entries
+    if (Array.isArray(payload.subclassFeature)) {
+      for (const sf of payload.subclassFeature) {
+        const scName = sf.subclassName || sf.className || '';
+        if (scName) {
+          if (!subclassFeatureMap[scName]) subclassFeatureMap[scName] = [];
+          subclassFeatureMap[scName].push(sf);
+        }
+      }
+    }
+    
+    // Attach to each class entry
+    for (const item of items) {
+      if (item.name && classFeatureMap[item.name]) {
+        item.classFeature = classFeatureMap[item.name];
+      }
+    }
+    
+    // Also attach to subclass entries
+    for (const item of items) {
+      if (item.shortName && subclassFeatureMap[item.shortName]) {
+        item.subclassFeature = subclassFeatureMap[item.shortName];
+      }
+    }
+    
+    console.log(`[Import] Attached classFeature to ${Object.keys(classFeatureMap).length} classes, subclassFeature to ${Object.keys(subclassFeatureMap).length} subclasses`);
+  }
+
   // Optional: Filter items by source (for datasets without per-book JSON files)
   let filteredItems = items;
   if (allowedSources && allowedSources.length > 0) {
@@ -1592,8 +1700,9 @@ async function importFiveEToolsDataset(params: {
       throw error;
     }
   } else {
+    // Find existing module by name+system+version (all three fields form the unique constraint)
     module = await prisma.dataModule.findFirst({
-      where: { name, system },
+      where: { name, system, version: version || '5etools' },
     });
   }
 
@@ -1626,7 +1735,7 @@ async function importFiveEToolsDataset(params: {
     await Promise.all(
       batch.map(async (item: any) => {
         try {
-          await createCompendiumEntry(module.id, system, preset.type, item);
+await createCompendiumEntry(module.id, system, undefined, item);
           createdCount++;
         } catch (err) {
           console.error('Error creating 5eTools entry:', err);
@@ -1673,7 +1782,7 @@ router.get('/import/5etools/datasets', async (_req, res) => {
 async function createCompendiumEntry(
   moduleId: string,
   system: string,
-  type: string,
+  type: string | undefined,
   data: any
 ) {
   // Normalize the data using our new normalizer
@@ -1687,7 +1796,7 @@ async function createCompendiumEntry(
     normalized.rarity = 'Common';
   }
   
-  const imageMeta = resolveEntryImages(type, data, normalized);
+  const imageMeta = resolveEntryImages(type || normalized.type || 'item', data, normalized);
   normalized.img = imageMeta.img;
   normalized.imgToken = imageMeta.imgToken;
   normalized.imgSource = imageMeta.imgSource;
@@ -1696,7 +1805,15 @@ async function createCompendiumEntry(
   // Use the inferred type if not provided
   const entryType = type || normalized.type;
   
+  console.log('[DEBUG createCompendiumEntry] normalized.raw:', normalized.raw ? 'exists' : 'missing');
+  console.log('[DEBUG createCompendiumEntry] normalized.raw keys:', normalized.raw ? Object.keys(normalized.raw).join(', ') : 'missing');
+  
   const slugBase = generateSlug(normalized.name || 'unnamed');
+  // Store normalized system data inside raw so API read endpoints can reconstruct it
+  const storedRaw = {
+    ...(normalized.raw || {}),
+    system: normalized.system || {},
+  };
   const entryData = {
     moduleId,
     system,
@@ -1704,7 +1821,7 @@ async function createCompendiumEntry(
     name: normalized.name || 'Unknown',
     source: normalized.book || normalized.publisher || null,
     summary: normalized.description || null,
-    raw: normalized as any,
+    raw: storedRaw as any,
   };
 
   let entry: Awaited<ReturnType<typeof prisma.compendiumEntry.create>> | null = null;
@@ -2031,11 +2148,12 @@ router.get('/items/:type', async (req, res) => {
   const { type } = req.params;
   const { q, limit = '100', offset = '0' } = req.query;
   
-  const limitNum = Math.min(parseInt(limit as string) || 100, 500);
+  const limitNum = Math.min(parseInt(limit as string) || 100, 5000);
   const offsetNum = parseInt(offset as string) || 0;
   
   try {
-    const where: any = { type };
+    const effectiveType = type === 'race' ? { in: ['race', 'species'] } : type;
+    const where: any = { type: effectiveType };
     if (q) {
       where.name = { contains: q as string, mode: 'insensitive' };
     }
@@ -2923,11 +3041,12 @@ router.get('/compendium/search', async (req, res) => {
   const toolType = req.query.toolType as string | undefined;
   const transportationType = req.query.transportationType as string | undefined;
   
-  const limitNum = Math.min(parseInt(limit as string) || 100, 500);
+  const limitNum = Math.min(parseInt(limit as string) || 100, 5000);
   const offsetNum = parseInt(offset as string) || 0;
   
   try {
-    const where: any = { type };
+    const effectiveType = type === 'race' ? { in: ['race', 'species'] } : type;
+    const where: any = { type: effectiveType };
     if (q) {
       where.name = { contains: String(q), mode: 'insensitive' };
     }
@@ -3040,22 +3159,33 @@ router.get('/compendium/search', async (req, res) => {
           // If no equipmentType is specified, add the parent filter to match all equipment
           if (!equipmentType) {
             // For Equipment without specific type, match items that have equipment-related properties
-            // Also include wondrous items which are a major category of equipment
+            // This mirrors the logic in getItemTypeCode() for identifying EQP items
             itemFilters.push({
               OR: [
-                // Armor types (legacy codes - lowercase in database)
+                // Armor types (check both lowercase and uppercase)
                 { raw: { path: ['type'], equals: 'ha' } },
+                { raw: { path: ['type'], equals: 'HA' } },
                 { raw: { path: ['type'], equals: 'la' } },
+                { raw: { path: ['type'], equals: 'LA' } },
                 { raw: { path: ['type'], equals: 'ma' } },
+                { raw: { path: ['type'], equals: 'MA' } },
                 { raw: { path: ['type'], equals: 's' } },
-                // Equipment types (legacy codes - lowercase in database)
+                { raw: { path: ['type'], equals: 'S' } },
+                // Equipment types
                 { raw: { path: ['type'], equals: 'g' } },
+                { raw: { path: ['type'], equals: 'G' } },
                 { raw: { path: ['type'], equals: 'rg' } },
+                { raw: { path: ['type'], equals: 'RG' } },
                 { raw: { path: ['type'], equals: 'rd' } },
+                { raw: { path: ['type'], equals: 'RD' } },
                 { raw: { path: ['type'], equals: 'wd' } },
+                { raw: { path: ['type'], equals: 'WD' } },
                 { raw: { path: ['type'], equals: 'w' } },
+                { raw: { path: ['type'], equals: 'W' } },
                 { raw: { path: ['type'], equals: 'tr' } },
+                { raw: { path: ['type'], equals: 'TR' } },
                 { raw: { path: ['type'], equals: 'veh' } },
+                { raw: { path: ['type'], equals: 'VEH' } },
                 // Same at itemType root
                 { raw: { path: ['itemType'], equals: 'ha' } },
                 { raw: { path: ['itemType'], equals: 'la' } },
@@ -3068,7 +3198,7 @@ router.get('/compendium/search', async (req, res) => {
                 { raw: { path: ['itemType'], equals: 'w' } },
                 { raw: { path: ['itemType'], equals: 'tr' } },
                 { raw: { path: ['itemType'], equals: 'veh' } },
-                // system.type (lowercase)
+                // system.type
                 { raw: { path: ['system', 'type'], equals: 'ha' } },
                 { raw: { path: ['system', 'type'], equals: 'la' } },
                 { raw: { path: ['system', 'type'], equals: 'ma' } },
@@ -3080,12 +3210,27 @@ router.get('/compendium/search', async (req, res) => {
                 { raw: { path: ['system', 'type'], equals: 'w' } },
                 { raw: { path: ['system', 'type'], equals: 'tr' } },
                 { raw: { path: ['system', 'type'], equals: 'veh' } },
-                // Wondrous items - check system.wondrous flag
-                { raw: { path: ['system', 'wondrous'], equals: true } },
-                // Armor property
+                // Property-based detection (root level - mirrors getItemTypeCode)
+                { raw: { path: ['armor'], not: null } },
                 { raw: { path: ['system', 'armor'], not: null } },
-                // Shield property
+                { raw: { path: ['shield'], not: null } },
                 { raw: { path: ['system', 'shield'], not: null } },
+                { raw: { path: ['ring'], equals: true } },
+                { raw: { path: ['system', 'ring'], equals: true } },
+                { raw: { path: ['wand'], equals: true } },
+                { raw: { path: ['system', 'wand'], equals: true } },
+                { raw: { path: ['rod'], equals: true } },
+                { raw: { path: ['system', 'rod'], equals: true } },
+                { raw: { path: ['wondrous'], equals: true } },
+                { raw: { path: ['system', 'wondrous'], equals: true } },
+                { raw: { path: ['trinket'], equals: true } },
+                { raw: { path: ['system', 'trinket'], equals: true } },
+                { raw: { path: ['vehicle'], equals: true } },
+                { raw: { path: ['system', 'vehicle'], equals: true } },
+                { raw: { path: ['naturalArmor'], not: null } },
+                { raw: { path: ['system', 'naturalArmor'], not: null } },
+                { raw: { path: ['equipment'], equals: true } },
+                { raw: { path: ['system', 'equipment'], equals: true } },
               ]
             });
             if (process.env.NODE_ENV !== 'production') {
@@ -3372,6 +3517,15 @@ router.get('/compendium/search', async (req, res) => {
           : {};
       
       const system: Record<string, any> = { ...rawSystem };
+      const raw = entry.raw as any;
+      
+      // Construct imgToken from hasToken if imgToken is not present (matches /compendium/:type behavior)
+      let imgToken = raw?.imgToken;
+      if (!imgToken && raw?.hasToken && entry.type === 'monster') {
+        const sourceCode = (raw?.source || 'mm').toLowerCase().substring(0, 3);
+        const nameSlug = (entry.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        imgToken = `https://5e.tools/img/bestiary/tokens/${sourceCode}/${nameSlug}.webp`;
+      }
       
       return {
         id: entry.id,
@@ -3380,10 +3534,10 @@ router.get('/compendium/search', async (req, res) => {
         book: entry.source || (entry.raw as any)?.book,
         publisher: entry.module?.name || (entry.raw as any)?.publisher,
         description: entry.summary || (entry.raw as any)?.description,
-        img: (entry.raw as any)?.img,
-        imgToken: (entry.raw as any)?.imgToken,
-        imgSource: (entry.raw as any)?.imgSource,
-        imgFallback: (entry.raw as any)?.imgFallback,
+        img: raw?.img,
+        imgToken: imgToken,
+        imgSource: raw?.imgSource,
+        imgFallback: raw?.imgFallback,
         system,
         slug: entry.slug,
         source: entry.source,
@@ -3402,549 +3556,17 @@ router.get('/compendium/search', async (req, res) => {
 // Get compendium entries by type (normalized) - must be AFTER /compendium/search
 router.get('/compendium/:type', async (req, res) => {
   const { type } = req.params;
-  const { q, limit = '100', offset = '0', system } = req.query;
+  const { q, limit = '100', offset = '0' } = req.query;
   
-  const limitNum = Math.min(parseInt(limit as string) || 100, 500);
+  const limitNum = Math.min(parseInt(limit as string) || 100, 5000);
   const offsetNum = parseInt(offset as string) || 0;
   
   try {
-    const where: any = { type };
+    // Map 'race' type to include 'species' entries (5eTools stores races as 'species')
+    const effectiveType = type === 'race' ? { in: ['race', 'species'] } : type;
+    const where: any = { type: effectiveType };
     if (q) {
       where.name = { contains: String(q), mode: 'insensitive' };
-    }
-    if (system) {
-      where.system = String(system);
-    }
-    
-    const entries = await prisma.compendiumEntry.findMany({
-      where,
-      include: {
-        module: {
-          select: { name: true, system: true, version: true },
-        },
-      },
-      take: limitNum,
-      skip: offsetNum,
-      orderBy: [{ name: 'asc' }, { createdAt: 'desc' }],
-    });
-    
-    const total = await prisma.compendiumEntry.count({ where });
-    
-    // Transform entries
-    const results = entries.map((entry: any) => ({
-      id: entry.id,
-      name: entry.name,
-      type: entry.type,
-      system: entry.system,
-      description: entry.description,
-      img: entry.img,
-      thumbnail: entry.thumbnail,
-      module: entry.module,
-    }));
-    
-    res.json({ data: results, total, limit: limitNum, offset: offsetNum });
-  } catch (error: any) {
-    console.error('Error fetching compendium entries by type:', error);
-    res.status(500).json({ error: 'Failed to fetch compendium entries', message: error.message });
-  }
-});
-
-// Get single compendium entry by ID
-router.get('/compendium/entry/:id', async (req, res) => {
-  const { id } = req.params;
-  
-  try {
-    const entry = await prisma.compendiumEntry.findUnique({
-      where: { id },
-      include: {
-        module: {
-          select: { name: true, system: true, version: true },
-        },
-      },
-    });
-    
-    if (!entry) {
-      return res.status(404).json({ error: 'Entry not found' });
-    }
-    
-    const system: Record<string, any> =
-      entry.raw &&
-      typeof entry.raw === 'object' &&
-      (entry.raw as any).system &&
-      typeof (entry.raw as any).system === 'object'
-        ? { ...(entry.raw as any).system }
-        : {};
-    
-    res.json({
-      id: entry.id,
-      type: entry.type,
-      name: entry.name,
-      book: entry.source,
-      publisher: entry.module?.name,
-      description: entry.summary,
-      img: (entry.raw as any)?.img,
-      imgToken: (entry.raw as any)?.imgToken,
-      imgSource: (entry.raw as any)?.imgSource,
-      imgFallback: (entry.raw as any)?.imgFallback,
-      system,
-      slug: entry.slug,
-      source: entry.source,
-      // Include full raw JSON for troubleshooting - all original data from 5e.tools
-      raw: entry.raw,
-    });
-  } catch (error: any) {
-    console.error('Error fetching compendium entry:', error);
-    res.status(500).json({ error: 'Failed to fetch entry', message: error.message });
-  }
-});
-
-// Update compendium entry by ID
-router.put('/compendium/entry/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const existing = await prisma.compendiumEntry.findUnique({
-      where: { id },
-      select: { id: true, moduleId: true, system: true, source: true, type: true },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Entry not found' });
-    }
-
-    const {
-      name,
-      type,
-      book,
-      source,
-      description,
-      img,
-      imgToken,
-      imgSource,
-      imgFallback,
-      system,
-    } = req.body || {};
-
-    const normalized = normalizeEntry({
-      id,
-      name,
-      type,
-      book: book ?? source,
-      source: source ?? book,
-      description,
-      img,
-      imgToken,
-      imgSource,
-      imgFallback,
-      system: system && typeof system === 'object' ? system : {},
-    }) as any;
-
-    const resolvedImageMeta = resolveEntryImages(type || normalized.type || existing.type || 'item', req.body || {}, normalized);
-    normalized.img = normalized.img || resolvedImageMeta.img;
-    normalized.imgToken = normalized.imgToken || resolvedImageMeta.imgToken;
-    normalized.imgSource = normalized.imgSource || resolvedImageMeta.imgSource;
-    normalized.imgFallback = normalized.imgFallback || resolvedImageMeta.imgFallback;
-
-    const validation = validateEntry(normalized);
-    if (!validation.valid) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: validation.errors,
-      });
-    }
-
-    const updated = await prisma.compendiumEntry.update({
-      where: { id },
-      data: {
-        name: normalized.name || existing.id,
-        type: normalized.type || type || 'item',
-        source: normalized.book || normalized.publisher || existing.source || null,
-        summary: normalized.description || null,
-        raw: normalized as any,
-      },
-      include: {
-        module: {
-          select: { name: true, system: true, version: true },
-        },
-      },
-    });
-
-    const responseSystem: Record<string, any> =
-      updated.raw &&
-      typeof updated.raw === 'object' &&
-      (updated.raw as any).system &&
-      typeof (updated.raw as any).system === 'object'
-        ? { ...(updated.raw as any).system }
-        : {};
-
-    res.json({
-      id: updated.id,
-      type: updated.type,
-      name: updated.name,
-      book: updated.source,
-      publisher: updated.module?.name,
-      description: updated.summary,
-      img: (updated.raw as any)?.img,
-      imgToken: (updated.raw as any)?.imgToken,
-      imgSource: (updated.raw as any)?.imgSource,
-      imgFallback: (updated.raw as any)?.imgFallback,
-      system: responseSystem,
-      slug: updated.slug,
-      source: updated.source,
-    });
-  } catch (error: any) {
-    console.error('Error updating compendium entry:', error);
-    res.status(500).json({ error: 'Failed to update entry', message: error.message });
-  }
-});
-
-// Delete compendium entry by ID
-router.delete('/compendium/entry/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const existing = await prisma.compendiumEntry.findUnique({
-      where: { id },
-      select: { id: true, moduleId: true },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: 'Entry not found' });
-    }
-
-    await prisma.compendiumEntry.delete({
-      where: { id },
-    });
-
-    const count = await prisma.compendiumEntry.count({
-      where: { moduleId: existing.moduleId },
-    });
-
-    await prisma.dataModule.update({
-      where: { id: existing.moduleId },
-      data: { itemCount: count },
-    });
-
-    res.json({ success: true, id });
-  } catch (error: any) {
-    console.error('Error deleting compendium entry:', error);
-    res.status(500).json({ error: 'Failed to delete entry', message: error.message });
-  }
-});
-
-// Backfill missing image metadata for existing entries
-router.post('/compendium/images/backfill', async (req, res) => {
-  const { type, limit = 250 } = req.body || {};
-  const where: any = {};
-  if (type) where.type = String(type);
-
-  const max = Math.min(Math.max(Number(limit) || 250, 1), 2000);
-
-  try {
-    const entries = await prisma.compendiumEntry.findMany({
-      where,
-      select: {
-        id: true,
-        type: true,
-        raw: true,
-      },
-      take: max,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    let updatedCount = 0;
-
-    for (const entry of entries as any[]) {
-      const raw = entry.raw && typeof entry.raw === 'object' ? { ...(entry.raw as any) } : {};
-      const missingAny = !raw.img || !raw.imgFallback || (entry.type === 'monster' && !raw.imgToken);
-      if (!missingAny) continue;
-
-      const normalized = normalizeEntry({
-        ...(raw || {}),
-        id: entry.id,
-        type: entry.type,
-        name: raw.name || 'Unknown',
-      }) as any;
-
-      const resolved = resolveEntryImages(entry.type, raw, normalized);
-      const nextRaw = {
-        ...raw,
-        img: raw.img || resolved.img,
-        imgToken: raw.imgToken || resolved.imgToken,
-        imgSource: raw.imgSource || resolved.imgSource,
-        imgFallback: raw.imgFallback || resolved.imgFallback,
-      };
-
-      await prisma.compendiumEntry.update({
-        where: { id: entry.id },
-        data: { raw: nextRaw as any },
-      });
-      updatedCount++;
-    }
-
-    res.json({
-      success: true,
-      scanned: entries.length,
-      updated: updatedCount,
-      type: type || 'all',
-    });
-
-    IMAGE_FETCH_METRICS.backfillRuns += 1;
-    IMAGE_FETCH_METRICS.backfillScanned += entries.length;
-    IMAGE_FETCH_METRICS.backfillUpdated += updatedCount;
-  } catch (error: any) {
-    console.error('Error backfilling compendium images:', error);
-    res.status(500).json({ error: 'Failed to backfill images', message: error?.message || String(error) });
-  }
-});
-
-router.get('/compendium/images/metrics', async (_req, res) => {
-  res.json({
-    success: true,
-    metrics: IMAGE_FETCH_METRICS,
-    timestamp: Date.now(),
-  });
-});
-
-// Search compendium entries
-router.get('/compendium/search', async (req, res) => {
-  const { q, type, system, limit = '50', offset = '0' } = req.query;
-  
-  // Spell filters
-  const level = req.query.level as string | undefined;
-  const school = req.query.school as string | undefined;
-  const sourceClass = req.query.sourceClass as string | undefined;
-  const concentration = req.query.concentration as string | undefined;
-  const ritual = req.query.ritual as string | undefined;
-  const verbal = req.query.verbal as string | undefined;
-  const somatic = req.query.somatic as string | undefined;
-  const material = req.query.material as string | undefined;
-  
-  // Monster filters
-  const crMin = req.query.crMin as string | undefined;
-  const crMax = req.query.crMax as string | undefined;
-  const size = req.query.size as string | undefined;
-  const creatureType = req.query.creatureType as string | undefined;
-  const speedFly = req.query.speedFly as string | undefined;
-  const speedSwim = req.query.speedSwim as string | undefined;
-  const speedBurrow = req.query.speedBurrow as string | undefined;
-  const speedClimb = req.query.speedClimb as string | undefined;
-  
-  // Item filters
-  const itemType = req.query.itemType as string | undefined;
-  const rarity = req.query.rarity as string | undefined;
-  const magical = req.query.magical as string | undefined;
-  const attunement = req.query.attunement as string | undefined;
-  const weaponCategory = req.query.weaponCategory as string | undefined;
-  const equipmentType = req.query.equipmentType as string | undefined;
-  
-  const limitNum = Math.min(parseInt(limit as string) || 50, 200);
-  const offsetNum = parseInt(offset as string) || 0;
-  
-  try {
-    const where: any = {};
-    
-    if (q) {
-      where.name = { contains: String(q), mode: 'insensitive' };
-    }
-    if (type) {
-      where.type = String(type);
-    }
-    if (system) {
-      where.system = String(system);
-    }
-    
-    // Build filter conditions based on type
-    if (type === 'spell') {
-      // Use raw JSON query for spell-specific filters
-      const spellFilters: any[] = [];
-      
-      if (level !== undefined) {
-        spellFilters.push({ raw: { path: ['system', 'level'], equals: parseInt(level) } });
-      }
-      if (school) {
-        // Use abbreviation for school matching (database stores as abbreviation like 'C', 'V', etc.)
-        const schoolValue = getSchoolValue(school);
-        spellFilters.push({
-          OR: [
-            { raw: { path: ['system', 'school'], string_contains: schoolValue } },
-            { raw: { path: ['system', 'school', 'name'], string_contains: schoolValue } },
-            { raw: { path: ['data', 'school'], string_contains: schoolValue } },
-            { raw: { path: ['school'], string_contains: schoolValue } }
-          ]
-        });
-      }
-      if (sourceClass) {
-        // Try multiple paths for class matching
-        spellFilters.push({
-          OR: [
-            { raw: { path: ['system', 'classes'], string_contains: sourceClass } },
-            { raw: { path: ['system', 'sourceClass'], string_contains: sourceClass } },
-            { raw: { path: ['system', 'class'], string_contains: sourceClass } },
-            { raw: { path: ['data', 'classes'], string_contains: sourceClass } },
-            { raw: { path: ['classes'], string_contains: sourceClass } }
-          ]
-        });
-      }
-      if (concentration === 'true') {
-        spellFilters.push({ raw: { path: ['system', 'concentration'], equals: true } });
-      }
-      if (ritual === 'true') {
-        spellFilters.push({ raw: { path: ['system', 'ritual'], equals: true } });
-      }
-      if (verbal === 'true') {
-        spellFilters.push({ raw: { path: ['system', 'components', 'verbal'], equals: true } });
-      }
-      if (somatic === 'true') {
-        spellFilters.push({ raw: { path: ['system', 'components', 'somatic'], equals: true } });
-      }
-      if (material === 'true') {
-        spellFilters.push({ raw: { path: ['system', 'components', 'material'], equals: true } });
-      }
-      
-      if (spellFilters.length > 0) {
-        where.AND = spellFilters;
-      }
-    } else if (type === 'monster') {
-      // Use raw JSON query for monster-specific filters
-      const monsterFilters: any[] = [];
-      
-      if (crMin !== undefined) {
-        monsterFilters.push({ raw: { path: ['system', 'cr'], gte: parseCrValue(crMin) } });
-      }
-      if (crMax !== undefined) {
-        monsterFilters.push({ raw: { path: ['system', 'cr'], lte: parseCrValue(crMax) } });
-      }
-      if (size) {
-        // Size is stored in raw.system.size as an array like ["H"] for Huge
-        const sizeValue = getSizeValue(size).toUpperCase();
-        // Use equals to match the exact array element
-        monsterFilters.push({ raw: { path: ['system', 'size'], equals: [sizeValue] } });
-      }
-      if (creatureType) {
-        // The type is stored at raw.type (e.g., "monstrosity", "beast")
-        const typeValue = getMonsterTypeLabel(creatureType).toLowerCase();
-        monsterFilters.push({ raw: { path: ['type'], string_contains: typeValue } });
-      }
-      if (speedFly === 'true') {
-        monsterFilters.push({ raw: { path: ['system', 'speed', 'fly'], not: null } });
-      }
-      if (speedSwim === 'true') {
-        monsterFilters.push({ raw: { path: ['system', 'speed', 'swim'], not: null } });
-      }
-      if (speedBurrow === 'true') {
-        monsterFilters.push({ raw: { path: ['system', 'speed', 'burrow'], not: null } });
-      }
-      if (speedClimb === 'true') {
-        monsterFilters.push({ raw: { path: ['system', 'speed', 'climb'], not: null } });
-      }
-      
-      if (monsterFilters.length > 0) {
-        where.AND = monsterFilters;
-      }
-    } else if (type === 'item') {
-      const itemFilters: any[] = [];
-
-      // Filter by item type - stored in system properties (wondrous, weapon, armor, etc.)
-      if (itemType) {
-        if (itemType === 'magic-item') {
-          itemFilters.push({ raw: { path: ['system', 'rarity'], not: null } });
-        } else if (itemType === 'WPN') {
-          // For weapons, match by weaponCategory field (simple/martial) OR legacy weapon flag
-          itemFilters.push({
-            OR: [
-              // Match items with weaponCategory (5e SRD/5etools style)
-              { raw: { path: ['system', 'weaponCategory'], not: null } },
-              { raw: { path: ['weaponCategory'], not: null } },
-              // Match legacy style weapons
-              { raw: { path: ['system', 'weapon'], not: null } },
-              { raw: { path: ['weapon'], not: null } },
-            ]
-          });
-        } else {
-          switch (itemType) {
-            case 'W':
-              itemFilters.push({ raw: { path: ['system', 'wondrous'], equals: true } });
-              break;
-            case 'M':
-              itemFilters.push({ raw: { path: ['system', 'weapon'], not: null } });
-              itemFilters.push({ raw: { path: ['system', 'weapon', 'ranged'], not: true } });
-              break;
-            case 'R':
-              itemFilters.push({ raw: { path: ['system', 'weapon', 'ranged'], equals: true } });
-              break;
-            case 'LA':
-              itemFilters.push({ raw: { path: ['system', 'armor'], not: null } });
-              break;
-            case 'S':
-              itemFilters.push({ raw: { path: ['system', 'shield'], equals: true } });
-              break;
-            case 'P':
-              itemFilters.push({ raw: { path: ['system', 'potion'], equals: true } });
-              break;
-            case 'T':
-              itemFilters.push({ raw: { path: ['system', 'tool'], equals: true } });
-              break;
-            case 'EQP':
-              // Equipment - don't add filter here, equipmentType filter will handle it
-              break;
-            default:
-              itemFilters.push({ raw: { path: ['system', 'type'], equals: itemType } });
-          }
-        }
-      }
-
-      // Filter by rarity - stored at system.rarity
-      if (rarity) {
-        if (rarity === 'mundane') {
-          itemFilters.push({ raw: { path: ['system', 'rarity'], in: ['none', 'None', 'common', 'Common'] } });
-        } else {
-          const normalizedRarity = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
-          itemFilters.push({ 
-            OR: [
-              { raw: { path: ['system', 'rarity'], equals: rarity } },
-              { raw: { path: ['system', 'rarity'], equals: normalizedRarity } }
-            ] 
-          });
-        }
-      }
-
-      // Filter for magical items
-      if (magical === 'true') {
-        itemFilters.push({ raw: { path: ['system', 'rarity'], notIn: ['none', 'None', 'common', 'Common'] } });
-      }
-
-      // Filter by attunement
-      if (attunement === 'required') {
-        itemFilters.push({ raw: { path: ['system', 'reqAttune'], not: null } });
-      } else if (attunement === 'not required') {
-        itemFilters.push({ OR: [
-          { raw: { path: ['system', 'reqAttune'], equals: null } },
-          { raw: { path: ['system', 'reqAttune'], not: null } }
-        ]});
-      }
-
-      // Filter by weapon category (Simple/Martial) - only applies when itemType is 'WPN'
-      if (weaponCategory && itemType === 'WPN') {
-        itemFilters.push({ 
-          OR: [
-            { raw: { path: ['system', 'weaponCategory'], equals: weaponCategory } },
-            { raw: { path: ['weaponCategory'], equals: weaponCategory } }
-          ]
-        });
-      }
-
-      // Filter by equipment type - only applies when itemType is 'EQP'
-      if (equipmentType && itemType === 'EQP') {
-        const equipmentTypeFilter = getEquipmentTypeFilter(equipmentType);
-        if (equipmentTypeFilter) {
-          itemFilters.push(equipmentTypeFilter);
-        }
-      }
-
-      if (itemFilters.length > 0) {
-        where.AND = itemFilters;
-      }
     }
 
     const entries = await prisma.compendiumEntry.findMany({
@@ -3971,6 +3593,16 @@ router.get('/compendium/search', async (req, res) => {
           ? { ...(entry.raw as any).system }
           : {};
       
+      const raw = entry.raw as any;
+      
+      // Construct imgToken from hasToken if imgToken is not present
+      let imgToken = raw?.imgToken;
+      if (!imgToken && raw?.hasToken && entry.type === 'monster') {
+        const sourceCode = (raw?.source || 'mm').toLowerCase().substring(0, 3);
+        const nameSlug = (entry.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        imgToken = `https://5e.tools/img/bestiary/tokens/${sourceCode}/${nameSlug}.webp`;
+      }
+      
       return {
         id: entry.id,
         type: entry.type,
@@ -3978,11 +3610,12 @@ router.get('/compendium/search', async (req, res) => {
         book: entry.source,
         publisher: entry.module?.name,
         description: entry.summary,
-        img: (entry.raw as any)?.img,
-        imgToken: (entry.raw as any)?.imgToken,
-        imgSource: (entry.raw as any)?.imgSource,
-        imgFallback: (entry.raw as any)?.imgFallback,
+        img: raw?.img,
+        imgToken: imgToken,
+        imgSource: raw?.imgSource,
+        imgFallback: raw?.imgFallback,
         system,
+        raw: raw ? { ...raw } : undefined,
         slug: entry.slug,
         source: entry.source,
       };
@@ -3995,6 +3628,55 @@ router.get('/compendium/search', async (req, res) => {
   }
 });
 
+// Get a single compendium entry by ID
+router.get('/compendium/entry/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const entry = await prisma.compendiumEntry.findUnique({
+      where: { id },
+      include: {
+        module: {
+          select: { name: true, system: true, version: true },
+        },
+      },
+    });
+    if (!entry) return res.status(404).json({ error: 'Entry not found' });
+
+    const raw = entry.raw && typeof entry.raw === 'object' ? { ...(entry.raw as any) } : {};
+    const rawSystem = raw.system && typeof raw.system === 'object' ? { ...raw.system } : {};
+
+    // Construct imgToken from hasToken if imgToken is not present
+    let imgToken = raw?.imgToken;
+    if (!imgToken && raw?.hasToken && entry.type === 'monster') {
+      const sourceCode = (raw?.source || 'mm').toLowerCase().substring(0, 3);
+      const nameSlug = (entry.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      imgToken = `https://5e.tools/img/bestiary/tokens/${sourceCode}/${nameSlug}.webp`;
+    }
+
+    res.json({
+      id: entry.id,
+      type: entry.type,
+      name: entry.name,
+      book: entry.source,
+      publisher: entry.module?.name,
+      description: entry.summary,
+      img: raw?.img,
+      imgToken: imgToken,
+      imgSource: raw?.imgSource,
+      imgFallback: raw?.imgFallback,
+      system: rawSystem,
+      raw: raw,
+      slug: entry.slug,
+      source: entry.source,
+    });
+  } catch (error: any) {
+    console.error('Error fetching compendium entry:', error);
+    res.status(500).json({ error: 'Failed to fetch compendium entry', message: error.message });
+  }
+});
+
+// ====================
+// Journal Routes
 // ====================
 // Journal Routes
 // ====================
@@ -4165,7 +3847,81 @@ router.get('/characters/:id', async (req, res) => {
 router.post('/sessions/:sessionId/characters', async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { name, playerName, level, race, class: charClass, background, alignment } = req.body;
+    const payload = req.body || {};
+    const asStringArray = (value: any): string[] => {
+      if (!Array.isArray(value)) return [];
+      return value
+        .map((entry) => {
+          if (typeof entry === 'string') return entry;
+          if (entry == null) return null;
+          if (typeof entry === 'number' || typeof entry === 'boolean') return String(entry);
+          if (typeof entry === 'object') {
+            if (typeof entry.name === 'string') return entry.name;
+            if (typeof entry.value === 'string') return entry.value;
+            return null;
+          }
+          return null;
+        })
+        .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
+    };
+    const {
+      name,
+      playerName,
+      level,
+      experience,
+      strength,
+      dexterity,
+      constitution,
+      intelligence,
+      wisdom,
+      charisma,
+      armorClass,
+      initiative,
+      speed,
+      maxHp,
+      currentHp,
+      tempHp,
+      hitDice,
+      hitDiceUsed,
+      copper,
+      silver,
+      gold,
+      platinum,
+      proficiencyBonus,
+      savingThrows,
+      skills,
+      inventory,
+      spellcastingAbility,
+      spellSaveDc,
+      spellAttack,
+      spells,
+      knownSpells,
+      preparedSpells,
+      features,
+      traits,
+      flaws,
+      bonds,
+      ideals,
+      backstory,
+      notes,
+      race,
+      class: charClass,
+      subclass,
+      background,
+      alignment,
+      age,
+      height,
+      weight,
+      eyes,
+      skin,
+      hair,
+      imageUrl,
+      tokenId,
+      raceData,
+      classData,
+      subclassData,
+      backgroundData,
+    } = payload;
     
     const character = await prisma.characterSheet.create({
       data: {
@@ -4173,11 +3929,59 @@ router.post('/sessions/:sessionId/characters', async (req, res) => {
         name: name || 'New Character',
         playerName: playerName || null,
         level: level || 1,
-        traits: '',
+        experience: experience ?? 0,
+        strength: strength ?? 10,
+        dexterity: dexterity ?? 10,
+        constitution: constitution ?? 10,
+        intelligence: intelligence ?? 10,
+        wisdom: wisdom ?? 10,
+        charisma: charisma ?? 10,
+        armorClass: armorClass ?? 10,
+        initiative: initiative ?? 0,
+        speed: speed ?? 30,
+        maxHp: maxHp ?? 10,
+        currentHp: currentHp ?? 10,
+        tempHp: tempHp ?? 0,
+        hitDice: hitDice || '1d8',
+        hitDiceUsed: hitDiceUsed ?? 0,
+        copper: copper ?? 0,
+        silver: silver ?? 0,
+        gold: gold ?? 0,
+        platinum: platinum ?? 0,
+        proficiencyBonus: proficiencyBonus ?? 2,
+        savingThrows: asStringArray(savingThrows),
+        skills: asStringArray(skills),
+        inventory: inventory ?? [],
+        spellcastingAbility: spellcastingAbility || null,
+        spellSaveDc: spellSaveDc ?? 10,
+        spellAttack: spellAttack ?? 0,
+        spells: spells ?? [],
+        knownSpells: asStringArray(knownSpells),
+        preparedSpells: asStringArray(preparedSpells),
+        features: features ?? [],
+        traits: traits || '',
+        flaws: flaws || null,
+        bonds: bonds || null,
+        ideals: ideals || null,
+        backstory: backstory || null,
+        notes: notes || null,
         race: race || null,
         class: charClass || null,
+        subclass: subclass || null,
         background: background || null,
         alignment: alignment || null,
+        age: age || null,
+        height: height || null,
+        weight: weight || null,
+        eyes: eyes || null,
+        skin: skin || null,
+        hair: hair || null,
+        imageUrl: imageUrl || null,
+        tokenId: tokenId || null,
+        raceData: raceData || null,
+        classData: classData || null,
+        subclassData: subclassData || null,
+        backgroundData: backgroundData || null,
       },
     });
     
@@ -4226,30 +4030,27 @@ router.post('/characters/:id/inventory', async (req, res) => {
       return res.status(404).json({ error: 'Character not found' });
     }
     
-    const inventory = typeof character.inventory === 'string' 
+    const inventory = normalizeInventoryStorage(typeof character.inventory === 'string' 
       ? JSON.parse(character.inventory) 
-      : character.inventory;
+      : character.inventory);
     
     // Add item with type detection for sorting
     const newItem = {
       id: itemId,
       data: itemData,
       addedAt: new Date().toISOString(),
-      // Auto-detect item type for sorting
       type: detectItemType(itemData),
     };
-    
-    inventory.push(newItem);
-    
-    // Sort inventory by type
-    const sortedInventory = sortInventoryByType(inventory);
+
+    const targetGroup = detectItemType(itemData);
+    inventory[targetGroup].push(newItem);
     
     await prisma.characterSheet.update({
       where: { id },
-      data: { inventory: JSON.stringify(sortedInventory) },
+      data: { inventory: JSON.stringify(inventory) },
     });
     
-    res.json({ success: true, inventory: sortedInventory });
+    res.json({ success: true, inventory });
   } catch (error: any) {
     console.error('Error adding item to inventory:', error);
     res.status(500).json({ error: 'Failed to add item', message: error.message });
@@ -4269,18 +4070,20 @@ router.delete('/characters/:id/inventory/:itemId', async (req, res) => {
       return res.status(404).json({ error: 'Character not found' });
     }
     
-    const inventory = typeof character.inventory === 'string' 
+    const inventory = normalizeInventoryStorage(typeof character.inventory === 'string' 
       ? JSON.parse(character.inventory) 
-      : character.inventory;
+      : character.inventory);
     
-    const filtered = inventory.filter((item: any) => item.id !== itemId);
+    Object.keys(inventory).forEach((group) => {
+      inventory[group] = inventory[group].filter((item: any) => item.id !== itemId);
+    });
     
     await prisma.characterSheet.update({
       where: { id },
-      data: { inventory: JSON.stringify(filtered) },
+      data: { inventory: JSON.stringify(inventory) },
     });
     
-    res.json({ success: true, inventory: filtered });
+    res.json({ success: true, inventory });
   } catch (error: any) {
     console.error('Error removing item from inventory:', error);
     res.status(500).json({ error: 'Failed to remove item', message: error.message });
@@ -4305,7 +4108,7 @@ router.delete('/characters/:id', async (req, res) => {
 
 // Helper function to detect item type
 function detectItemType(itemData: any): string {
-  if (!itemData) return 'misc';
+  if (!itemData) return 'other';
   
   const data = itemData.data || itemData;
   const type = data.type?.toLowerCase() || '';
@@ -4325,22 +4128,7 @@ function detectItemType(itemData: any): string {
   
   // Potion
   if (name.includes('potion') || name.includes('elixir') || name.includes('philter')) {
-    return 'potion';
-  }
-  
-  // Scroll
-  if (name.includes('scroll') || type === 'scroll') {
-    return 'scroll';
-  }
-  
-  // Ring
-  if (name.includes('ring')) {
-    return 'ring';
-  }
-  
-  // Wondrous Item
-  if (type === 'wondrous' || name.includes('wand') || name.includes('rod') || name.includes('staff')) {
-    return 'wondrous';
+    return 'consumable';
   }
   
   // Tool
@@ -4348,12 +4136,42 @@ function detectItemType(itemData: any): string {
     return 'tool';
   }
   
-  // Consumable
-  if (type === 'consumable' || name.includes('arrow') || name.includes('bolt') || name.includes('bullet')) {
+  if (type === 'consumable' || name.includes('arrow') || name.includes('bolt') || name.includes('bullet') || name.includes('scroll')) {
     return 'consumable';
   }
-  
-  return 'misc';
+
+  if (type === 'equipment' || type === 'item' || type === 'loot' || type === 'treasure') {
+    return 'gear';
+  }
+
+  return 'other';
+}
+
+function normalizeInventoryStorage(value: any): Record<string, any[]> {
+  const base: Record<string, any[]> = {
+    weapon: [],
+    armor: [],
+    gear: [],
+    consumable: [],
+    tool: [],
+    other: [],
+  };
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => {
+      const group = detectItemType(item?.data || item);
+      base[group].push(item);
+    });
+    return base;
+  }
+
+  if (value && typeof value === 'object') {
+    Object.entries(value).forEach(([group, items]) => {
+      if (Array.isArray(items)) base[group] = items;
+    });
+  }
+
+  return base;
 }
 
 // Helper function to sort inventory by type

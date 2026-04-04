@@ -920,12 +920,13 @@ button.tool-btn i {
   pointer-events: none;
 }
 
-/* Header hover trigger - invisible area at top of screen */
+/* Header hover trigger - positioned at toolbar location */
 .header-hover-trigger {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
   height: 64px;
   pointer-events: auto;
   cursor: pointer;

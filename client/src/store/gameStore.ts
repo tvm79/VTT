@@ -1199,6 +1199,14 @@ interface GameState {
   setAudioPanelPosition: (position: { x: number; y: number }) => void;
   setAudioPanelSize: (size: { width: number; height: number }) => void;
 
+  // Character Creator Wizard state
+  characterCreatorWizardVisible: boolean;
+  characterCreatorWizardPosition: { x: number; y: number };
+  characterCreatorWizardSize: { width: number; height: number };
+  setCharacterCreatorWizardVisible: (visible: boolean) => void;
+  setCharacterCreatorWizardPosition: (position: { x: number; y: number }) => void;
+  setCharacterCreatorWizardSize: (size: { width: number; height: number }) => void;
+
   // Player List Panel state
   playerListPanelPosition: { x: number; y: number };
   playerListPanelSize: { width: number; height: number };
@@ -1900,6 +1908,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   audioPanelVisible: false,
   audioPanelPosition: { x: window.innerWidth - 840, y: 70 },
   audioPanelSize: { width: 300, height: 400 },
+  // Character Creator Wizard
+  characterCreatorWizardVisible: false,
+  characterCreatorWizardPosition: { x: window.innerWidth / 2 - 400, y: 50 },
+  characterCreatorWizardSize: { width: 800, height: 700 },
   playerListPanelPosition: loadSavedPlayerListPanelPosition(),
   playerListPanelSize: loadSavedPlayerListPanelSize(),
 
@@ -3825,6 +3837,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   })),
   setAudioPanelPosition: (position: { x: number; y: number }) => set({ audioPanelPosition: position }),
   setAudioPanelSize: (size: { width: number; height: number }) => set({ audioPanelSize: size }),
+  setCharacterCreatorWizardVisible: (visible: boolean) => set({ characterCreatorWizardVisible: visible, panelFocus: visible ? 'characterCreatorWizard' : null }),
+  setCharacterCreatorWizardPosition: (position: { x: number; y: number }) => set({ characterCreatorWizardPosition: position }),
+  setCharacterCreatorWizardSize: (size: { width: number; height: number }) => set({ characterCreatorWizardSize: size }),
   setPlayerListPanelPosition: (position: { x: number; y: number }) => {
     try {
       localStorage.setItem('vtt-playerListPanel-position', JSON.stringify(position));

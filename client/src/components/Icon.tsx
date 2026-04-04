@@ -37,6 +37,7 @@ import {
   faCertificate,      // 💜 (blessed/charmed - certificate looks like a halo)
   faFaceGrinStars,    // charmed
   faCheck,            // checkmark
+  faUserGear,         // ⚙️ (settings)
   faArrowsAlt,        // ↘ (resize)
   faCompressAlt,      // ↘ (alternate)
   faBan,              // ✖ (cancel)
@@ -73,6 +74,10 @@ import {
   faFolder,           // 📁 (folder)
   faFolderOpen,
   faDumbbell,
+  faSpinner,
+  faMagic,
+  faBoxOpen,
+  faShieldAlt,
   faFolderPlus,       // 📁+ (create folder)
   faBolt,             // ⚡ (paralyzed)
   faBed,              // 🛏️ (bed)
@@ -112,6 +117,7 @@ import {
   faGlobe,            // 🌐 (globe)
   faLocationDot,      // 📍 (map-marker-alt)
   faFileLines,
+  faAward,
   faInfo,
   faDice,        // 📄 (file-alt)
   faWandMagicSparkles, // ✨ (enchantment/aura)
@@ -152,7 +158,8 @@ import {
   faVirus,
   faHeartPulse,
   faFaceTired,      // 😴 (exhaustion)
-  faFaceSurprise,   // Frightened
+  faFaceSurprise,
+  faCircleCheck,   // Frightened
 } from '@fortawesome/free-solid-svg-icons';
 
 type IconSize = FontAwesomeIconProps['size'];
@@ -176,6 +183,7 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'draw-polygon': faDrawPolygon, 
   'hand-pointer': faHandPointer,
   'ruler': faRuler,
+  'magic': faMagic,
   'measure-ray': faRuler,
   'measure-line': faRuler,
   'measure-circle': faCircle,
@@ -204,6 +212,7 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'plus': faPlus,
   'minus': faMinus,
   'trash': faTrash,
+  'box-open': faBoxOpen,
   'border-all': faBorderAll,
   'palette': faPalette,
   'border-none': faBorderNone,
@@ -220,11 +229,14 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'heart-crack': faHeartCrack,
   'certificate': faCertificate,
   'check': faCheck,
+  'award': faAward,
+  'check-circle': faUserGear,
   'arrows-alt': faArrowsAlt,
   'compress-alt': faCompressAlt,
   'ban': faBan,
   'user-group': faUserGroup,
   'bug': faBug,
+  'shield-alt': faShieldAlt,
   'times': faTimes,
   'grip-lines': faGripLines,
   'dice-d20': faDiceD20,
@@ -251,13 +263,14 @@ const iconMap: Record<string, typeof faDiceD20> = {
   'copy': faCopy,
   'file': faFile,
   'info': faInfo,
+  'spinner': faSpinner,
   'external-link-alt': faExternalLinkAlt,
   'toggle-on': faToggleOn,
   'toggle-off': faToggleOff,
   'arrow-left': faArrowLeft,
   'folder': faFolder,
   'folder-open' : faFolderOpen,
-  'dumbell' : faDumbbell,
+  'dumbbell' : faDumbbell,
   'folder-plus': faFolderPlus,
   'tired': faFaceTired,       // 😴 exhaustion
   'bolt': faBolt,        // ⚡ paralyzed

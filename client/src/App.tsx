@@ -41,6 +41,7 @@ const usePanelVisibility = () => useGameStore(state => ({
   macrosVisible: state.macrosVisible,
   rollTablePanelVisible: state.rollTablePanelVisible,
   particleEmitterVisible: state.particleEmitterVisible,
+  characterCreatorWizardVisible: state.characterCreatorWizardVisible,
 }));
 
 // GM and permissions selector
@@ -64,6 +65,7 @@ const MacrosPanel = lazy(() => import('./components/MacrosPanel').then(m => ({ d
 const RollTablePanel = lazy(() => import('./components/RollTablePanel').then(m => ({ default: m.RollTablePanel })));
 const AudioPanel = lazy(() => import('./components/AudioPanel').then(m => ({ default: m.AudioPanel })));
 const Dice3DOverlay = lazy(() => import('./components/dice3d/Dice3DOverlay').then(m => ({ default: m.Dice3DOverlay })));
+const CharacterCreatorPanel = lazy(() => import('./components/CharacterCreatorPanel').then(m => ({ default: m.CharacterCreatorPanel })));
 
 // ============================================
 // Theme Helpers - Moved outside component to avoid recreation on every render
@@ -87,7 +89,7 @@ function App() {
   const { userProfileImage } = useUserProfile();
   const { session, currentBoard } = useSessionBoard();
   const colorScheme = useColorScheme();
-  const { dndManagerVisible, fileBrowserVisible, chatVisible, profilePanelVisible, audioPanelVisible, diceRollerVisible, macrosVisible, rollTablePanelVisible, particleEmitterVisible } = usePanelVisibility();
+  const { dndManagerVisible, fileBrowserVisible, chatVisible, profilePanelVisible, audioPanelVisible, diceRollerVisible, macrosVisible, rollTablePanelVisible, particleEmitterVisible, characterCreatorWizardVisible } = usePanelVisibility();
   const { isGM } = useGMPermissions();
   const { timelinePosition, timelineStretched, timelineAnchor } = useTimeline();
   const dice3dEnabled = useGameStore(state => state.dice3dEnabled);
@@ -432,6 +434,11 @@ function App() {
       {/* Non-interactive 3D dice overlay runtime (lazy loaded only when enabled) */}
       <Suspense fallback={null}>
         <Dice3DOverlay />
+      </Suspense>
+
+      {/* Character Creator Wizard - separate floating panel} */}
+      <Suspense fallback={null}>
+        {characterCreatorWizardVisible && <CharacterCreatorPanel />}
       </Suspense>
     </div>
   );

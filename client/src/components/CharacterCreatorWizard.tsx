@@ -45,6 +45,161 @@ const STEPS: { key: WizardStep; label: string; icon: string }[] = [
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 const ABILITY_NAMES = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
 
+// Equipment parsing helpers
+interface ParsedEquipment {
+  id: string;
+  name: string;
+  type: string;
+  quantity: number;
+  source?: string;
+}
+
+// Parse class starting equipment from 5e.tools data structure
+const parseClassEquipment = (classData: any, existingEquipment: ParsedEquipment[]): ParsedEquipment[] => {
+  const equipment: ParsedEquipment[] = [];
+  const classSystem = classData?.system;
+  const className = classData?.name || 'Class';
+  const classId = classData?.id || 'unknown';
+  
+  if (!classSystem) return equipment;
+  
+  // Helper to add equipment if not duplicate
+  const addEquipment = (name: string, qty: number = 1, prefix: string = 'eq') => {
+    if (name && !existingEquipment.some(e => e.name.includes(String(name)))) {
+      equipment.push({
+        id: `${prefix}-${classId}-${equipment.length}`,
+        name: String(name),
+        type: 'class',
+        quantity: qty,
+        source: className
+      });
+    }
+  };
+  
+  // Handle various starting equipment formats
+  const se = classSystem.startingEquipment;
+  if (se) {
+    // Format 1: { default: [...] }
+    if (se.default && Array.isArray(se.default)) {
+      se.default.forEach((item: any) => {
+        const itemStr = String(item);
+        // Extract {@item name|source} patterns
+        const itemMatches = itemStr.match(/\{@item\s+([^}|]+)\|?[^}]*\}/g);
+        if (itemMatches) {
+          itemMatches.forEach(m => addEquipment(m.replace(/\{@item\s+/, '').replace(/\|[^}]*\}/, '')));
+        } else if (itemStr && !itemStr.toLowerCase().includes(' or ')) {
+          addEquipment(itemStr.replace(/^\([^)]+\)\s*/, '').trim());
+        }
+      });
+    }
+    // Format 2: Direct array
+    if (Array.isArray(se)) {
+      se.forEach((item: any) => addEquipment(typeof item === 'string' ? item : (item.name || item.a || item)));
+    }
+  }
+  
+  // Handle startingEquipmentDefault
+  const sed = classSystem.startingEquipmentDefault;
+  if (sed && Array.isArray(sed)) {
+    sed.forEach((group: any) => {
+      ['a', 'b'].forEach(choice => {
+        if (group[choice]) {
+          const items = Array.isArray(group[choice]) ? group[choice] : [group[choice]];
+          items.forEach((item: any) => addEquipment(item.item || item.name || String(item), item.quantity || 1, 'sed'));
+        }
+      });
+    });
+  }
+  
+  // Handle startingEquipmentOptions (choices player must make)
+  const seo = classSystem.startingEquipmentOptions;
+  if (seo && Array.isArray(seo)) {
+    seo.forEach((option: any) => {
+      if (option.from && Array.isArray(option.from)) {
+        option.from.forEach((item: any) => {
+          addEquipment((item.item || item.name || String(item)) + ' (choose)', 1, 'opt');
+        });
+      }
+    });
+  }
+  
+  // Also check if there's equipment in other fields
+  Object.keys(classSystem).forEach(key => {
+    if (key.toLowerCase().includes('equipment') && key !== 'startingEquipment' && key !== 'startingEquipmentDefault' && key !== 'startingEquipmentOptions') {
+      const val = classSystem[key];
+      if (Array.isArray(val)) {
+        val.forEach((item: any) => addEquipment(item.item || item.name || String(item), item.quantity || 1, 'otheq'));
+      } else if (typeof val === 'string') {
+        addEquipment(val, 1, 'otheq');
+      }
+    }
+  });
+  
+  // Log for debugging
+  console.log('[parseClassEquipment] Class:', className, 'Equipment found:', equipment.length);
+  return equipment;
+};
+
+// Parse background equipment
+const parseBackgroundEquipment = (backgroundData: any, existingEquipment: ParsedEquipment[]): ParsedEquipment[] => {
+  const equipment: ParsedEquipment[] = [];
+  const bgSystem = backgroundData?.system;
+  const bgName = backgroundData?.name || 'Background';
+  const bgId = backgroundData?.id || 'unknown';
+  
+  if (!bgSystem) return equipment;
+  
+  // Handle equipment as plain text string
+  if (bgSystem.equipment) {
+    const equipmentText = bgSystem.equipment;
+    // Parse comma or comma-and-separated items
+    const items = equipmentText.split(/,(?=\s*[a-z])/).map((s: string) => s.trim()).filter(Boolean);
+    
+    items.forEach((itemName: string, index: number) => {
+      if (!existingEquipment.some(e => e.name === itemName)) {
+        equipment.push({
+          id: `bg-${bgId}-${index}`,
+          name: itemName,
+          type: 'background',
+          quantity: 1,
+          source: bgName
+        });
+      }
+    });
+  }
+  
+  // Handle equipment as array
+  if (bgSystem.equipment && Array.isArray(bgSystem.equipment)) {
+    bgSystem.equipment.forEach((item: any, index: number) => {
+      const name = item.item || item.name || String(item);
+      if (name && !existingEquipment.some(e => e.name === name)) {
+        equipment.push({
+          id: `bg-${bgId}-${index}`,
+          name: String(name),
+          type: 'background',
+          quantity: item.quantity || 1,
+          source: bgName
+        });
+      }
+    });
+  }
+  
+  // Log for debugging
+  console.log('[parseBackgroundEquipment] Background:', bgName, 'Equipment found:', equipment.length);
+  return equipment;
+};
+
+// Merge equipment without duplicates
+const mergeEquipment = (existing: ParsedEquipment[], newItems: ParsedEquipment[]): ParsedEquipment[] => {
+  const result = [...existing];
+  newItems.forEach(newItem => {
+    if (!result.some(e => e.name === newItem.name)) {
+      result.push(newItem);
+    }
+  });
+  return result;
+};
+
 export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: CharacterCreatorWizardProps) {
   const { session } = useGameStore();
   
@@ -93,7 +248,7 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
       // Try both 'species' and 'race' types to handle both normalized and non-normalized imports
       // Use compendium endpoint which has all 5e.tools data
       for (const dbType of dbTypes) {
-        const res = await fetch(`/api/data/compendium/${dbType}?limit=200`);
+        const res = await fetch(`/api/data/compendium/${dbType}?limit=500`);
         if (res.ok) {
           const response = await res.json();
           // Handle both array response and { data: [...] } response
@@ -228,7 +383,12 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
         proficiencyBonus: profBonus,
         savingThrows: characterData.class?.system?.savingThrows || [],
         skills: [],
-        inventory: characterData.equipment,
+        inventory: characterData.equipment.map(eq => ({
+          id: eq.id || `eq-${Math.random().toString(36).substr(2, 9)}`,
+          data: { name: eq.name, properties: { ...eq } },
+          type: eq.type || 'equipment',
+          addedAt: new Date().toISOString()
+        })),
         spellcastingAbility: characterData.class?.system?.spellcastingAbility || undefined,
         spellSaveDc: characterData.class?.system?.spellcastingAbility ? 
           8 + profBonus + Math.floor((characterData.abilities[characterData.class.system.spellcastingAbility.toLowerCase() as keyof typeof characterData.abilities] - 10) / 2) : 
@@ -236,7 +396,11 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
         spellAttack: characterData.class?.system?.spellcastingAbility ? 
           profBonus + Math.floor((characterData.abilities[characterData.class.system.spellcastingAbility.toLowerCase() as keyof typeof characterData.abilities] - 10) / 2) : 
           0,
-        features: [],
+        features: [
+          ...(characterData.class?.system?.classFeatures || []),
+          ...(characterData.race?.system?.classFeatures || []),
+          ...(characterData.background?.system?.classFeatures || []),
+        ],
         traits: characterData.race?.system?.traits || undefined,
         flaws: undefined,
         bonds: undefined,
@@ -248,7 +412,30 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
         background: characterData.background?.name || undefined,
         alignment: undefined,
         imageUrl: characterData.race?.img || characterData.race?.system?.img || undefined,
+        // NEW: Full object fields for detailed display
+        raceData: characterData.race ? {
+          id: characterData.race.id,
+          name: characterData.race.name,
+          system: characterData.race.system || {},
+          img: characterData.race.img
+        } : undefined,
+        classData: characterData.class ? {
+          id: characterData.class.id,
+          name: characterData.class.name,
+          system: characterData.class.system || {},
+          img: characterData.class.img
+        } : undefined,
+        backgroundData: characterData.background ? {
+          id: characterData.background.id,
+          name: characterData.background.name,
+          system: characterData.background.system || {},
+          img: characterData.background.img
+        } : undefined,
       };
+      
+      console.log('[createCharacter] Saving character with classData:', JSON.stringify(characterSheet.classData).substring(0, 500));
+      console.log('[createCharacter] Saving character with backgroundData:', JSON.stringify(characterSheet.backgroundData).substring(0, 500));
+      console.log('[createCharacter] Saving character with features:', JSON.stringify(characterSheet.features).substring(0, 500));
       
       const res = await fetch(`/api/data/sessions/${session.id}/characters`, {
         method: 'POST',
@@ -433,7 +620,30 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
                       <div
                         key={cls.id}
                         className={`selection-card ${characterData.class?.id === cls.id ? 'selected' : ''}`}
-                        onClick={() => setCharacterData(prev => ({ ...prev, class: cls }))}
+                        onClick={async () => {
+                          console.log('[Class Selection] Selected class:', cls.name, 'system:', JSON.stringify(cls.system).substring(0, 500));
+                          
+                          // Fetch full class data from compendium entry endpoint
+                          let fullClassData = cls;
+                          try {
+                            const res = await fetch(`/api/data/compendium/entry/${encodeURIComponent(cls.id)}`);
+                            if (res.ok) {
+                              const fullData = await res.json();
+                              console.log('[Class Selection] Full class data:', JSON.stringify(fullData).substring(0, 1000));
+                              fullClassData = { ...cls, ...fullData };
+                            }
+                          } catch (err) {
+                            console.warn('[Class Selection] Could not fetch full class data:', err);
+                          }
+                          
+                          const classEquipment = parseClassEquipment(fullClassData, characterData.equipment);
+                          console.log('[Class Selection] Equipment parsed:', classEquipment);
+                          setCharacterData(prev => ({
+                            ...prev,
+                            class: fullClassData,
+                            equipment: mergeEquipment(prev.equipment, classEquipment)
+                          }));
+                        }}
                       >
                         <div className="card-image">
                           {cls.img || cls.system?.img ? (
@@ -480,7 +690,30 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
                       <div
                         key={bg.id}
                         className={`selection-card ${characterData.background?.id === bg.id ? 'selected' : ''}`}
-                        onClick={() => setCharacterData(prev => ({ ...prev, background: bg }))}
+                        onClick={async () => {
+                          console.log('[Background Selection] Selected background:', bg.name, 'system:', JSON.stringify(bg.system).substring(0, 500));
+                          
+                          // Fetch full background data from compendium entry endpoint
+                          let fullBgData = bg;
+                          try {
+                            const res = await fetch(`/api/data/compendium/entry/${encodeURIComponent(bg.id)}`);
+                            if (res.ok) {
+                              const fullData = await res.json();
+                              console.log('[Background Selection] Full background data:', JSON.stringify(fullData).substring(0, 1000));
+                              fullBgData = { ...bg, ...fullData };
+                            }
+                          } catch (err) {
+                            console.warn('[Background Selection] Could not fetch full background data:', err);
+                          }
+                          
+                          const bgEquipment = parseBackgroundEquipment(fullBgData, characterData.equipment);
+                          console.log('[Background Selection] Equipment parsed:', bgEquipment);
+                          setCharacterData(prev => ({
+                            ...prev,
+                            background: fullBgData,
+                            equipment: mergeEquipment(prev.equipment, bgEquipment)
+                          }));
+                        }}
                       >
                         <div className="card-image">
                           {bg.img || bg.system?.img ? (
@@ -558,37 +791,82 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
                   <h3>Starting Equipment</h3>
                   <p className="step-description">Select starting equipment from your class and background.</p>
                   
+                  {/* Auto-populated equipment from class and background */}
+                  {characterData.equipment.length > 0 && (
+                    <div className="equipment-section">
+                      <h4>Starting Equipment ({characterData.equipment.length} items)</h4>
+                      <div className="equipment-list">
+                        {characterData.equipment.map((eq, i) => (
+                          <div key={i} className="equipment-item">
+                            <label>
+                              <input
+                                type="checkbox"
+                                checked={true}
+                                disabled={!!eq.source}
+                                onChange={e => {
+                                  if (!eq.source && !e.target.checked) {
+                                    setCharacterData(prev => ({
+                                      ...prev,
+                                      equipment: prev.equipment.filter((_, idx) => idx !== i)
+                                    }));
+                                  }
+                                }}
+                              />
+                              {eq.quantity > 1 && <span>{eq.quantity}x </span>}
+                              {eq.name}
+                              {eq.source ? <span className="eq-source"> ({eq.source})</span> : null}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Debug info - show if equipment is empty */}
+                  {characterData.equipment.length === 0 && (
+                    <div className="equipment-section">
+                      <h4>No Starting Equipment</h4>
+                      <p style={{ color: '#888', fontSize: '12px' }}>
+                        Select a class and background to see starting equipment.
+                        {characterData.class && <span> Class selected: {characterData.class.name}</span>}
+                        {characterData.background && <span> Background selected: {characterData.background.name}</span>}
+                      </p>
+                    </div>
+                  )}
+                  
                   {/* Show starting equipment from class */}
                   {characterData.class?.system?.startingEquipment && (
                     <div className="equipment-section">
                       <h4>Class Starting Equipment</h4>
                       <div className="equipment-list">
-                        {Array.isArray(characterData.class.system.startingEquipment) 
-                          ? characterData.class.system.startingEquipment.map((eq: any, i: number) => (
-                            <div key={i} className="equipment-item">
-                              <label>
-                                <input
-                                  type="checkbox"
-                                  checked={characterData.equipment.some(e => e.name === (eq.name || eq))}
-                                  onChange={e => {
-                                    if (e.target.checked) {
-                                      setCharacterData(prev => ({
-                                        ...prev,
-                                        equipment: [...prev.equipment, { id: `class-${i}`, name: eq.name || eq, type: 'equipment' }]
-                                      }));
-                                    } else {
-                                      setCharacterData(prev => ({
-                                        ...prev,
-                                        equipment: prev.equipment.filter(eq => !String(eq.name).includes(String((eq as any).name || eq)))
-                                      }));
-                                    }
-                                  }}
-                                />
-                                {eq.name || eq}
-                              </label>
-                            </div>
-                          ))
-                          : <p>{characterData.class.system.startingEquipment}</p>
+                        {typeof characterData.class.system.startingEquipment === 'string' 
+                          ? <p>{characterData.class.system.startingEquipment}</p>
+                          : Array.isArray(characterData.class.system.startingEquipment) 
+                            ? characterData.class.system.startingEquipment.map((eq: any, i: number) => (
+                                <div key={i} className="equipment-item">
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={characterData.equipment.some(e => e.name === (eq.name || eq))}
+                                      onChange={e => {
+                                        if (e.target.checked) {
+                                          setCharacterData(prev => ({
+                                            ...prev,
+                                            equipment: [...prev.equipment, { id: `class-${i}`, name: eq.name || eq, type: 'equipment' }]
+                                          }));
+                                        } else {
+                                          setCharacterData(prev => ({
+                                            ...prev,
+                                            equipment: prev.equipment.filter(eq => !String(eq.name).includes(String((eq as any).name || eq)))
+                                          }));
+                                        }
+                                      }}
+                                    />
+                                    {eq.name || eq}
+                                  </label>
+                                </div>
+                              ))
+                            : <p>Starting equipment available (check auto-populated list above)</p>
                         }
                       </div>
                     </div>
@@ -599,6 +877,84 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
                     <div className="equipment-section">
                       <h4>Background Equipment</h4>
                       <p>{characterData.background.system.equipment}</p>
+                    </div>
+                  )}
+                  
+                  {/* Show class details */}
+                  {characterData.class && (
+                    <div className="equipment-section">
+                      <h4>Class Details: {characterData.class.name}</h4>
+                      {characterData.class.system?.hitDie && (
+                        <p><strong>Hit Die:</strong> {characterData.class.system.hitDie}</p>
+                      )}
+                      {characterData.class.system?.primaryAbility && (
+                        <p><strong>Primary Ability:</strong> {characterData.class.system.primaryAbility}</p>
+                      )}
+                      {characterData.class.system?.savingThrows?.length > 0 && (
+                        <p><strong>Saving Throws:</strong> {characterData.class.system.savingThrows.join(', ')}</p>
+                      )}
+                      {(characterData.class.system?.startingProficiencies || characterData.class.system?.proficiencies) && (
+                        <p><strong>Proficiencies:</strong> {typeof (characterData.class.system.startingProficiencies || characterData.class.system.proficiencies) === 'string' ? (characterData.class.system.startingProficiencies || characterData.class.system.proficiencies) : JSON.stringify(characterData.class.system.startingProficiencies || characterData.class.system.proficiencies)}</p>
+                      )}
+                      {characterData.class.system?.spellcastingAbility && (
+                        <p><strong>Spellcasting:</strong> {characterData.class.system.spellcastingAbility}</p>
+                      )}
+                      {/* Show class features/traits from full data */}
+                      {characterData.class.system?.classFeatures?.length > 0 && (
+                        <div>
+                          <strong>Class Features:</strong>
+                          <ul>
+                            {characterData.class.system.classFeatures.slice(0, 10).map((f: any, i: number) => (
+                              <li key={i}>{typeof f === 'string' ? f : (f.name || JSON.stringify(f).substring(0, 50))}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Show race details */}
+                  {characterData.race && (
+                    <div className="equipment-section">
+                      <h4>Race Details: {characterData.race.name}</h4>
+                      {characterData.race.system?.abilityScores && (
+                        <p><strong>Ability Score Increase:</strong> {characterData.race.system.abilityScores}</p>
+                      )}
+                      {characterData.race.system?.size && (
+                        <p><strong>Size:</strong> {characterData.race.system.size}</p>
+                      )}
+                      {characterData.race.system?.speed && (
+                        <p><strong>Speed:</strong> {characterData.race.system.speed}</p>
+                      )}
+                      {characterData.race.system?.traits && (
+                        <p><strong>Traits:</strong> {typeof characterData.race.system.traits === 'string' ? characterData.race.system.traits : JSON.stringify(characterData.race.system.traits).substring(0, 500)}</p>
+                      )}
+                      {characterData.race.system?.classFeatures?.length > 0 && (
+                        <div>
+                          <strong>Race Features:</strong>
+                          <ul>
+                            {characterData.race.system.classFeatures.slice(0, 10).map((f: any, i: number) => (
+                              <li key={i}>{typeof f === 'string' ? f : (f.name || JSON.stringify(f).substring(0, 50))}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Show background features */}
+                  {characterData.background && (
+                    <div className="equipment-section">
+                      <h4>Background Details: {characterData.background.name}</h4>
+                      {characterData.background.system?.feature && (
+                        <p><strong>Feature:</strong> {characterData.background.system.feature}</p>
+                      )}
+                      {characterData.background.system?.skillProficiencies?.length > 0 && (
+                        <p><strong>Skill Proficiencies:</strong> {characterData.background.system.skillProficiencies.join(', ')}</p>
+                      )}
+                      {characterData.background.system?.toolProficiencies?.length > 0 && (
+                        <p><strong>Tool Proficiencies:</strong> {characterData.background.system.toolProficiencies.join(', ')}</p>
+                      )}
                     </div>
                   )}
                   
@@ -679,11 +1035,29 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
                         </div>
                         <div className="summary-item">
                           <span className="label">Class</span>
-                          <span className="value">{characterData.class?.name || 'Not selected'}</span>
+                          <span className="value">
+                            {characterData.class?.name ? (
+                              <>
+                                <div>Level {characterData.level} {characterData.class.name}</div>
+                                {characterData.class.system?.hitDie && (
+                                  <div className="sub-detail">Hit Die: {characterData.class.system.hitDie}</div>
+                                )}
+                              </>
+                            ) : 'Not selected'}
+                          </span>
                         </div>
                         <div className="summary-item">
                           <span className="label">Background</span>
-                          <span className="value">{characterData.background?.name || 'Not selected'}</span>
+                          <span className="value">
+                            {characterData.background?.name ? (
+                              <>
+                                <div>{characterData.background.name}</div>
+                                {characterData.background.system?.feature && (
+                                  <div className="sub-detail">{characterData.background.system.feature}</div>
+                                )}
+                              </>
+                            ) : 'Not selected'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -708,7 +1082,11 @@ export function CharacterCreatorWizard({ isOpen, onClose, onCharacterCreated }: 
                         <h4>Equipment</h4>
                         <ul className="equipment-summary">
                           {characterData.equipment.map((eq, i) => (
-                            <li key={i}>{eq.name}</li>
+                            <li key={i}>
+                              {eq.quantity > 1 && <span className="eq-qty">{eq.quantity}x </span>}
+                              {eq.name}
+                              {eq.source ? <span className="eq-source"> ({eq.source})</span> : null}
+                            </li>
                           ))}
                         </ul>
                       </div>
